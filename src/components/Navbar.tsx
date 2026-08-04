@@ -1,3 +1,4 @@
+import Image from "next/image";
 export default function Navbar() {
   return (
     <nav className="max-w-7xl mx-auto flex items-center justify-between py-6 px-8">
