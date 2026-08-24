@@ -3144,10 +3144,13 @@ export default function CFOBriefing() {
                     const chartMin = minValue - valueRange * 0.12;
                     const chartMax = maxValue + valueRange * 0.12;
                     const chartRange = Math.max(chartMax - chartMin, 1);
-                    const plotLeft = 18;
-                    const plotRight = 98;
-                    const plotTop = 8;
-                    const plotBottom = 72;
+                    // Use a wide view box that matches the card's proportions.
+                    // This lets the chart use the available horizontal space
+                    // instead of centering a small, nearly square graphic.
+                    const plotLeft = 14;
+                    const plotRight = 226;
+                    const plotTop = 10;
+                    const plotBottom = 88;
 
                     const points = values.map((value, index) => {
                       const x = values.length === 1
@@ -3193,8 +3196,8 @@ export default function CFOBriefing() {
 
                         <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/60 p-2">
                           <svg
-                            viewBox="0 0 120 100"
-                            className="h-24 w-full"
+                            viewBox="0 0 240 120"
+                            className="h-32 w-full"
                             role="img"
                             aria-label={`${series.name} historical trend across ${values.length} periods`}
                           >
@@ -3250,7 +3253,7 @@ export default function CFOBriefing() {
                                 <text
                                   key={`x-${index}`}
                                   x={x}
-                                  y="88"
+                                  y="108"
                                   textAnchor={index === 0 ? "start" : index === values.length - 1 ? "end" : "middle"}
                                   fontSize="5"
                                   fill="#94a3b8"
