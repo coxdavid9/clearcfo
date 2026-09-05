@@ -49,3 +49,42 @@ textarea:focus-visible {
 ::selection {
   background: rgba(37, 99, 235, 0.16);
 }
+
+/* Mobile dashboard polish: keep section headers readable instead of
+   squeezing the heading beside a full-width control. */
+@media (max-width: 639px) {
+  /* Financial Drivers is the order-2 dashboard card. */
+  .max-w-6xl .order-2 > div:first-child {
+    display: block;
+  }
+
+  .max-w-6xl .order-2 > div:first-child > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .max-w-6xl .order-2 > div:first-child > div:nth-child(2) {
+    margin-top: 0.875rem;
+    width: 100%;
+  }
+
+  .max-w-6xl .order-2 > div:first-child button {
+    width: 100%;
+  }
+
+  /* Give driver cards their full mobile width and let confidence sit on its
+     own line when necessary instead of squeezing the driver title. */
+  .max-w-6xl .order-2 .flex.items-start.justify-between.gap-3 > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .max-w-6xl .order-2 .flex.items-start.justify-between.gap-3 > span {
+    flex-shrink: 0;
+  }
+
+  /* Keep the dashboard shell from feeling cramped against the phone edges. */
+  .max-w-6xl {
+    border-radius: 1.25rem;
+  }
+}
