@@ -19,7 +19,7 @@ export default function HowItWorks() {
       <div className="grid md:grid-cols-3 gap-6 mt-12">
         {/* Step 1 */}
         <div className="border border-slate-200 rounded-2xl p-7 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:bg-slate-50/50 hover:shadow-lg">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-full bg-[#0B2F8A] text-white flex items-center justify-center font-bold">
             1
           </div>
 
@@ -35,7 +35,7 @@ export default function HowItWorks() {
 
         {/* Step 2 */}
         <div className="border border-slate-200 rounded-2xl p-7 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:bg-slate-50/50 hover:shadow-lg">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-full bg-[#0B2F8A] text-white flex items-center justify-center font-bold">
             2
           </div>
 
@@ -51,7 +51,7 @@ export default function HowItWorks() {
 
         {/* Step 3 */}
         <div className="border border-slate-200 rounded-2xl p-7 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:bg-slate-50/50 hover:shadow-lg">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-full bg-[#0B2F8A] text-white flex items-center justify-center font-bold">
             3
           </div>
 
