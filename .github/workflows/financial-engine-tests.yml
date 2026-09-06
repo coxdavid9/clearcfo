@@ -1,0 +1,35 @@
+name: ClearCFO Financial Engine Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  financial-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run deterministic financial engine regression tests
+        run: node scripts/financial-engine-scenarios.mjs
+
+      - name: Run reasoning scenarios
+        run: npm run test:reasoning
+
+      - name: Run trend scenarios
+        run: npm run test:trends
+
+      - name: Verify production build
+        run: npm run build
