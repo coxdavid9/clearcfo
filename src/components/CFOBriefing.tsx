@@ -2465,8 +2465,7 @@ export default function CFOBriefing() {
   const [expandedMetric, setExpandedMetric] =
     useState<ExpandedMetric>(null);
 
-  const [showFinancialDetail, setShowFinancialDetail] =
-    useState(false);
+  const showFinancialDetail = true;
 
   const trendChange =
     data.trend.length >= 2 && data.trend[0] !== 0
@@ -2996,14 +2995,7 @@ export default function CFOBriefing() {
                   <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
                     {data.drivers.length} driver{data.drivers.length === 1 ? "" : "s"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowFinancialDetail((value) => !value)}
-                    aria-expanded={showFinancialDetail}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"
-                  >
-                    {showFinancialDetail ? "Hide financial detail -" : "View financial detail +"}
-                  </button>
+                  
                 </div>
               </div>
 
