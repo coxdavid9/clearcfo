@@ -1,22 +1,20 @@
 name: Fix financial drivers visibility
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  push:
     branches:
-      - main
+      - fix/always-show-financial-drivers
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.ref }}
           fetch-depth: 1
 
       - name: Make financial drivers always visible
@@ -52,16 +50,14 @@ jobs:
           path.write_text(text)
           PY
 
-      - name: Verify change
+      - name: Verify and commit
         run: |
           grep -q 'const showFinancialDetail = true;' src/components/CFOBriefing.tsx
           ! grep -q 'View financial detail' src/components/CFOBriefing.tsx
           ! grep -q 'Hide financial detail' src/components/CFOBriefing.tsx
-
-      - name: Commit and remove one-time workflow
-        run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/components/CFOBriefing.tsx .github/workflows/fix-financial-drivers.yml
+          git add src/components/CFOBriefing.tsx
+          git rm .github/workflows/fix-financial-drivers.yml
           git commit -m 'fix: keep financial drivers expanded'
           git push
