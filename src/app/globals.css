@@ -50,6 +50,26 @@ textarea:focus-visible {
   background: rgba(37, 99, 235, 0.16);
 }
 
+/* Financial trend charts: give the actual data visualization enough vertical
+   space to read as a chart rather than a decorative sparkline. */
+svg[role="img"][aria-label*="historical trend"] {
+  height: 10.5rem !important;
+  width: 100% !important;
+  overflow: visible;
+}
+
+svg[role="img"][aria-label*="historical trend"] polyline {
+  stroke-width: 3.25 !important;
+}
+
+svg[role="img"][aria-label*="historical trend"] circle {
+  r: 2.7;
+}
+
+svg[role="img"][aria-label*="historical trend"] text {
+  font-size: 6.5px;
+}
+
 /* Mobile dashboard polish: keep section headers readable instead of
    squeezing the heading beside a full-width control. */
 @media (max-width: 639px) {
@@ -80,26 +100,11 @@ textarea:focus-visible {
     flex-shrink: 0;
   }
 
-  /* Make the financial trend mini-charts feel like actual charts on a phone.
-     The original SVG viewBox leaves too much unused space around the plotted
-     line, so enlarge the chart surface and strengthen the real data markers. */
+  /* On phones, use the full card width rather than the old oversize crop. */
   svg[role="img"][aria-label*="historical trend"] {
-    height: 9rem !important;
-    width: 120% !important;
-    margin-left: -10%;
-    overflow: visible;
-  }
-
-  svg[role="img"][aria-label*="historical trend"] polyline {
-    stroke-width: 3.25 !important;
-  }
-
-  svg[role="img"][aria-label*="historical trend"] circle {
-    r: 2.7;
-  }
-
-  svg[role="img"][aria-label*="historical trend"] text {
-    font-size: 6px;
+    height: 11rem !important;
+    width: 100% !important;
+    margin-left: 0;
   }
 
   .max-w-6xl {
