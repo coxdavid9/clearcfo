@@ -3099,7 +3099,7 @@ export default function CFOBriefing() {
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Across periods</span>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
                   {data.trendSeries.slice(0, 4).map((series) => {
                     const values = series.values.filter((v) => Number.isFinite(v));
                     const first = values[0] ?? 0;
