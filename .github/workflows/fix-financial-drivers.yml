@@ -34,7 +34,7 @@ jobs:
               raise SystemExit('Financial detail state declaration was not found')
 
           button_pattern = re.compile(
-              r'<button\b(?=[\s\S]*?onClick=\{\(\) => setShowFinancialDetail\(\(value\) => !value\)\})[\s\S]*?</button>',
+              r'<button\b[^>]*onClick=\{\(\) => setShowFinancialDetail\(\(value\) => !value\)\}[^>]*>[\s\S]*?</button>',
               re.MULTILINE,
           )
           text, removed = button_pattern.subn('', text, count=1)
