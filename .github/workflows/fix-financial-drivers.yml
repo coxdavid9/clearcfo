@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.ref_name }}
           fetch-depth: 1
 
       - name: Make financial drivers always visible
@@ -26,21 +26,15 @@ jobs:
           path = Path('src/components/CFOBriefing.tsx')
           text = path.read_text()
 
-          old_state = 'const [showFinancialDetail, setShowFinancialDetail] = useState(false);'
-          if old_state in text:
-              text = text.replace(old_state, 'const showFinancialDetail = true;', 1)
-          elif 'const showFinancialDetail = true;' not in text:
+          state_pattern = re.compile(
+              r'const\s+\[showFinancialDetail,\s*setShowFinancialDetail\]\s*=\s*useState\(false\);'
+          )
+          text, state_count = state_pattern.subn('const showFinancialDetail = true;', text, count=1)
+          if state_count == 0 and 'const showFinancialDetail = true;' not in text:
               raise SystemExit('Financial detail state declaration was not found')
 
           button_pattern = re.compile(
-              r'\s*<button\n'
-              r'\s*type="button"\n'
-              r'\s*onClick=\{\(\) => setShowFinancialDetail\(\(value\) => !value\)\}\n'
-              r'\s*aria-expanded=\{showFinancialDetail\}\n'
-              r'\s*className="[^"]*"\n'
-              r'\s*>\n'
-              r'\s*\{showFinancialDetail \? "Hide financial detail -" : "View financial detail \+"\}\n'
-              r'\s*</button>',
+              r'<button\b(?=[\s\S]*?onClick=\{\(\) => setShowFinancialDetail\(\(value\) => !value\)\})[\s\S]*?</button>',
               re.MULTILINE,
           )
           text, removed = button_pattern.subn('', text, count=1)
