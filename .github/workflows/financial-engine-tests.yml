@@ -25,13 +25,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Implement clickable financial trend detail screen
-        if: github.event_name == 'push' && github.sha == '073db02974ff0c1bfe1776715132d2eec4d3cc11'
+      - name: Apply trend detail implementation if needed
+        if: github.event_name == 'push'
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('src/components/CFOBriefing.tsx')
           s = p.read_text()
+          if 'selectedTrendMetric' in s:
+              print('Trend detail already present.')
+              raise SystemExit(0)
 
           old = '''  const [expandedMetric, setExpandedMetric] =
     useState<ExpandedMetric>(null);
@@ -44,8 +47,7 @@ jobs:
     useState<string | null>(null);
 
   const showFinancialDetail = true;'''
-          if old not in s:
-              raise SystemExit('State insertion point not found')
+          if old not in s: raise SystemExit('State insertion point not found')
           s = s.replace(old, new, 1)
 
           old = '''                      <div key={series.name} className="rounded-xl border border-slate-200 bg-white p-4">'''
@@ -56,8 +58,7 @@ jobs:
                         className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"
                         aria-label={`View ${series.name} financial details`}
                       >'''
-          if old not in s:
-              raise SystemExit('Trend card insertion point not found')
+          if old not in s: raise SystemExit('Trend card insertion point not found')
           s = s.replace(old, new, 1)
 
           old = '''              <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
@@ -77,26 +78,21 @@ jobs:
                       </button>
                     );
                   })}'''
-          if old not in s:
-              raise SystemExit('Trend card closing block not found')
+          if old not in s: raise SystemExit('Trend card closing block not found')
           s = s.replace(old, new, 1)
 
           marker = '''      {showAnalysis && (
         <div id="cfo-analysis" className="fixed inset-0 z-50 overflow-y-auto bg-white">'''
-          if marker not in s:
-              raise SystemExit('Overlay insertion point not found')
+          if marker not in s: raise SystemExit('Overlay insertion point not found')
 
           insert = '''      {selectedTrendMetric && (() => {
         const selectedSeries = data.trendSeries.find((series) => series.name === selectedTrendMetric);
         if (!selectedSeries) return null;
-
         const values = selectedSeries.values;
         const latest = values[values.length - 1] ?? 0;
         const prior = values[values.length - 2] ?? latest;
         const change = prior !== 0 ? ((latest - prior) / Math.abs(prior)) * 100 : 0;
-        const totalChange = values.length > 1 && values[0] !== 0
-          ? ((latest - values[0]) / Math.abs(values[0])) * 100
-          : 0;
+        const totalChange = values.length > 1 && values[0] !== 0 ? ((latest - values[0]) / Math.abs(values[0])) * 100 : 0;
         const relatedDriver = data.drivers.find((driver) => {
           if (selectedTrendMetric === "Inventory") return driver.category === "Inventory";
           if (selectedTrendMetric === "Cash") return driver.category === "Cash";
@@ -106,30 +102,12 @@ jobs:
         });
         const accountDrivers = data.detailDrivers.slice(0, 6);
         const metricLabel = selectedTrendMetric === "Operating Expenses" ? "Operating expenses" : selectedTrendMetric;
-        const metricDirection =
-          selectedTrendMetric === "Inventory" ? (change >= 0 ? "Building" : "Easing") :
-          selectedTrendMetric === "Operating Expenses" ? (change >= 0 ? "Increasing" : "Decreasing") :
-          selectedTrendMetric === "Cash" ? (change >= 0 ? "Strengthening" : "Declining") :
-          selectedTrendMetric === "Gross margin" ? (change >= 0 ? "Expanding" : "Compressing") :
-          (change >= 0 ? "Growing" : "Declining");
-
+        const metricDirection = selectedTrendMetric === "Inventory" ? (change >= 0 ? "Building" : "Easing") : selectedTrendMetric === "Operating Expenses" ? (change >= 0 ? "Increasing" : "Decreasing") : selectedTrendMetric === "Cash" ? (change >= 0 ? "Strengthening" : "Declining") : selectedTrendMetric === "Gross margin" ? (change >= 0 ? "Expanding" : "Compressing") : (change >= 0 ? "Growing" : "Declining");
         return (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50">
-            <Navbar
-              onNavigate={() => setSelectedTrendMetric(null)}
-              onLogin={() => setSelectedTrendMetric(null)}
-              loginLabel="Back to Briefing"
-            />
-
+            <Navbar onNavigate={() => setSelectedTrendMetric(null)} onLogin={() => setSelectedTrendMetric(null)} loginLabel="Back to Briefing" />
             <div className="mx-auto min-h-[calc(100vh-5rem)] max-w-6xl px-5 py-7 sm:px-7 sm:py-10">
-              <button
-                type="button"
-                onClick={() => setSelectedTrendMetric(null)}
-                className="mb-5 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-800"
-              >
-                ← Back to Financial Trends
-              </button>
-
+              <button type="button" onClick={() => setSelectedTrendMetric(null)} className="mb-5 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-800">← Back to Financial Trends</button>
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                   <div>
@@ -137,131 +115,41 @@ jobs:
                     <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{metricLabel}</h2>
                     <p className="mt-2 text-sm text-slate-500">A closer look at the latest result and the pattern across the available periods.</p>
                   </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-3xl font-bold text-slate-900">{formatTrendValue(latest)}</p>
-                    <p className={`mt-1 text-sm font-bold ${change >= 0 ? "text-emerald-600" : "text-red-600"}`}>{change >= 0 ? "+" : ""}{change.toFixed(1)}% vs. prior · {metricDirection}</p>
-                  </div>
+                  <div className="text-left sm:text-right"><p className="text-3xl font-bold text-slate-900">{formatTrendValue(latest)}</p><p className={`mt-1 text-sm font-bold ${change >= 0 ? "text-emerald-600" : "text-red-600"}`}>{change >= 0 ? "+" : ""}{change.toFixed(1)}% vs. prior · {metricDirection}</p></div>
                 </div>
 
                 <div className="mt-7 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Latest period</p>
-                    <p className="mt-2 text-xl font-bold text-slate-900">{formatTrendValue(latest)}</p>
-                    <p className="mt-1 text-xs text-slate-500">{selectedSeries.periods[values.length - 1] ?? "Current"}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prior period</p>
-                    <p className="mt-2 text-xl font-bold text-slate-900">{formatTrendValue(prior)}</p>
-                    <p className="mt-1 text-xs text-slate-500">{selectedSeries.periods[values.length - 2] ?? "Prior"}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Across periods</p>
-                    <p className={`mt-2 text-xl font-bold ${totalChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>{totalChange >= 0 ? "+" : ""}{totalChange.toFixed(1)}%</p>
-                    <p className="mt-1 text-xs text-slate-500">{values.length} periods shown</p>
-                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Latest period</p><p className="mt-2 text-xl font-bold text-slate-900">{formatTrendValue(latest)}</p><p className="mt-1 text-xs text-slate-500">{selectedSeries.periods[values.length - 1] ?? "Current"}</p></div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prior period</p><p className="mt-2 text-xl font-bold text-slate-900">{formatTrendValue(prior)}</p><p className="mt-1 text-xs text-slate-500">{selectedSeries.periods[values.length - 2] ?? "Prior"}</p></div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Across periods</p><p className={`mt-2 text-xl font-bold ${totalChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>{totalChange >= 0 ? "+" : ""}{totalChange.toFixed(1)}%</p><p className="mt-1 text-xs text-slate-500">{values.length} periods shown</p></div>
                 </div>
 
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">Trend over time</p>
-                      <p className="mt-1 text-xs text-slate-500">The available history used in the briefing.</p>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-400">{values.length} periods</span>
-                  </div>
+                  <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-900">Trend over time</p><p className="mt-1 text-xs text-slate-500">The available history used in the briefing.</p></div><span className="text-xs font-semibold text-slate-400">{values.length} periods</span></div>
                   <div className="mt-4 overflow-x-auto">
                     <svg viewBox="0 0 900 300" className="h-64 min-w-[680px] w-full" role="img" aria-label={`${metricLabel} detailed historical trend`}>
                       {(() => {
-                        const left = 72;
-                        const right = 860;
-                        const top = 24;
-                        const bottom = 224;
-                        const min = Math.min(...values);
-                        const max = Math.max(...values);
-                        const range = max - min || 1;
+                        const left = 72, right = 860, top = 24, bottom = 224;
+                        const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
                         const y = (v: number) => bottom - ((v - min) / range) * (bottom - top);
                         const x = (i: number) => values.length === 1 ? (left + right) / 2 : left + (i / (values.length - 1)) * (right - left);
                         const points = values.map((v, i) => `${x(i)},${y(v)}`).join(" ");
                         const area = `${left},${bottom} ${points} ${right},${bottom}`;
                         const ticks = [max, (max + min) / 2, min];
-                        return (
-                          <>
-                            {ticks.map((tick, i) => (
-                              <g key={i}>
-                                <line x1={left} y1={y(tick)} x2={right} y2={y(tick)} stroke="#dbe3ec" strokeWidth="1" />
-                                <text x={left - 10} y={y(tick) + 4} textAnchor="end" fontSize="12" fill="#64748b">{formatTrendValue(tick)}</text>
-                              </g>
-                            ))}
-                            <polygon points={area} fill="#2563eb" opacity="0.06" />
-                            <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                            {values.map((value, i) => (
-                              <g key={i}>
-                                <circle cx={x(i)} cy={y(value)} r={i === values.length - 1 ? 6 : 4} fill="#2563eb" stroke="#fff" strokeWidth="2" />
-                                <text x={x(i)} y="252" textAnchor={i === 0 ? "start" : i === values.length - 1 ? "end" : "middle"} fontSize="12" fontWeight="600" fill="#64748b">{selectedSeries.periods[i] ?? `P${i + 1}`}</text>
-                              </g>
-                            ))}
-                          </>
-                        );
+                        return <>{ticks.map((tick, i) => <g key={i}><line x1={left} y1={y(tick)} x2={right} y2={y(tick)} stroke="#dbe3ec" strokeWidth="1" /><text x={left - 10} y={y(tick) + 4} textAnchor="end" fontSize="12" fill="#64748b">{formatTrendValue(tick)}</text></g>)}<polygon points={area} fill="#2563eb" opacity="0.06" /><polyline points={points} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />{values.map((value, i) => <g key={i}><circle cx={x(i)} cy={y(value)} r={i === values.length - 1 ? 6 : 4} fill="#2563eb" stroke="#fff" strokeWidth="2" /><text x={x(i)} y="252" textAnchor={i === 0 ? "start" : i === values.length - 1 ? "end" : "middle"} fontSize="12" fontWeight="600" fill="#64748b">{selectedSeries.periods[i] ?? `P${i + 1}`}</text></g>)}</>;
                       })()}
                     </svg>
                   </div>
                 </div>
 
                 <div className="mt-6 grid gap-5 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">What ClearCFO sees</p>
-                    <p className="mt-2 text-base font-semibold leading-6 text-slate-900">{relatedDriver?.title ?? `${metricLabel} has changed across the displayed periods.`}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{relatedDriver?.observation ?? `The latest ${metricLabel.toLowerCase()} result should be evaluated in the context of the broader trend rather than the latest period alone.`}</p>
-                    {relatedDriver && relatedDriver.evidence.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {relatedDriver.evidence.slice(0, 4).map((evidence) => (
-                          <span key={evidence} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-600">{evidence}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Management takeaway</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">{relatedDriver?.managementQuestion ?? `What business event or operating change best explains the ${metricLabel.toLowerCase()} movement?`}</p>
-                    <p className="mt-3 text-sm font-semibold leading-6 text-slate-900">{selectedTrendMetric === "Inventory" ? "Validate the inventory build by category, aging, purchases, and demand before changing replenishment decisions." : selectedTrendMetric === "Cash" ? "Reconcile the cash movement to collections, inventory, purchasing, debt, and upcoming payments before drawing a stronger conclusion." : selectedTrendMetric === "Operating Expenses" ? "Review the fastest-growing expense categories and separate recurring costs from discretionary or one-time spending." : selectedTrendMetric === "Revenue" ? "Investigate the customer, product, pricing, and volume factors behind the trend before drawing a stronger conclusion." : "Decompose the margin movement into pricing, material, labor, mix, and other direct-cost drivers before making a corrective decision."}</p>
-                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">What ClearCFO sees</p><p className="mt-2 text-base font-semibold leading-6 text-slate-900">{relatedDriver?.title ?? `${metricLabel} has changed across the displayed periods.`}</p><p className="mt-2 text-sm leading-6 text-slate-600">{relatedDriver?.observation ?? `The latest ${metricLabel.toLowerCase()} result should be evaluated in the context of the broader trend rather than the latest period alone.`}</p>{relatedDriver && relatedDriver.evidence.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{relatedDriver.evidence.slice(0, 4).map((evidence) => <span key={evidence} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-600">{evidence}</span>)}</div>}</div>
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5"><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Management takeaway</p><p className="mt-2 text-sm leading-6 text-slate-700">{relatedDriver?.managementQuestion ?? `What business event or operating change best explains the ${metricLabel.toLowerCase()} movement?`}</p><p className="mt-3 text-sm font-semibold leading-6 text-slate-900">{selectedTrendMetric === "Inventory" ? "Validate the inventory build by category, aging, purchases, and demand before changing replenishment decisions." : selectedTrendMetric === "Cash" ? "Reconcile the cash movement to collections, inventory, purchasing, debt, and upcoming payments before drawing a stronger conclusion." : selectedTrendMetric === "Operating Expenses" ? "Review the fastest-growing expense categories and separate recurring costs from discretionary or one-time spending." : selectedTrendMetric === "Revenue" ? "Investigate the customer, product, pricing, and volume factors behind the trend before drawing a stronger conclusion." : "Decompose the margin movement into pricing, material, labor, mix, and other direct-cost drivers before making a corrective decision."}</p></div>
                 </div>
 
-                {accountDrivers.length > 0 && (
-                  <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Underlying account movements</p>
-                        <p className="mt-1 text-sm text-slate-500">The largest dollar movements found in the uploaded workbook.</p>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Top {Math.min(6, accountDrivers.length)}</span>
-                    </div>
-                    <div className="mt-4 grid gap-2 md:grid-cols-2">
-                      {accountDrivers.map((driver) => (
-                        <div key={driver.name} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-xs font-semibold text-slate-900">{driver.name}</p>
-                            <span className={`text-xs font-bold ${driver.direction === "up" ? "text-amber-600" : "text-emerald-600"}`}>{driver.direction === "up" ? "+" : "−"}{currency.format(Math.abs(driver.change))}</span>
-                          </div>
-                          <p className="mt-1 text-[11px] text-slate-500">{driver.percentChange >= 0 ? "+" : ""}{driver.percentChange.toFixed(1)}% vs. prior period · Current {currency.format(driver.current)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {accountDrivers.length > 0 && <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Underlying account movements</p><p className="mt-1 text-sm text-slate-500">The largest dollar movements found in the uploaded workbook.</p></div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Top {Math.min(6, accountDrivers.length)}</span></div><div className="mt-4 grid gap-2 md:grid-cols-2">{accountDrivers.map((driver) => <div key={driver.name} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-slate-900">{driver.name}</p><span className={`text-xs font-bold ${driver.direction === "up" ? "text-amber-600" : "text-emerald-600"}`}>{driver.direction === "up" ? "+" : "−"}{currency.format(Math.abs(driver.change))}</span></div><p className="mt-1 text-[11px] text-slate-500">{driver.percentChange >= 0 ? "+" : ""}{driver.percentChange.toFixed(1)}% vs. prior period · Current {currency.format(driver.current)}</p></div>)}</div></div>}
 
-                {data.unknowns.length > 0 && (
-                  <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">What ClearCFO does not know yet</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">These are evidence gaps, not assumptions. Additional detail can strengthen the conclusion.</p>
-                    <div className="mt-3 space-y-2">
-                      {data.unknowns.slice(0, 4).map((unknown) => (
-                        <p key={unknown} className="text-xs leading-5 text-slate-600">• {unknown}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {data.unknowns.length > 0 && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-5"><p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">What ClearCFO does not know yet</p><p className="mt-2 text-sm leading-6 text-slate-600">These are evidence gaps, not assumptions. Additional detail can strengthen the conclusion.</p><div className="mt-3 space-y-2">{data.unknowns.slice(0, 4).map((unknown) => <p key={unknown} className="text-xs leading-5 text-slate-600">• {unknown}</p>)}</div></div>}
               </div>
             </div>
           </div>
@@ -274,6 +162,7 @@ jobs:
           p.write_text(s)
           print('Patched CFOBriefing.tsx')
           PY
+          if git diff --quiet -- src/components/CFOBriefing.tsx; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/components/CFOBriefing.tsx
