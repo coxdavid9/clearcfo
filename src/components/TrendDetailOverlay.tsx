@@ -12,7 +12,7 @@ type SelectedTrend = {
   direction: string;
 };
 
-function readMetricFromCard(target: HTMLElement): SelectedTrend | null {
+function readMetricFromCard(target: Element): SelectedTrend | null {
   const svg = target.closest("svg[aria-label*='historical trend']") as SVGElement | null;
   if (!svg) return null;
 
@@ -52,9 +52,12 @@ export default function TrendDetailOverlay({ enabled }: { enabled: boolean }) {
 
     const handleClick = (event: MouseEvent) => {
       const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
+      if (!(target instanceof Element)) return;
       const next = readMetricFromCard(target);
-      if (next) setSelected(next);
+      if (next) {
+        setSelected(next);
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      }
     };
 
     document.addEventListener("click", handleClick);
