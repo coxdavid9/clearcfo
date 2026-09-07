@@ -50,12 +50,13 @@ textarea:focus-visible {
   background: rgba(37, 99, 235, 0.16);
 }
 
-/* Financial trend charts: give the actual data visualization enough vertical
-   space to read as a chart rather than a decorative sparkline. */
+/* Financial trend charts: keep the visualization readable and make the
+   interaction discoverable. Clicking any part of a trend opens its detail. */
 svg[role="img"][aria-label*="historical trend"] {
   height: 10.5rem !important;
   width: 100% !important;
   overflow: visible;
+  cursor: pointer;
 }
 
 svg[role="img"][aria-label*="historical trend"] polyline {
