@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Hero from "../components/Hero";
 import HowItWorks from "../components/HowItWorks";
@@ -15,18 +15,13 @@ import TrendDetailOverlay from "../components/TrendDetailOverlay";
 export default function Home() {
   const [customerMode, setCustomerMode] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previousScrollRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
 
-    const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    const resetScroll = () => window.scrollTo(0, 0);
     resetScroll();
     const frame = window.requestAnimationFrame(resetScroll);
-
-    if (window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname);
-      resetScroll();
-    }
 
     return () => {
       window.cancelAnimationFrame(frame);
@@ -37,10 +32,7 @@ export default function Home() {
   if (customerMode) {
     return (
       <main id="customer" className="min-h-screen bg-slate-50 text-slate-900">
-        <Navbar
-          onLogin={() => setCustomerMode(false)}
-          loginLabel="Back to Home"
-        />
+        <Navbar onLogin={() => setCustomerMode(false)} loginLabel="Back to Home" />
         <CFOBriefing />
         <TrendDetailOverlay enabled={customerMode} />
       </main>
@@ -50,27 +42,12 @@ export default function Home() {
   return (
     <main id="top" className="min-h-screen bg-white text-slate-900">
       <Navbar onLogin={() => setCustomerMode(true)} loginLabel="Log In" />
-
-      <section id="product" className="scroll-mt-24 bg-gradient-to-b from-blue-50/70 via-white to-white">
-        <Hero />
-      </section>
-
-      <section id="how-it-works" className="scroll-mt-24 border-y border-slate-200/70 bg-white">
-        <HowItWorks />
-      </section>
-
-      <section id="what-you-receive" className="scroll-mt-24 bg-slate-50/70">
-        <Features />
-      </section>
-
+      <section id="product" className="scroll-mt-24 bg-gradient-to-b from-blue-50/70 via-white to-white"><Hero /></section>
+      <section id="how-it-works" className="scroll-mt-24 border-y border-slate-200/70 bg-white"><HowItWorks /></section>
+      <section id="what-you-receive" className="scroll-mt-24 bg-slate-50/70"><Features /></section>
       <WhyClearCFO />
-
-      <section id="pricing" className="scroll-mt-24">
-        <Pricing />
-      </section>
-
+      <section id="pricing" className="scroll-mt-24"><Pricing /></section>
       <Contact />
-
       <Footer />
     </main>
   );
