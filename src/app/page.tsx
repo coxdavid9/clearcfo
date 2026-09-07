@@ -10,6 +10,7 @@ import WhyClearCFO from "../components/WhyClearCFO";
 import Footer from "../components/Footer";
 import Contact from "../components/Contact";
 import CFOBriefing from "../components/CFOBriefing";
+import TrendDetailOverlay from "../components/TrendDetailOverlay";
 
 export default function Home() {
   const [customerMode, setCustomerMode] = useState(false);
@@ -29,6 +30,7 @@ export default function Home() {
           loginLabel="Back to Home"
         />
         <CFOBriefing />
+        <TrendDetailOverlay enabled={customerMode} />
       </main>
     );
   }
