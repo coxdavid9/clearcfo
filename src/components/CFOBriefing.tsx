@@ -3182,79 +3182,71 @@ export default function CFOBriefing() {
                         </div>
 
                         <p className="mt-1 text-[11px] font-semibold text-slate-500">{trendLabel}</p>
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 pb-2 pt-3">
+                <div className="flex items-center justify-between px-1 pb-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Trend by period</span>
+                  <span className="text-[10px] font-semibold text-slate-500">Latest {formatTrendValue(latest)}</span>
+                </div>
+                <svg
+                  viewBox="0 0 520 190"
+                  className="h-44 w-full"
+                  role="img"
+                  aria-label={`${series.name} historical trend across ${values.length} periods`}
+                >
+                  {(() => {
+                    const chartLeft = 54;
+                    const chartRight = 504;
+                    const chartTop = 14;
+                    const chartBottom = 142;
+                    const chartHeight = chartBottom - chartTop;
+                    const yTicks = [maxValue, (maxValue + minValue) / 2, minValue];
+                    const tickLabels = yTicks.map((value) => isMargin ? `${value.toFixed(1)}%` : formatCurrency(value));
+                    const xFor = (index: number) => values.length === 1
+                      ? (chartLeft + chartRight) / 2
+                      : chartLeft + (index / (values.length - 1)) * (chartRight - chartLeft);
+                    const yFor = (value: number) => chartBottom - ((value - chartMin) / chartRange) * chartHeight;
+                    const chartPoints = values.map((value, index) => `${xFor(index)},${yFor(value)}`).join(" ");
+                    const areaPoints = `${chartLeft},${chartBottom} ${chartPoints} ${chartRight},${chartBottom}`;
 
-                        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/60 p-2">
-                          <svg
-                            viewBox="0 0 120 100"
-                            className="h-24 w-full"
-                            role="img"
-                            aria-label={`${series.name} historical trend across ${values.length} periods`}
-                          >
-                            {/* Three light horizontal reference levels */}
-                            {[plotTop, (plotTop + plotBottom) / 2, plotBottom].map((y, index) => (
-                              <line
-                                key={`grid-${index}`}
-                                x1={plotLeft}
-                                y1={y}
-                                x2={plotRight}
-                                y2={y}
-                                stroke="#e2e8f0"
-                                strokeWidth="1"
-                              />
-                            ))}
+                    return (
+                      <>
+                        {yTicks.map((value, index) => (
+                          <g key={`y-${index}`}>
+                            <line x1={chartLeft} y1={yFor(value)} x2={chartRight} y2={yFor(value)} stroke="#dbe3ec" strokeWidth="1" />
+                            <text x="48" y={yFor(value) + 3} textAnchor="end" fontSize="10" fill="#64748b">{tickLabels[index]}</text>
+                          </g>
+                        ))}
+                        <line x1={chartLeft} y1={chartBottom} x2={chartRight} y2={chartBottom} stroke="#cbd5e1" strokeWidth="1" />
+                        <polygon points={areaPoints} fill={line} opacity="0.08" />
+                        <polyline points={chartPoints} fill="none" stroke={line} strokeWidth="3.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
 
+                        {values.map((value, index) => {
+                          const x = xFor(index);
+                          const y = yFor(value);
+                          const isLatest = index === values.length - 1;
+                          return (
+                            <g key={`${series.name}-${index}`}>
+                              {isLatest && <circle cx={x} cy={y} r="7" fill={line} opacity="0.14" />}
+                              <circle cx={x} cy={y} r={isLatest ? "4.5" : "3.2"} fill={line} stroke="#ffffff" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                            </g>
+                          );
+                        })}
 
-                            {/* Actual line through every available period */}
-                            <polyline
-                              points={points}
-                              fill="none"
-                              stroke={line}
-                              strokeWidth="2.5"
-                              vectorEffect="non-scaling-stroke"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
+                        {axisPeriodLabels.map(({ index, label }) => {
+                          const x = xFor(index);
+                          return (
+                            <text key={`x-${index}`} x={x} y="166" textAnchor={index === 0 ? "start" : index === values.length - 1 ? "end" : "middle"} fontSize="11" fontWeight="600" fill="#64748b">
+                              {label}
+                            </text>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
 
-                            {/* One marker for every real period */}
-                            {values.map((value, index) => {
-                              const x = values.length === 1
-                                ? (plotLeft + plotRight) / 2
-                                : plotLeft + (index / (values.length - 1)) * (plotRight - plotLeft);
-                              const y = plotBottom - ((value - chartMin) / chartRange) * (plotBottom - plotTop);
-                              return (
-                                <circle
-                                  key={`${series.name}-${index}`}
-                                  cx={x}
-                                  cy={y}
-                                  r={index === values.length - 1 ? "2.8" : "2.1"}
-                                  fill={line}
-                                  vectorEffect="non-scaling-stroke"
-                                />
-                              );
-                            })}
-
-                            {/* Only a few x-axis labels; all data points remain visible */}
-                            {axisPeriodLabels.map(({ index, label }) => {
-                              const x = values.length === 1
-                                ? (plotLeft + plotRight) / 2
-                                : plotLeft + (index / (values.length - 1)) * (plotRight - plotLeft);
-                              return (
-                                <text
-                                  key={`x-${index}`}
-                                  x={x}
-                                  y="88"
-                                  textAnchor={index === 0 ? "start" : index === values.length - 1 ? "end" : "middle"}
-                                  fontSize="5"
-                                  fill="#94a3b8"
-                                >
-                                  {label}
-                                </text>
-                              );
-                            })}
-                          </svg>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+              <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
                           <span>Latest {formatTrendValue(latest)}</span>
                           <span>Prior {formatTrendValue(prior)}</span>
                         </div>
