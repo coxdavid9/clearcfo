@@ -51,24 +51,13 @@ textarea:focus-visible {
 }
 
 /* Financial trend charts: keep the visualization readable and make the
-   interaction discoverable. Clicking any part of a trend opens its detail. */
+   interaction discoverable. The chart's JSX controls its own labels,
+   markers, and line weights. */
 svg[role="img"][aria-label*="historical trend"] {
-  height: 10.5rem !important;
+  height: 11rem !important;
   width: 100% !important;
   overflow: visible;
   cursor: pointer;
-}
-
-svg[role="img"][aria-label*="historical trend"] polyline {
-  stroke-width: 3.25 !important;
-}
-
-svg[role="img"][aria-label*="historical trend"] circle {
-  r: 2.7;
-}
-
-svg[role="img"][aria-label*="historical trend"] text {
-  font-size: 6.5px;
 }
 
 /* Mobile dashboard polish: keep section headers readable instead of
@@ -99,13 +88,6 @@ svg[role="img"][aria-label*="historical trend"] text {
 
   .max-w-6xl .order-2 .flex.items-start.justify-between.gap-3 > span {
     flex-shrink: 0;
-  }
-
-  /* On phones, use the full card width rather than the old oversize crop. */
-  svg[role="img"][aria-label*="historical trend"] {
-    height: 11rem !important;
-    width: 100% !important;
-    margin-left: 0;
   }
 
   .max-w-6xl {
