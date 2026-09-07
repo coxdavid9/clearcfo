@@ -16,10 +16,22 @@ export default function Home() {
   const [customerMode, setCustomerMode] = useState(false);
 
   useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    resetScroll();
+    const frame = window.requestAnimationFrame(resetScroll);
+
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname);
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      resetScroll();
     }
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
   }, []);
 
   if (customerMode) {
