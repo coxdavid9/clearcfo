@@ -956,65 +956,6 @@ function analyzeWorkbook(
     }
   }
 
-  // Uploaded workbooks can store cash and inventory history on a separate Balance Sheet.
-  // Add that history to the same trend-series pipeline used by the P&L metrics.
-  if (balanceSheetName) {
-    const balanceMatrix = asMatrix(workbook, balanceSheetName);
-    const balanceRows = asRows(workbook, balanceSheetName);
-    const addTrendSeries = (name: string, aliases: string[], values: number[], seriesPeriods: string[]) => {
-      if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
-      if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
-      historicalSeries.push({ name, values: values.slice(-12), periods: seriesPeriods.slice(-12) });
-    };
-    let headerIndex = -1;
-    let accountIndex = -1;
-    for (let r = 0; r < Math.min(balanceMatrix.length, 25); r++) {
-      const row = balanceMatrix[r] ?? [];
-      const index = row.findIndex((value) => ["account", "metric", "category", "line item", "account name", "description"].includes(clean(value)));
-      if (index >= 0) { headerIndex = r; accountIndex = index; break; }
-    }
-    if (headerIndex >= 0 && accountIndex >= 0) {
-      const header = balanceMatrix[headerIndex] ?? [];
-      const columns = header.map((value, index) => ({ value, index })).filter(({ index, value }) => index !== accountIndex && String(value ?? "").trim() !== "");
-      const seriesPeriods = columns.map(({ value }) => formatPeriod(value));
-      const metricSeries = (aliases: string[]) => {
-        const row = balanceMatrix.slice(headerIndex + 1).find((candidate) => aliases.some((alias) => clean(alias) === clean(candidate[accountIndex])));
-        return row ? columns.map(({ index }) => toNumber(row[index])) : [];
-      };
-      addTrendSeries("Cash", cashAliases, metricSeries(cashAliases), seriesPeriods);
-      addTrendSeries("Inventory", inventoryAliases, metricSeries(inventoryAliases), seriesPeriods);
-    } else if (balanceRows.length >= 3) {
-      const periodKey = Object.keys(balanceRows[0] ?? {}).find((key) => ["month", "period", "date", "year month", "reporting period"].includes(clean(key)));
-      const rows = balanceRows.slice(-12);
-      const seriesPeriods = rows.map((row, index) => periodKey ? formatPeriod(row[periodKey]) : `P-${rows.length - index}`);
-      addTrendSeries("Cash", cashAliases, rows.map((row) => findValue(row, cashAliases) ?? 0), seriesPeriods);
-      addTrendSeries("Inventory", inventoryAliases, rows.map((row) => findValue(row, inventoryAliases) ?? 0), seriesPeriods);
-    }
-  }
-
-  if (isMetricRowFormat) {
-    const addMetricTrend = (name: string, aliases: string[]) => {
-      if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
-      const found = metricRows.find(({ metric }) => aliases.some((alias) => clean(alias) === clean(metric)));
-      if (!found) return;
-      const values = found.values.map(toNumber);
-      if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
-      historicalSeries.push({ name, values: values.slice(-12), periods: periods.slice(-12) });
-    };
-    addMetricTrend("Cash", cashAliases);
-    addMetricTrend("Inventory", inventoryAliases);
-  }
-
-  const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
-  historicalSeries.sort((a, b) => {
-    const ai = coreTrendOrder.indexOf(a.name);
-    const bi = coreTrendOrder.indexOf(b.name);
-    if (ai >= 0 && bi >= 0) return ai - bi;
-    if (ai >= 0) return -1;
-    if (bi >= 0) return 1;
-    return 0;
-  });
-
   const latestMetricIndex = isMetricRowFormat
     ? Math.max(0, periods.length - 1)
     : 0;
@@ -1346,6 +1287,66 @@ function analyzeWorkbook(
     "inventory asset",
     "total inventory",
   ];
+
+  // Uploaded workbooks can store cash and inventory history on a separate Balance Sheet.
+  // Add that history to the same trend-series pipeline used by the P&L metrics.
+  if (balanceSheetName) {
+    const balanceMatrix = asMatrix(workbook, balanceSheetName);
+    const balanceRows = asRows(workbook, balanceSheetName);
+    const addTrendSeries = (name: string, aliases: string[], values: number[], seriesPeriods: string[]) => {
+      if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
+      if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
+      historicalSeries.push({ name, values: values.slice(-12), periods: seriesPeriods.slice(-12) });
+    };
+    let headerIndex = -1;
+    let accountIndex = -1;
+    for (let r = 0; r < Math.min(balanceMatrix.length, 25); r++) {
+      const row = balanceMatrix[r] ?? [];
+      const index = row.findIndex((value) => ["account", "metric", "category", "line item", "account name", "description"].includes(clean(value)));
+      if (index >= 0) { headerIndex = r; accountIndex = index; break; }
+    }
+    if (headerIndex >= 0 && accountIndex >= 0) {
+      const header = balanceMatrix[headerIndex] ?? [];
+      const columns = header.map((value, index) => ({ value, index })).filter(({ index, value }) => index !== accountIndex && String(value ?? "").trim() !== "");
+      const seriesPeriods = columns.map(({ value }) => formatPeriod(value));
+      const metricSeries = (aliases: string[]) => {
+        const row = balanceMatrix.slice(headerIndex + 1).find((candidate) => aliases.some((alias) => clean(alias) === clean(candidate[accountIndex])));
+        return row ? columns.map(({ index }) => toNumber(row[index])) : [];
+      };
+      addTrendSeries("Cash", cashAliases, metricSeries(cashAliases), seriesPeriods);
+      addTrendSeries("Inventory", inventoryAliases, metricSeries(inventoryAliases), seriesPeriods);
+    } else if (balanceRows.length >= 3) {
+      const periodKey = Object.keys(balanceRows[0] ?? {}).find((key) => ["month", "period", "date", "year month", "reporting period"].includes(clean(key)));
+      const rows = balanceRows.slice(-12);
+      const seriesPeriods = rows.map((row, index) => periodKey ? formatPeriod(row[periodKey]) : `P-${rows.length - index}`);
+      addTrendSeries("Cash", cashAliases, rows.map((row) => findValue(row, cashAliases) ?? 0), seriesPeriods);
+      addTrendSeries("Inventory", inventoryAliases, rows.map((row) => findValue(row, inventoryAliases) ?? 0), seriesPeriods);
+    }
+  }
+
+  if (isMetricRowFormat) {
+    const addMetricTrend = (name: string, aliases: string[]) => {
+      if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
+      const found = metricRows.find(({ metric }) => aliases.some((alias) => clean(alias) === clean(metric)));
+      if (!found) return;
+      const values = found.values.map(toNumber);
+      if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
+      historicalSeries.push({ name, values: values.slice(-12), periods: periods.slice(-12) });
+    };
+    addMetricTrend("Cash", cashAliases);
+    addMetricTrend("Inventory", inventoryAliases);
+  }
+
+  const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
+  historicalSeries.sort((a, b) => {
+    const ai = coreTrendOrder.indexOf(a.name);
+    const bi = coreTrendOrder.indexOf(b.name);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  });
+
 
     /*
    * Cash and inventory may exist either on a dedicated Balance Sheet
