@@ -6,7 +6,7 @@ on:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'Apply ClearCFO hardening') }}
+    if: github.event.head_commit.message != 'chore: Apply ClearCFO hardening'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,52 +22,26 @@ jobs:
           text = briefing.read_text()
 
           replacements = [
-              (
-                  '  const [aiError, setAiError] =\n    useState("");\n\n  const [expandedMetric, setExpandedMetric] =',
-                  '  const [aiError, setAiError] =\n    useState("");\n\n  const [hasValidAnalysis, setHasValidAnalysis] =\n    useState(true);\n\n  const [expandedMetric, setExpandedMetric] ='
-              ),
-              (
-                  '    setUploading(true);\n    setError("");\n    setAiError("");',
-                  '    setUploading(true);\n    setError("");\n    setAiError("");\n    setHasValidAnalysis(false);'
-              ),
-              (
-                  '      setData(analyzed);\n      await generateAIAnalysis(analyzed);',
-                  '      setData(analyzed);\n      setHasValidAnalysis(true);\n      await generateAIAnalysis(analyzed);'
-              ),
-              (
-                  '    } catch (err) {\n      setError(\n        err instanceof Error',
-                  '    } catch (err) {\n      setHasValidAnalysis(false);\n      setError(\n        err instanceof Error'
-              ),
-              (
-                  '  return (\n    <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">',
-                  '''  if (!hasValidAnalysis) {
+              ('  const [aiError, setAiError] =\n    useState("");\n\n  const [expandedMetric, setExpandedMetric] =', '  const [aiError, setAiError] =\n    useState("");\n\n  const [hasValidAnalysis, setHasValidAnalysis] =\n    useState(true);\n\n  const [expandedMetric, setExpandedMetric] ='),
+              ('    setUploading(true);\n    setError("");\n    setAiError("");', '    setUploading(true);\n    setError("");\n    setAiError("");\n    setHasValidAnalysis(false);'),
+              ('      setData(analyzed);\n      await generateAIAnalysis(analyzed);', '      setData(analyzed);\n      setHasValidAnalysis(true);\n      await generateAIAnalysis(analyzed);'),
+              ('    } catch (err) {\n      setError(\n        err instanceof Error', '    } catch (err) {\n      setHasValidAnalysis(false);\n      setError(\n        err instanceof Error'),
+              ('  return (\n    <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">', '''  if (!hasValidAnalysis) {
     return (
       <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
         <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={handleUpload}
-          />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
           <div className="border-b border-slate-200 bg-white px-6 py-6 sm:px-8 sm:py-7">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
                 <p className="mt-1 text-xs text-slate-500">Financial briefing</p>
               </div>
-              <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-600">
-                {uploading ? "Analyzing…" : "Upload Excel"}
-              </button>
+              <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-600">{uploading ? "Analyzing…" : "Upload Excel"}</button>
             </div>
           </div>
           <div className="p-7 sm:p-10">
-            {error && (
-              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
-                {error}
-              </div>
-            )}
+            {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">{error}</div>}
             {emptyState}
           </div>
         </div>
@@ -76,28 +50,12 @@ jobs:
   }
 
   return (
-    <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">'''
-              ),
-              (
-                  '<p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Underlying account drivers</p>',
-                  '<p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Largest account movements</p>'
-              ),
-              (
-                  '    relationships.push("Inventory is increasing faster than revenue, which can tie up cash without a matching increase in sales.");',
-                  '    if (inventoryChange >= 5 && inventoryChange > revenueChange + 3) relationships.push("Inventory is increasing faster than revenue, which can tie up cash without a matching increase in sales.");'
-              ),
-              (
-                  '  if (inventoryChange > 0 && cashChange < 0) {\n    relationships.push("Inventory is rising while cash is falling, a combination that can indicate working capital is being absorbed by stock growth.");\n  }',
-                  '  if (inventoryChange >= 5 && cashChange <= -5) {\n    relationships.push("Inventory is rising while cash is falling, a combination that can indicate working capital is being absorbed by stock growth.");\n  }'
-              ),
-              (
-                  '{aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence',
-                  '{data.attention === 0 ? "Monitor" : aiAnalysis.priority} · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence'
-              ),
-              (
-                  '{aiAnalysis.whyItMatters}',
-                  '{compactWhyItMatters(aiAnalysis.whyItMatters)}'
-              ),
+    <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">'''),
+              ('<p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Underlying account drivers</p>', '<p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Largest account movements</p>'),
+              ('  if (inventoryChange > 0 && revenueChange < inventoryChange) {\n    relationships.push("Inventory is increasing faster than revenue, which can tie up cash without a matching increase in sales.");\n  }', '  if (inventoryChange >= 5 && inventoryChange > revenueChange + 3) {\n    relationships.push("Inventory is increasing faster than revenue, which can tie up cash without a matching increase in sales.");\n  }'),
+              ('  if (inventoryChange > 0 && cashChange < 0) {\n    relationships.push("Inventory is rising while cash is falling, a combination that can indicate working capital is being absorbed by stock growth.");\n  }', '  if (inventoryChange >= 5 && cashChange <= -5) {\n    relationships.push("Inventory is rising while cash is falling, a combination that can indicate working capital is being absorbed by stock growth.");\n  }'),
+              ('{aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence', '{data.attention === 0 ? "Monitor" : aiAnalysis.priority} · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence'),
+              ('{aiAnalysis.whyItMatters}', '{compactWhyItMatters(aiAnalysis.whyItMatters)}'),
           ]
 
           for old, new in replacements:
@@ -110,9 +68,7 @@ jobs:
   const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
   let compact = sentences.slice(0, 3).join(" ").trim();
   const words = compact.split(/\\s+/).filter(Boolean);
-  if (words.length > 55) {
-    compact = words.slice(0, 55).join(" ").replace(/[,:;]$/, "") + "…";
-  }
+  if (words.length > 55) compact = words.slice(0, 55).join(" ").replace(/[,:;]$/, "") + "…";
   return compact;
 }
 
@@ -124,17 +80,11 @@ jobs:
 
           route = Path('src/app/api/cfo-analysis/route.ts')
           rtext = route.read_text()
-          instructions = [
-              (
-                  '  "Keep the explanation concise enough for a business owner, controller, or CFO to use in a management meeting.",',
-                  '  "Keep the explanation concise enough for a business owner, controller, or CFO to use in a management meeting.",\n\n  "The whyItMatters field must be concise: 2 to 3 sentences and no more than about 55 words. Explain the business significance without repeating the executiveSummary, evidence list, or recommendedAction.",'
-              ),
-              (
-                  '  "If multiple drivers interact, describe the relationship as a plausible connection rather than proven causation unless the supplied data establishes causation.",',
-                  '  "If multiple drivers interact, describe the relationship as a plausible connection rather than proven causation unless the supplied data establishes causation.",\n\n  "Use calibrated causal language: prefer coincides with, is consistent with, may contribute to, can indicate, or suggests when the data does not establish causation. Do not say a factor caused an outcome unless the supplied evidence establishes that causal link.",'
-              ),
+          pairs = [
+              ('  "Keep the explanation concise enough for a business owner, controller, or CFO to use in a management meeting.",', '  "Keep the explanation concise enough for a business owner, controller, or CFO to use in a management meeting.",\n\n  "The whyItMatters field must be concise: 2 to 3 sentences and no more than about 55 words. Explain the business significance without repeating the executiveSummary, evidence list, or recommendedAction.",'),
+              ('  "If multiple drivers interact, describe the relationship as a plausible connection rather than proven causation unless the supplied data establishes causation.",', '  "If multiple drivers interact, describe the relationship as a plausible connection rather than proven causation unless the supplied data establishes causation.",\n\n  "Use calibrated causal language: prefer coincides with, is consistent with, may contribute to, can indicate, or suggests when the data does not establish causation. Do not say a factor caused an outcome unless the supplied evidence establishes that causal link.",'),
           ]
-          for old, new in instructions:
+          for old, new in pairs:
               if old not in rtext:
                   raise SystemExit(f'Expected API instruction block not found: {old[:100]}')
               rtext = rtext.replace(old, new, 1)
