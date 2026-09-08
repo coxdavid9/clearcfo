@@ -590,6 +590,16 @@ function workbookContainsFinancialSignal(
   return false;
 }
 
+function compactWhyItMatters(text: string): string {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
+  let compact = sentences.slice(0, 3).join(" ").trim();
+  const words = compact.split(/\s+/).filter(Boolean);
+  if (words.length > 55) {
+    compact = words.slice(0, 55).join(" ").replace(/[,:;]$/, "") + "…";
+  }
+  return compact;
+}
+
 function analyzeWorkbook(
   workbook: XLSX.WorkBook
 ): BriefingData {
@@ -3424,7 +3434,7 @@ export default function CFOBriefing() {
                     Why it matters
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {aiAnalysis.whyItMatters}
+                    {compactWhyItMatters(aiAnalysis.whyItMatters)}
                   </p>
                 </div>
 
