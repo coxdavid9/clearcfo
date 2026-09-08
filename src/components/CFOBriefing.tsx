@@ -2209,11 +2209,11 @@ function analyzeWorkbook(
     relationships.push("Revenue and gross margin are both declining, increasing the risk that weaker sales are being accompanied by weaker profitability.");
   }
 
-  if (inventoryChange > 0 && revenueChange < inventoryChange) {
+  if (inventoryChange >= 5 && inventoryChange > revenueChange + 3) {
     relationships.push("Inventory is increasing faster than revenue, which can tie up cash without a matching increase in sales.");
   }
 
-  if (inventoryChange > 0 && cashChange < 0) {
+  if (inventoryChange >= 5 && cashChange <= -5) {
     relationships.push("Inventory is rising while cash is falling, a combination that can indicate working capital is being absorbed by stock growth.");
   }
 
