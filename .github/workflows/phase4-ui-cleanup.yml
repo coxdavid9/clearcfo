@@ -1,0 +1,76 @@
+name: Apply ClearCFO Phase 4 UI cleanup
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'phase 4 UI cleanup') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simplify financial driver presentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/components/CFOBriefing.tsx')
+          s = p.read_text()
+
+          s = s.replace(
+              'const percent = (value: number) =>\n  `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;',
+              'const percent = (value: number) => {\n  const rounded = Number(value.toFixed(1));\n  return `${rounded >= 0 ? "+" : ""}${rounded}%`;\n};'
+          )
+
+          s = s.replace(
+              '{driver.confidence}% confidence',
+              '{driver.confidence}% confidence'
+          )
+
+          confidence_pattern = re.compile(
+              r'\n\s*<span className="shrink-0 text-\[10px\] font-semibold text-slate-400">\{driver\.confidence\}% confidence</span>'
+          )
+          s, count = confidence_pattern.subn('', s, count=1)
+          if count != 1:
+              raise SystemExit('Driver confidence label not found')
+
+          evidence_pattern = re.compile(
+              r'\n\s*<div className="mt-3 flex flex-wrap gap-1\.5">\n\s*\{driver\.evidence\.slice\(0, 3\)\.map\(\(evidence\) => \(.*?\n\s*\)\}\n\s*</div>',
+              re.S
+          )
+          s, count = evidence_pattern.subn('', s, count=1)
+          if count != 1:
+              raise SystemExit('Driver evidence pills not found')
+
+          count_pattern = re.compile(
+              r'\n\s*<div className="flex shrink-0 items-center gap-2">\n\s*<span className="hidden rounded-full bg-slate-100 px-3 py-1 text-\[10px\] font-bold uppercase tracking-wide text-slate-600 sm:inline">\n\s*\{data\.drivers\.length\} driver\{data\.drivers\.length === 1 \? "" : "s"\}\n\s*</span>\n\s*</div>'
+          )
+          s, count = count_pattern.subn('', s, count=1)
+          if count != 1:
+              raise SystemExit('Driver count pill not found')
+
+          detail_pattern = re.compile(
+              r'\n\s*\{data\.detailDrivers\.length > 0 && \(.*?\n\s*\}\s*\n\s*\{data\.relationships\.length > 0 && \(',
+              re.S
+          )
+          replacement = '\n\n              {data.relationships.length > 0 && ('
+          s, count = detail_pattern.subn(replacement, s, count=1)
+          if count != 1:
+              raise SystemExit('Largest account movements block not found')
+
+          s = s.replace(
+              '{driver.percentChange >= 0 ? "+" : ""}{driver.percentChange.toFixed(1)}%',
+              '{percent(driver.percentChange)}'
+          )
+
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx
+          git commit -m "fix: simplify financial driver presentation phase 4 UI cleanup"
+          git push
