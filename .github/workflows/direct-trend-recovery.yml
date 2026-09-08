@@ -1,0 +1,90 @@
+name: Direct trend recovery
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/CFOBriefing.tsx')
+          s = p.read_text()
+          marker = '  const trendInsights = buildTrendInsights(historicalSeries, revenueChange);'
+          if marker not in s:
+              raise SystemExit('trend insights marker not found')
+          if 'Direct source-sheet trend recovery' not in s:
+              block = r'''  // Direct source-sheet trend recovery. Some uploaded metric-row workbooks
+          // contain balance-sheet metrics in the source sheet but the normalized metricRows
+          // collection intentionally contains only P&L metrics. Read the source sheet directly
+          // so Inventory and Cash can use the same chart pipeline without inventing data.
+          const addDirectSourceTrend = (name: string, aliases: string[]) => {
+            if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
+            const sourceSheet = findSheet(workbook, ["Financials", "Financial Statements", "P&L", "Profit and Loss"]);
+            if (!sourceSheet) return;
+            const matrix = asMatrix(workbook, sourceSheet);
+            let headerIndex = -1;
+            let metricIndex = -1;
+            for (let r = 0; r < Math.min(matrix.length, 25); r++) {
+              const row = matrix[r] ?? [];
+              const index = row.findIndex((value) => ["metric", "account", "line item", "account name", "description"].includes(clean(value)));
+              if (index >= 0) { headerIndex = r; metricIndex = index; break; }
+            }
+            if (headerIndex < 0 || metricIndex < 0) return;
+            const header = matrix[headerIndex] ?? [];
+            const columns = header
+              .map((value, index) => ({ value, index }))
+              .filter(({ index, value }) => index !== metricIndex && String(value ?? "").trim() !== "");
+            const row = matrix.slice(headerIndex + 1).find((candidate) => aliases.some((alias) => clean(alias) === clean(candidate[metricIndex])));
+            if (!row) return;
+            const values = columns.map(({ index }) => toNumber(row[index]));
+            if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
+            historicalSeries.push({
+              name,
+              values: values.slice(-12),
+              periods: columns.map(({ value }) => formatPeriod(value)).slice(-12),
+            });
+          };
+
+          addDirectSourceTrend("Inventory", inventoryAliases);
+          addDirectSourceTrend("Cash", cashAliases);
+
+          const directCoreOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
+          historicalSeries.sort((a, b) => {
+            const ai = directCoreOrder.indexOf(a.name);
+            const bi = directCoreOrder.indexOf(b.name);
+            if (ai >= 0 && bi >= 0) return ai - bi;
+            if (ai >= 0) return -1;
+            if (bi >= 0) return 1;
+            return 0;
+          });
+
+'''
+              s = s.replace(marker, block + marker)
+          p.write_text(s)
+          PY
+
+      - name: Verify
+        run: |
+          grep -q 'Direct source-sheet trend recovery' src/components/CFOBriefing.tsx
+          grep -q 'addDirectSourceTrend("Inventory"' src/components/CFOBriefing.tsx
+          grep -q 'addDirectSourceTrend("Cash"' src/components/CFOBriefing.tsx
+
+      - name: Commit and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/CFOBriefing.tsx
+          git commit -m 'Fix uploaded inventory and cash trend recovery'
+          git rm .github/workflows/direct-trend-recovery.yml
+          git commit -m 'Remove direct trend recovery workflow'
+          git push
