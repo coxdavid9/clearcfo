@@ -6,7 +6,6 @@ const steps = [
       <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
         <path d="M24 68h48c9 0 16-7 16-16 0-8-6-15-14-16-2-12-12-20-24-20-11 0-20 7-23 17-10 1-17 8-17 18 0 10 8 17 18 17Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M38 64V48m0 0-6 6m6-6 6 6M50 64V40m0 0-6 6m6-6 6 6M62 64V45m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M72 24v14m0 0-6-6m6 6 6-6" fill="none" stroke="#4DBD36" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -17,8 +16,9 @@ const steps = [
       <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
         <path d="M48 12c-17 0-30 13-30 30 0 11 5 20 14 26 4 3 6 7 6 12h20c0-5 2-9 6-12 9-6 14-15 14-26 0-17-13-30-30-30Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M36 80h24M39 86h18" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-        <path d="M38 57V43m0 0-6 6m6-6 6 6M50 57V36m0 0-6 6m6-6 6 6M62 57V42" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M62 42l-5 5m5-5-5-1" fill="none" stroke="#4DBD36" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="38" y="45" width="6" height="12" rx="1" fill="#1687C7" />
+        <rect x="47" y="35" width="6" height="22" rx="1" fill="#4DBD36" />
+        <rect x="56" y="42" width="6" height="15" rx="1" fill="#1687C7" />
       </svg>
     ),
   },
