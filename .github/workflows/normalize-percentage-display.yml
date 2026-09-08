@@ -1,0 +1,115 @@
+name: Normalize percentage display
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    if: ${{ !startsWith(github.event.head_commit.message, 'fix: normalize percentage display') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Normalize percentage formatting
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path("src/components/CFOBriefing.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''const percent = (value: number) => {
+            const rounded = Number(value.toFixed(1));
+            return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+          };
+          '''
+
+          new = '''const formatPercentValue = (value: number): string => {
+            const rounded = Number(value.toFixed(1));
+            return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+          };
+
+          const percent = (value: number) => {
+            const rounded = Number(value.toFixed(1));
+            return `${rounded >= 0 ? "+" : ""}${formatPercentValue(value)}%`;
+          };
+          '''
+
+          if old not in text:
+              raise SystemExit("Expected percent formatter was not found")
+
+          text = text.replace(old, new, 1)
+
+          # Any UI/template percentage that was explicitly formatted to one
+          # decimal place should suppress an insignificant trailing zero while
+          # retaining a meaningful decimal (31.0% -> 31%, 31.1% -> 31.1%).
+          text = re.sub(
+              r"\\$\\{([^{}]*?)\\.toFixed\\(\\s*1\\s*\\)\\}%(?!%)",
+              lambda m: "${formatPercentValue(" + m.group(1) + ")}%",
+              text,
+              flags=re.DOTALL,
+          )
+
+          # AI-generated narrative can contain its own percentage strings.
+          # Normalize only a zero tenth so we do not change meaningful precision.
+          old_ai = '      setAiAnalysis(payload.analysis as AIAnalysis);'
+          new_ai = '''      const normalizePercentageText = (value: string): string =>
+        value.replace(/(-?\\d+)\\.0%\\b/g, "$1%");
+
+      const analysis = payload.analysis as AIAnalysis;
+      setAiAnalysis({
+        ...analysis,
+        executiveSummary: normalizePercentageText(analysis.executiveSummary),
+        primaryDriver: normalizePercentageText(analysis.primaryDriver),
+        whyItMatters: normalizePercentageText(analysis.whyItMatters),
+        managementQuestion: normalizePercentageText(analysis.managementQuestion),
+        recommendedAction: normalizePercentageText(analysis.recommendedAction),
+        evidence: analysis.evidence.map(normalizePercentageText),
+        unknowns: analysis.unknowns?.map(normalizePercentageText),
+        actions: analysis.actions.map((action) => ({
+          ...action,
+          title: normalizePercentageText(action.title),
+          rationale: normalizePercentageText(action.rationale),
+        })),
+      });'''
+
+          if old_ai not in text:
+              raise SystemExit("Expected AI analysis assignment was not found")
+
+          text = text.replace(old_ai, new_ai, 1)
+          path.write_text(text, encoding="utf-8")
+
+      - name: Run reasoning tests
+        run: npm ci && npm run test:reasoning
+
+      - name: Run trend tests
+        run: npm run test:trends
+
+      - name: Run production build
+        run: npm run build
+
+      - name: Commit formatting change
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "fix: normalize percentage display"
+          git push
+
+      - name: Remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/normalize-percentage-display.yml
+          git add .github/workflows/normalize-percentage-display.yml
+          git commit -m "chore: remove temporary formatting workflow"
+          git push
