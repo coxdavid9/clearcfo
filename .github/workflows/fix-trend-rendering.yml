@@ -1,0 +1,111 @@
+name: Fix trend rendering and percentage formatting
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add temporary trend rendering fix workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch CFO briefing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/CFOBriefing.tsx')
+          s = p.read_text()
+
+          old = '''      const normalizePercentageText = (value: string): string =>\n        value.replace(/(-?\\d+)\\.0%\\b/g, "$1%");'''
+          new = '''      const normalizePercentageText = (value: string): string =>\n        value\n          .replace(/(-?\\d+)\\.0%\\b/g, "$1%")\n          .replace(/(-?\\d+)\\.0 (points|pts)\\b/g, "$1 $2");'''
+          if old in s:
+              s = s.replace(old, new)
+
+          s = s.replace('{change >= 0 ? "+" : ""}{change.toFixed(1)}%', '{change >= 0 ? "+" : ""}{formatPercentValue(change)}%')
+          s = s.replace('`${data.marginChange >= 0 ? "+" : ""}${data.marginChange.toFixed(1)} pts`', '`${data.marginChange >= 0 ? "+" : ""}${formatPercentValue(data.marginChange)} pts`')
+          s = s.replace('${Math.abs(data.marginChange).toFixed(1)} points', '${formatPercentValue(Math.abs(data.marginChange))} points')
+          s = s.replace('gross margin is down ${Math.abs(data.marginChange).toFixed(1)} points', 'gross margin is down ${formatPercentValue(Math.abs(data.marginChange))} points')
+          s = s.replace('gross margin is up ${data.marginChange.toFixed(1)} points', 'gross margin is up ${formatPercentValue(data.marginChange)} points')
+
+          marker = '  const trendInsights = buildTrendInsights(historicalSeries, revenueChange);'
+          if marker not in s:
+              raise SystemExit('trend insights marker not found')
+
+          recovery = r'''  // Final uploaded-workbook recovery: guarantee the four core trend cards
+          // whenever the source workbook actually contains at least three historical
+          // observations for the metric. This uses only source workbook values.
+          const ensureCoreTrend = (
+            name: string,
+            aliases: string[],
+            sourceRows: Record<string, unknown>[],
+            sourcePeriods: string[]
+          ) => {
+            if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
+            const values = sourceRows.map((row) => findValue(row, aliases) ?? 0);
+            if (values.filter((value) => Number.isFinite(value) && value !== 0).length >= 3) {
+              historicalSeries.push({ name, values: values.slice(-12), periods: sourcePeriods.slice(-12) });
+            }
+          };
+
+          const addCoreMetricTrend = (name: string, aliases: string[]) => {
+            if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
+            const found = metricRows.find(({ metric }) => aliases.some((alias) => clean(alias) === clean(metric)));
+            if (!found) return;
+            const values = found.values.map(toNumber);
+            if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
+            historicalSeries.push({ name, values: values.slice(-12), periods: periods.slice(-12) });
+          };
+
+          if (isMetricRowFormat) {
+            addCoreMetricTrend("Revenue", revenueAliases);
+            addCoreMetricTrend("Inventory", inventoryAliases);
+            addCoreMetricTrend("Operating Expenses", operatingExpenseAliases);
+            addCoreMetricTrend("Cash", cashAliases);
+          } else {
+            const rows = pnlRows.slice(-12);
+            ensureCoreTrend("Revenue", revenueAliases, rows, periods);
+            ensureCoreTrend("Inventory", inventoryAliases, rows, periods);
+            ensureCoreTrend("Operating Expenses", operatingExpenseAliases, rows, periods);
+            ensureCoreTrend("Cash", cashAliases, rows, periods);
+          }
+
+          const finalCoreOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
+          historicalSeries.sort((a, b) => {
+            const ai = finalCoreOrder.indexOf(a.name);
+            const bi = finalCoreOrder.indexOf(b.name);
+            if (ai >= 0 && bi >= 0) return ai - bi;
+            if (ai >= 0) return -1;
+            if (bi >= 0) return 1;
+            return 0;
+          });
+
+'''
+          s = s.replace(marker, recovery + marker)
+          p.write_text(s)
+          PY
+
+      - name: Verify patch
+        run: |
+          grep -q 'Final uploaded-workbook recovery' src/components/CFOBriefing.tsx
+          grep -q 'formatPercentValue(change)' src/components/CFOBriefing.tsx
+
+      - name: Commit code fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/CFOBriefing.tsx
+          git diff --cached --quiet || git commit -m 'Fix uploaded trend rendering and percentage formatting'
+          git push
+
+      - name: Remove temporary workflow
+        if: always()
+        run: |
+          rm -f .github/workflows/fix-trend-rendering.yml
+          git add .github/workflows/fix-trend-rendering.yml
+          git diff --cached --quiet || git commit -m 'Remove temporary trend rendering workflow'
+          git push
