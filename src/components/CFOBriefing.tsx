@@ -2444,6 +2444,9 @@ export default function CFOBriefing() {
       demoData
     );
 
+  const [hasValidAnalysis, setHasValidAnalysis] =
+    useState(true);
+
   const [uploading, setUploading] =
     useState(false);
 
@@ -2526,6 +2529,7 @@ export default function CFOBriefing() {
     if (!file) return;
 
     setUploading(true);
+    setHasValidAnalysis(false);
     setError("");
     setAiError("");
     setAiAnalysis(null);
@@ -2546,8 +2550,10 @@ export default function CFOBriefing() {
         );
 
       setData(analyzed);
+      setHasValidAnalysis(true);
       await generateAIAnalysis(analyzed);
     } catch (err) {
+      setHasValidAnalysis(false);
       setError(
         err instanceof Error
           ? err.message
@@ -2654,6 +2660,18 @@ export default function CFOBriefing() {
       </p>
     </div>
   );
+
+  if (!hasValidAnalysis) {
+    return (
+      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        {error && (
+          <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>
+        )}
+        <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
@@ -3030,7 +3048,7 @@ export default function CFOBriefing() {
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Underlying account drivers</p>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Largest account movements</p>
                       <p className="mt-1 text-sm text-slate-500">The largest period-over-period dollar movements found in the workbook.</p>
                     </div>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Top {Math.min(6, data.detailDrivers.length)}</span>
@@ -3360,7 +3378,7 @@ export default function CFOBriefing() {
                     </h4>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">
-                    {aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence
+                    {data.attention === 0 ? "Monitor" : aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence
                   </span>
                 </div>
 
