@@ -5,6 +5,7 @@ const navItems = [
   ["How It Works", "#how-it-works"],
   ["What You Receive", "#what-you-receive"],
   ["Pricing", "#pricing"],
+  ["Contact", "#contact"],
 ];
 
 type NavbarProps = {
@@ -42,15 +43,6 @@ export default function Navbar({ onNavigate, onLogin, loginLabel = "Log In" }: N
         </div>
 
         <div className="flex items-center gap-3">
-          {onNavigate ? (
-            <button type="button" onClick={() => onNavigate("#contact")} className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4 sm:inline-flex">
-              Contact
-            </button>
-          ) : (
-            <a href="#contact" className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4 sm:inline-flex">
-              Contact
-            </a>
-          )}
           {onLogin ? (
             <button type="button" onClick={onLogin} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 sm:px-5">
               {loginLabel}
