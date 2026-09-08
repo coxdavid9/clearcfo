@@ -590,16 +590,6 @@ function workbookContainsFinancialSignal(
   return false;
 }
 
-function compactWhyItMatters(text: string): string {
-  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
-  let compact = sentences.slice(0, 3).join(" ").trim();
-  const words = compact.split(/\s+/).filter(Boolean);
-  if (words.length > 55) {
-    compact = words.slice(0, 55).join(" ").replace(/[,:;]$/, "") + "…";
-  }
-  return compact;
-}
-
 function analyzeWorkbook(
   workbook: XLSX.WorkBook
 ): BriefingData {
@@ -3419,7 +3409,7 @@ export default function CFOBriefing() {
                 </div>
               )}
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                     Primary driver
@@ -3431,19 +3421,19 @@ export default function CFOBriefing() {
 
                 <div className="rounded-2xl bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                    Why it matters
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {compactWhyItMatters(aiAnalysis.whyItMatters)}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white p-5 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                     Management question
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
                     {aiAnalysis.managementQuestion}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-sm md:col-span-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Why it matters
+                  </p>
+                  <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-700">
+                    {aiAnalysis.whyItMatters}
                   </p>
                 </div>
               </div>

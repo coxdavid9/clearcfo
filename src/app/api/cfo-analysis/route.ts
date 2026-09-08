@@ -138,8 +138,6 @@ const instructions = [
 
   "Keep the explanation concise enough for a business owner, controller, or CFO to use in a management meeting.",
 
-  "Keep whyItMatters to 2 or 3 short sentences and target roughly 55 words or fewer. Do not repeat the executiveSummary, evidence list, recommendedAction, or unknowns verbatim; explain only the business significance of the primary driver.",
-
   "Use calibrated causal language. Prefer phrases such as coincides with, is consistent with, may contribute to, can indicate, suggests, or warrants investigation. Do not say an event caused another outcome unless the supplied evidence explicitly establishes causation.",
 
   "Do not present estimated impact as guaranteed savings, guaranteed profit, or a forecast.",
