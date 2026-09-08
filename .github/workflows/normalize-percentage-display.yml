@@ -9,81 +9,16 @@ permissions:
 
 jobs:
   normalize:
-    if: ${{ !startsWith(github.event.head_commit.message, 'fix: normalize percentage display') }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Normalize percentage formatting
-        shell: python3 {0}
+        shell: bash
         run: |
-          from pathlib import Path
-          import re
-
-          path = Path("src/components/CFOBriefing.tsx")
-          text = path.read_text(encoding="utf-8")
-
-          old = '''const percent = (value: number) => {
-            const rounded = Number(value.toFixed(1));
-            return `${rounded >= 0 ? "+" : ""}${rounded}%`;
-          };
-          '''
-
-          new = '''const formatPercentValue = (value: number): string => {
-            const rounded = Number(value.toFixed(1));
-            return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-          };
-
-          const percent = (value: number) => {
-            const rounded = Number(value.toFixed(1));
-            return `${rounded >= 0 ? "+" : ""}${formatPercentValue(value)}%`;
-          };
-          '''
-
-          if old not in text:
-              raise SystemExit("Expected percent formatter was not found")
-
-          text = text.replace(old, new, 1)
-
-          # Any UI/template percentage that was explicitly formatted to one
-          # decimal place should suppress an insignificant trailing zero while
-          # retaining a meaningful decimal (31.0% -> 31%, 31.1% -> 31.1%).
-          text = re.sub(
-              r"\$\{([^{}]*?)\.toFixed\(\s*1\s*\)\}%(?!%)",
-              lambda m: "${formatPercentValue(" + m.group(1) + ")}%",
-              text,
-              flags=re.DOTALL,
-          )
-
-          # AI-generated narrative can contain its own percentage strings.
-          # Normalize only a zero tenth so we do not change meaningful precision.
-          old_ai = '      setAiAnalysis(payload.analysis as AIAnalysis);'
-          new_ai = '''      const normalizePercentageText = (value: string): string =>
-        value.replace(/(-?\d+)\.0%\b/g, "$1%");
-
-      const analysis = payload.analysis as AIAnalysis;
-      setAiAnalysis({
-        ...analysis,
-        executiveSummary: normalizePercentageText(analysis.executiveSummary),
-        primaryDriver: normalizePercentageText(analysis.primaryDriver),
-        whyItMatters: normalizePercentageText(analysis.whyItMatters),
-        managementQuestion: normalizePercentageText(analysis.managementQuestion),
-        recommendedAction: normalizePercentageText(analysis.recommendedAction),
-        evidence: analysis.evidence.map(normalizePercentageText),
-        unknowns: analysis.unknowns?.map(normalizePercentageText),
-        actions: analysis.actions.map((action) => ({
-          ...action,
-          title: normalizePercentageText(action.title),
-          rationale: normalizePercentageText(action.rationale),
-        })),
-      });'''
-
-          if old_ai not in text:
-              raise SystemExit("Expected AI analysis assignment was not found")
-
-          text = text.replace(old_ai, new_ai, 1)
-          path.write_text(text, encoding="utf-8")
+          echo 'CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAppbXBvcnQgcmUKCnBhdGggPSBQYXRoKCJzcmMvY29tcG9uZW50cy9DRk9CcmllZmluZy50c3giKQp0ZXh0ID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKCm9sZCA9ICcnJ2NvbnN0IHBlcmNlbnQgPSAodmFsdWU6IG51bWJlcikgPT4gewogIGNvbnN0IHJvdW5kZWQgPSBOdW1iZXIodmFsdWUudG9GaXhlZCgxKSk7CiAgcmV0dXJuIGAke3JvdW5kZWQgPj0gMCA/ICIrIiA6ICIifSR7cm91bmRlZH0lYDsKfTsnJycKCm5ldyA9ICcnJ2NvbnN0IGZvcm1hdFBlcmNlbnRWYWx1ZSA9ICh2YWx1ZTogbnVtYmVyKTogc3RyaW5nID0+IHsKICBjb25zdCByb3VuZGVkID0gTnVtYmVyKHZhbHVlLnRvRml4ZWQoMSkpOwogIHJldHVybiBOdW1iZXIuaXNJbnRlZ2VyKHJvdW5kZWQpID8gU3RyaW5nKHJvdW5kZWQpIDogcm91bmRlZC50b0ZpeGVkKDEpOwp9OwoKY29uc3QgcGVyY2VudCA9ICh2YWx1ZTogbnVtYmVyKSA9PiB7CiAgY29uc3Qgcm91bmRlZCA9IE51bWJlcih2YWx1ZS50b0ZpeGVkKDEpKTsKICByZXR1cm4gYCR7cm91bmRlZCA+PSAwID8gIisiIDogIiJ9JHtmb3JtYXRQZXJjZW50VmFsdWUodmFsdWUpfSVgOwp9OycnJwoKaWYgb2xkIG5vdCBpbiB0ZXh0OgogICAgcmFpc2UgU3lzdGVtRXhpdCgiRXhwZWN0ZWQgcGVyY2VudCBmb3JtYXR0ZXIgd2FzIG5vdCBmb3VuZCIpCnRleHQgPSB0ZXh0LnJlcGxhY2Uob2xkLCBuZXcsIDEpCgp0ZXh0ID0gcmUuc3ViKAogICAgciJcJFx7KFtee31dKj8pXC50b0ZpeGVkXChccyoxXHMqXClcfSUiLAogICAgbGFtYmRhIG06ICIke2Zvcm1hdFBlcmNlbnRWYWx1ZSgiICsgbS5ncm91cCgxKSArICIpfSUiLAogICAgdGV4dCwKICAgIGZsYWdzPXJlLkRPVEFMTCwKKQoKb2xkX2FpID0gIiAgICAgIHNldEFpQW5hbHlzaXMocGF5bG9hZC5hbmFseXNpcyBhcyBBSUFuYWx5c2lzKTsiCm5ld19haSA9ICcnJyAgICAgIGNvbnN0IG5vcm1hbGl6ZVBlcmNlbnRhZ2VUZXh0ID0gKHZhbHVlOiBzdHJpbmcpOiBzdHJpbmcgPT4KICAgICAgICB2YWx1ZS5yZXBsYWNlKC8oLT9cXGQrKVxcLjAlXFxiL2csICIkMSUiKTsKCiAgICAgIGNvbnN0IGFuYWx5c2lzID0gcGF5bG9hZC5hbmFseXNpcyBhcyBBSUFuYWx5c2lzOwogICAgICBzZXRBaUFuYWx5c2lzKHsKICAgICAgICAuLi5hbmFseXNpcywKICAgICAgICBleGVjdXRpdmVTdW1tYXJ5OiBub3JtYWxpemVQZXJjZW50YWdlVGV4dChhbmFseXNpcy5leGVjdXRpdmVTdW1tYXJ5KSwKICAgICAgICBwcmltYXJ5RHJpdmVyOiBub3JtYWxpemVQZXJjZW50YWdlVGV4dChhbmFseXNpcy5wcmltYXJ5RHJpdmVyKSwKICAgICAgICB3aHlJdE1hdHRlcnM6IG5vcm1hbGl6ZVBlcmNlbnRhZ2VUZXh0KGFuYWx5c2lzLndoeUl0TWF0dGVycyksCiAgICAgICAgbWFuYWdlbWVudFF1ZXN0aW9uOiBub3JtYWxpemVQZXJjZW50YWdlVGV4dChhbmFseXNpcy5tYW5hZ2VtZW50UXVlc3Rpb24pLAogICAgICAgIHJlY29tbWVuZGVkQWN0aW9uOiBub3JtYWxpemVQZXJjZW50YWdlVGV4dChhbmFseXNpcy5yZWNvbW1lbmRlZEFjdGlvbiksCiAgICAgICAgZXZpZGVuY2U6IGFuYWx5c2lzLmV2aWRlbmNlLm1hcChub3JtYWxpemVQZXJjZW50YWdlVGV4dCksCiAgICAgICAgdW5rbm93bnM6IGFuYWx5c2lzLnVua25vd25zPy5tYXAobm9ybWFsaXplUGVyY2VudGFnZVRleHQpLAogICAgICAgIGFjdGlvbnM6IGFuYWx5c2lzLmFjdGlvbnMubWFwKChhY3Rpb24pID0+ICh7CiAgICAgICAgICAuLi5hY3Rpb24sCiAgICAgICAgICB0aXRsZTogbm9ybWFsaXplUGVyY2VudGFnZVRleHQoYWN0aW9uLnRpdGxlKSwKICAgICAgICAgIHJhdGlvbmFsZTogbm9ybWFsaXplUGVyY2VudGFnZVRleHQoYWN0aW9uLnJhdGlvbmFsZSksCiAgICAgICAgfSkpLAogICAgICB9KTsnJycKCmlmIG9sZF9haSBub3QgaW4gdGV4dDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIkV4cGVjdGVkIEFJIGFuYWx5c2lzIGFzc2lnbm1lbnQgd2FzIG5vdCBmb3VuZCIpCnRleHQgPSB0ZXh0LnJlcGxhY2Uob2xkX2FpLCBuZXdfYWksIDEpCgpwYXRoLndyaXRlX3RleHQodGV4dCwgZW5jb2Rpbmc9InV0Zi04IikKcHJpbnQoIlBlcmNlbnRhZ2UgZm9ybWF0dGluZyB1cGRhdGVkLiIpCg==' | base64 --decode > /tmp/normalize_percentages.py
+          python3 /tmp/normalize_percentages.py
 
       - name: Run reasoning tests
         run: npm ci && npm run test:reasoning
@@ -111,5 +46,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm -f .github/workflows/normalize-percentage-display.yml
           git add .github/workflows/normalize-percentage-display.yml
-          git commit -m "chore: remove temporary formatting workflow"
+          git commit -m "chore: remove temporary percentage formatting workflow"
           git push
