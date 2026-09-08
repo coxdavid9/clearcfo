@@ -1,0 +1,96 @@
+name: Apply ClearCFO UI cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Simplify financial driver presentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/components/CFOBriefing.tsx')
+          s = p.read_text()
+          original = s
+
+          s = s.replace(
+              '''const percent = (value: number) =>
+            `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;''',
+              '''const percent = (value: number) => {
+            const rounded = Number(value.toFixed(1));
+            return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+          };''',
+              1,
+          )
+
+          # Remove per-driver confidence text; the section is about the
+          # strongest observable signals, not pseudo-precise confidence scores.
+          s = re.sub(
+              r'\s*<span[^>]*>\{driver\.confidence\}% confidence</span>',
+              '',
+              s,
+              count=1,
+          )
+
+          # Remove repetitive evidence pills from each driver card.
+          s = re.sub(
+              r'\s*<div className="mt-3 flex flex-wrap gap-1\.5">\s*\{driver\.evidence\.slice\(0, 3\)\.map\(\(evidence\) => \(.*?</div>',
+              '',
+              s,
+              count=1,
+              flags=re.S,
+          )
+
+          # Remove the driver-count pill in the Financial Drivers header.
+          s = re.sub(
+              r'\s*<div className="flex shrink-0 items-center gap-2">\s*<span[^>]*>\s*\{data\.drivers\.length\} driver\{data\.drivers\.length === 1 \? "" : "s"\}\s*</span>\s*</div>',
+              '',
+              s,
+              count=1,
+              flags=re.S,
+          )
+
+          # Remove the oversized account-movement subsection. It adds little
+          # decision value when the AI reasoning already explains the key movement.
+          s = re.sub(
+              r'\s*\{data\.detailDrivers\.length > 0 && \(.*?\n\s*\{data\.relationships\.length > 0 && \(',
+              '\n\n              {data.relationships.length > 0 && (',
+              s,
+              count=1,
+              flags=re.S,
+          )
+
+          # Use compact, human-readable percentages in driver cards.
+          s = s.replace(
+              '{driver.percentChange >= 0 ? "+" : ""}{driver.percentChange.toFixed(1)}%',
+              '{percent(driver.percentChange)}',
+          )
+
+          if s == original:
+              print('No cleanup changes needed')
+          else:
+              p.write_text(s)
+              print('Financial driver cleanup applied')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "fix: simplify financial driver presentation"
+            git push
+          fi
