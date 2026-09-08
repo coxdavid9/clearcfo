@@ -20,72 +20,39 @@ jobs:
           from pathlib import Path
           p = Path('src/components/CFOBriefing.tsx')
           s = p.read_text()
-          marker = '  const trendInsights = buildTrendInsights(historicalSeries, revenueChange);'
+
+          # Broaden common customer-facing names without changing calculations.
+          s = s.replace('''  const cashAliases = [\n    "cash",\n    "cash and equivalents",\n    "cash equivalents",\n    "cash and cash equivalents",\n    "cash & equivalents",\n    "cash & cash equivalents",\n  ];''', '''  const cashAliases = [\n    "cash",\n    "cash position",\n    "cash balance",\n    "cash on hand",\n    "cash and equivalents",\n    "cash equivalents",\n    "cash and cash equivalents",\n    "cash & equivalents",\n    "cash & cash equivalents",\n  ];''')
+
+          s = s.replace('''  const inventoryAliases = [\n    "inventory",\n    "inventory asset",\n    "total inventory",\n  ];''', '''  const inventoryAliases = [\n    "inventory",\n    "inventory asset",\n    "inventory balance",\n    "inventory position",\n    "total inventory",\n  ];''')
+
+          old = '''    const addMetricTrend = (name: string, aliases: string[]) => {\n      if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;\n      const found = metricRows.find(({ metric }) => aliases.some((alias) => clean(alias) === clean(metric)));\n      if (!found) return;\n      const values = found.values.map(toNumber);\n      if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;\n      historicalSeries.push({ name, values: values.slice(-12), periods: periods.slice(-12) });\n    };'''
+          new = '''    const addMetricTrend = (name: string, aliases: string[]) => {\n      if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;\n      const found = metricRows.find(({ metric }) => {\n        const normalizedMetric = clean(metric);\n        return aliases.some((alias) => {\n          const normalizedAlias = clean(alias);\n          return normalizedMetric === normalizedAlias ||\n            normalizedMetric.includes(normalizedAlias) ||\n            normalizedAlias.includes(normalizedMetric);\n        });\n      });\n      if (!found) return;\n      const values = found.values.map(toNumber);\n      if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;\n      historicalSeries.push({ name, values: values.slice(-12), periods: periods.slice(-12) });\n    };'''
+          if old not in s:
+              raise SystemExit('metric trend block not found')
+          s = s.replace(old, new)
+
+          # Recover core trends directly from the Financials metric-row sheet as a final fallback.
+          marker = '  const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];'
           if marker not in s:
-              raise SystemExit('trend insights marker not found')
-          if 'Direct source-sheet trend recovery' not in s:
-              block = r'''  // Direct source-sheet trend recovery. Some uploaded metric-row workbooks
-          // keep Inventory and Cash in the Financials sheet but omit them from normalized
-          // P&L metricRows. Read the source sheet directly so all available core metrics
-          // use the same historical trend chart pipeline without inventing data.
-          const addDirectSourceTrend = (name: string, aliases: string[]) => {
-            if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
-            const sourceSheet = findSheet(workbook, ["Financials", "Financial Statements", "P&L", "Profit and Loss"]);
-            if (!sourceSheet) return;
-            const matrix = asMatrix(workbook, sourceSheet);
-            let headerIndex = -1;
-            let metricIndex = -1;
-            for (let r = 0; r < Math.min(matrix.length, 25); r++) {
-              const row = matrix[r] ?? [];
-              const index = row.findIndex((value) => ["metric", "account", "line item", "account name", "description"].includes(clean(value)));
-              if (index >= 0) { headerIndex = r; metricIndex = index; break; }
-            }
-            if (headerIndex < 0 || metricIndex < 0) return;
-            const header = matrix[headerIndex] ?? [];
-            const columns = header
-              .map((value, index) => ({ value, index }))
-              .filter(({ index, value }) => index !== metricIndex && String(value ?? "").trim() !== "");
-            const row = matrix.slice(headerIndex + 1).find((candidate) => aliases.some((alias) => clean(alias) === clean(candidate[metricIndex])));
-            if (!row) return;
-            const values = columns.map(({ index }) => toNumber(row[index]));
-            if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
-            historicalSeries.push({
-              name,
-              values: values.slice(-12),
-              periods: columns.map(({ value }) => formatPeriod(value)).slice(-12),
-            });
-          };
-
-          addDirectSourceTrend("Inventory", inventoryAliases);
-          addDirectSourceTrend("Cash", cashAliases);
-
-          const directCoreOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
-          historicalSeries.sort((a, b) => {
-            const ai = directCoreOrder.indexOf(a.name);
-            const bi = directCoreOrder.indexOf(b.name);
-            if (ai >= 0 && bi >= 0) return ai - bi;
-            if (ai >= 0) return -1;
-            if (bi >= 0) return 1;
-            return 0;
-          });
-
-'''
+              raise SystemExit('core trend marker not found')
+          if 'Final core metric trend recovery' not in s:
+              block = '''  // Final core metric trend recovery: use the actual Financials metric rows when\n  // normalized metricRows omitted a balance-sheet series. This never invents values.\n  if (historicalSeries.length > 0) {\n    const sourceSheet = findSheet(workbook, ["Financials", "Financial Statements", "P&L", "Profit and Loss"]);\n    if (sourceSheet) {\n      const sourceMatrix = asMatrix(workbook, sourceSheet);\n      let sourceHeader = -1;\n      let sourceMetricIndex = -1;\n      for (let r = 0; r < Math.min(sourceMatrix.length, 30); r++) {\n        const row = sourceMatrix[r] ?? [];\n        const idx = row.findIndex((value) =>\n          ["metric", "account", "line item", "account name", "description"].includes(clean(value))\n        );\n        if (idx >= 0) { sourceHeader = r; sourceMetricIndex = idx; break; }\n      }\n      if (sourceHeader >= 0 && sourceMetricIndex >= 0) {\n        const header = sourceMatrix[sourceHeader] ?? [];\n        const columns = header\n          .map((value, index) => ({ value, index }))\n          .filter(({ index, value }) => index !== sourceMetricIndex && String(value ?? "").trim() !== "");\n        const addSourceTrend = (name: string, aliases: string[]) => {\n          if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;\n          const row = sourceMatrix.slice(sourceHeader + 1).find((candidate) => {\n            const metric = clean(candidate[sourceMetricIndex]);\n            return aliases.some((alias) => {\n              const target = clean(alias);\n              return metric === target || metric.includes(target) || target.includes(metric);\n            });\n          });\n          if (!row) return;\n          const values = columns.map(({ index }) => toNumber(row[index]));\n          if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;\n          historicalSeries.push({\n            name,\n            values: values.slice(-12),\n            periods: columns.map(({ value }) => formatPeriod(value)).slice(-12),\n          });\n        };\n        addSourceTrend("Inventory", inventoryAliases);\n        addSourceTrend("Cash", cashAliases);\n      }\n    }\n  }\n\n'''
               s = s.replace(marker, block + marker)
+
           p.write_text(s)
           PY
-      - name: Verify patch
+      - name: Verify source changes
         run: |
-          grep -q 'Direct source-sheet trend recovery' src/components/CFOBriefing.tsx
-          grep -q 'addDirectSourceTrend("Inventory"' src/components/CFOBriefing.tsx
-          grep -q 'addDirectSourceTrend("Cash"' src/components/CFOBriefing.tsx
+          grep -q '"cash position"' src/components/CFOBriefing.tsx
+          grep -q '"inventory balance"' src/components/CFOBriefing.tsx
+          grep -q 'Final core metric trend recovery' src/components/CFOBriefing.tsx
+          grep -q 'normalizedMetric.includes' src/components/CFOBriefing.tsx
+
       - name: Commit code fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/CFOBriefing.tsx
-          git commit -m 'Fix uploaded inventory and cash trend recovery'
-          git rm .github/workflows/fix-trend-rendering.yml
-          git commit -m 'Remove temporary trend rendering workflow'
+          git commit -m 'Fix uploaded core financial trend recovery'
           git push
-
-# Triggered intentionally by the next update commit; self-removes after applying the source fix.
