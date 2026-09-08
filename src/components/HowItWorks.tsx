@@ -15,11 +15,10 @@ const steps = [
     description: "Get CFO-level insights.",
     icon: (
       <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
-        <path d="M31 74c-2-7-2-13-1-19-5-5-8-12-8-20 0-15 12-27 27-27 14 0 26 11 26 25 0 8-4 15-10 20-4 3-7 8-7 14v7H31Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M48 29v20m0 0-7-7m7 7 7-7M38 61h22" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <rect x="38" y="35" width="5" height="10" rx="1" fill="currentColor" />
-        <rect x="46" y="30" width="5" height="15" rx="1" fill="#1687C7" />
-        <rect x="54" y="25" width="5" height="20" rx="1" fill="#4DBD36" />
+        <path d="M48 12c-17 0-30 13-30 30 0 11 5 20 14 26 4 3 6 7 6 12h20c0-5 2-9 6-12 9-6 14-15 14-26 0-17-13-30-30-30Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M36 80h24M39 86h18" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        <path d="M38 57V43m0 0-6 6m6-6 6 6M50 57V36m0 0-6 6m6-6 6 6M62 57V42" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M62 42l-5 5m5-5-5-1" fill="none" stroke="#4DBD36" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
