@@ -1275,6 +1275,9 @@ function analyzeWorkbook(
 
   const cashAliases = [
     "cash",
+    "cash position",
+    "cash balance",
+    "cash on hand",
     "cash and equivalents",
     "cash equivalents",
     "cash and cash equivalents",
@@ -1285,6 +1288,8 @@ function analyzeWorkbook(
   const inventoryAliases = [
     "inventory",
     "inventory asset",
+    "inventory balance",
+    "inventory position",
     "total inventory",
   ];
 
@@ -1327,7 +1332,15 @@ function analyzeWorkbook(
   if (isMetricRowFormat) {
     const addMetricTrend = (name: string, aliases: string[]) => {
       if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
-      const found = metricRows.find(({ metric }) => aliases.some((alias) => clean(alias) === clean(metric)));
+      const found = metricRows.find(({ metric }) => {
+        const normalizedMetric = clean(metric);
+        return aliases.some((alias) => {
+          const normalizedAlias = clean(alias);
+          return normalizedMetric === normalizedAlias ||
+            normalizedMetric.includes(normalizedAlias) ||
+            normalizedAlias.includes(normalizedMetric);
+        });
+      });
       if (!found) return;
       const values = found.values.map(toNumber);
       if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
@@ -1335,6 +1348,50 @@ function analyzeWorkbook(
     };
     addMetricTrend("Cash", cashAliases);
     addMetricTrend("Inventory", inventoryAliases);
+  }
+
+  // Final core metric trend recovery: use the actual Financials metric rows when
+  // normalized metricRows omitted a balance-sheet series. This never invents values.
+  if (historicalSeries.length > 0) {
+    const sourceSheet = findSheet(workbook, ["Financials", "Financial Statements", "P&L", "Profit and Loss"]);
+    if (sourceSheet) {
+      const sourceMatrix = asMatrix(workbook, sourceSheet);
+      let sourceHeader = -1;
+      let sourceMetricIndex = -1;
+      for (let r = 0; r < Math.min(sourceMatrix.length, 30); r++) {
+        const row = sourceMatrix[r] ?? [];
+        const idx = row.findIndex((value) =>
+          ["metric", "account", "line item", "account name", "description"].includes(clean(value))
+        );
+        if (idx >= 0) { sourceHeader = r; sourceMetricIndex = idx; break; }
+      }
+      if (sourceHeader >= 0 && sourceMetricIndex >= 0) {
+        const header = sourceMatrix[sourceHeader] ?? [];
+        const columns = header
+          .map((value, index) => ({ value, index }))
+          .filter(({ index, value }) => index !== sourceMetricIndex && String(value ?? "").trim() !== "");
+        const addSourceTrend = (name: string, aliases: string[]) => {
+          if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
+          const row = sourceMatrix.slice(sourceHeader + 1).find((candidate) => {
+            const metric = clean(candidate[sourceMetricIndex]);
+            return aliases.some((alias) => {
+              const target = clean(alias);
+              return metric === target || metric.includes(target) || target.includes(metric);
+            });
+          });
+          if (!row) return;
+          const values = columns.map(({ index }) => toNumber(row[index]));
+          if (values.filter((value) => Number.isFinite(value) && value !== 0).length < 3) return;
+          historicalSeries.push({
+            name,
+            values: values.slice(-12),
+            periods: columns.map(({ value }) => formatPeriod(value)).slice(-12),
+          });
+        };
+        addSourceTrend("Inventory", inventoryAliases);
+        addSourceTrend("Cash", cashAliases);
+      }
+    }
   }
 
   const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
