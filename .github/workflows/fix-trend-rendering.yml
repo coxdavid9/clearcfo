@@ -23,12 +23,11 @@ jobs:
           marker = '  const trendInsights = buildTrendInsights(historicalSeries, revenueChange);'
           if marker not in s:
               raise SystemExit('trend insights marker not found')
-
           if 'Direct source-sheet trend recovery' not in s:
               block = r'''  // Direct source-sheet trend recovery. Some uploaded metric-row workbooks
-          // contain balance-sheet metrics in the source sheet but the normalized metricRows
-          // collection intentionally contains only P&L metrics. Read the source sheet directly
-          // so Inventory and Cash can use the same chart pipeline without inventing data.
+          // keep Inventory and Cash in the Financials sheet but omit them from normalized
+          // P&L metricRows. Read the source sheet directly so all available core metrics
+          // use the same historical trend chart pipeline without inventing data.
           const addDirectSourceTrend = (name: string, aliases: string[]) => {
             if (historicalSeries.some((series) => clean(series.name) === clean(name))) return;
             const sourceSheet = findSheet(workbook, ["Financials", "Financial Statements", "P&L", "Profit and Loss"]);
@@ -74,13 +73,11 @@ jobs:
               s = s.replace(marker, block + marker)
           p.write_text(s)
           PY
-
       - name: Verify patch
         run: |
           grep -q 'Direct source-sheet trend recovery' src/components/CFOBriefing.tsx
           grep -q 'addDirectSourceTrend("Inventory"' src/components/CFOBriefing.tsx
           grep -q 'addDirectSourceTrend("Cash"' src/components/CFOBriefing.tsx
-
       - name: Commit code fix
         run: |
           git config user.name 'github-actions[bot]'
@@ -90,3 +87,5 @@ jobs:
           git rm .github/workflows/fix-trend-rendering.yml
           git commit -m 'Remove temporary trend rendering workflow'
           git push
+
+# Triggered intentionally by the next update commit; self-removes after applying the source fix.
