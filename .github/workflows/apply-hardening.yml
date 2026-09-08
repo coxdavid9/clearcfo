@@ -6,7 +6,6 @@ on:
 
 jobs:
   patch:
-    if: github.event.head_commit.message != 'chore: Apply ClearCFO hardening'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,6 +19,9 @@ jobs:
 
           briefing = Path('src/components/CFOBriefing.tsx')
           text = briefing.read_text()
+          if 'hasValidAnalysis' in text:
+              print('Hardening patches are already present; nothing to do.')
+              raise SystemExit(0)
 
           replacements = [
               ('  const [aiError, setAiError] =\n    useState("");\n\n  const [expandedMetric, setExpandedMetric] =', '  const [aiError, setAiError] =\n    useState("");\n\n  const [hasValidAnalysis, setHasValidAnalysis] =\n    useState(true);\n\n  const [expandedMetric, setExpandedMetric] ='),
@@ -33,10 +35,7 @@ jobs:
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
           <div className="border-b border-slate-200 bg-white px-6 py-6 sm:px-8 sm:py-7">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
-                <p className="mt-1 text-xs text-slate-500">Financial briefing</p>
-              </div>
+              <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p><p className="mt-1 text-xs text-slate-500">Financial briefing</p></div>
               <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-600">{uploading ? "Analyzing…" : "Upload Excel"}</button>
             </div>
           </div>
@@ -57,7 +56,6 @@ jobs:
               ('{aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence', '{data.attention === 0 ? "Monitor" : aiAnalysis.priority} · {aiAnalysis.confidence >= 85 ? "High" : aiAnalysis.confidence >= 65 ? "Moderate" : "Limited"} confidence'),
               ('{aiAnalysis.whyItMatters}', '{compactWhyItMatters(aiAnalysis.whyItMatters)}'),
           ]
-
           for old, new in replacements:
               if old not in text:
                   raise SystemExit(f'Expected briefing patch block not found: {old[:100]}')
