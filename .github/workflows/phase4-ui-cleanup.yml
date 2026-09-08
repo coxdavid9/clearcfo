@@ -6,7 +6,7 @@ on:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'phase 4 UI cleanup') }}
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,15 +21,14 @@ jobs:
           p = Path('src/components/CFOBriefing.tsx')
           s = p.read_text()
 
-          s = s.replace(
-              'const percent = (value: number) =>\n  `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;',
-              'const percent = (value: number) => {\n  const rounded = Number(value.toFixed(1));\n  return `${rounded >= 0 ? "+" : ""}${rounded}%`;\n};'
-          )
-
-          s = s.replace(
-              '{driver.confidence}% confidence',
-              '{driver.confidence}% confidence'
-          )
+          old_percent = '''const percent = (value: number) =>
+  `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;'''
+          new_percent = '''const percent = (value: number) => {
+  const rounded = Number(value.toFixed(1));
+  return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+};'''
+          if old_percent in s:
+              s = s.replace(old_percent, new_percent, 1)
 
           confidence_pattern = re.compile(
               r'\n\s*<span className="shrink-0 text-\[10px\] font-semibold text-slate-400">\{driver\.confidence\}% confidence</span>'
@@ -57,8 +56,7 @@ jobs:
               r'\n\s*\{data\.detailDrivers\.length > 0 && \(.*?\n\s*\}\s*\n\s*\{data\.relationships\.length > 0 && \(',
               re.S
           )
-          replacement = '\n\n              {data.relationships.length > 0 && ('
-          s, count = detail_pattern.subn(replacement, s, count=1)
+          s, count = detail_pattern.subn('\n\n              {data.relationships.length > 0 && (', s, count=1)
           if count != 1:
               raise SystemExit('Largest account movements block not found')
 
