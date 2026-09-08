@@ -180,9 +180,14 @@ const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
+const formatPercentValue = (value: number): string => {
+  const rounded = Number(value.toFixed(1));
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+};
+
 const percent = (value: number) => {
   const rounded = Number(value.toFixed(1));
-  return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+  return `${rounded >= 0 ? "+" : ""}${formatPercentValue(value)}%`;
 };
 
 const formatCurrency = (value: number): string =>
@@ -486,11 +491,11 @@ function buildTrendInsights(
     const gap = opex - revenue;
     if (gap >= 5) {
       insights.push(
-        `Operating expenses are growing ${Math.abs(opex).toFixed(1)}% across the recent periods versus ${Math.abs(revenue).toFixed(1)}% for revenue. The widening gap suggests operating leverage is weakening.`
+        `Operating expenses are growing ${formatPercentValue(Math.abs(opex))}% across the recent periods versus ${formatPercentValue(Math.abs(revenue))}% for revenue. The widening gap suggests operating leverage is weakening.`
       );
     } else if (gap <= -5) {
       insights.push(
-        `Revenue is growing ${Math.abs(revenue).toFixed(1)}% across the recent periods while operating expenses are growing ${Math.abs(opex).toFixed(1)}%. The business is currently gaining operating leverage.`
+        `Revenue is growing ${formatPercentValue(Math.abs(revenue))}% across the recent periods while operating expenses are growing ${formatPercentValue(Math.abs(opex))}%. The business is currently gaining operating leverage.`
       );
     }
   }
@@ -498,24 +503,24 @@ function buildTrendInsights(
   if (typeof revenue === "number" && typeof margin === "number") {
     if (margin <= -2 && revenue >= 0) {
       insights.push(
-        `Gross margin has declined ${Math.abs(margin).toFixed(1)}% across the recent periods while revenue increased ${Math.abs(revenue).toFixed(1)}%. Growth is not fully translating into gross-profit improvement.`
+        `Gross margin has declined ${formatPercentValue(Math.abs(margin))}% across the recent periods while revenue increased ${formatPercentValue(Math.abs(revenue))}%. Growth is not fully translating into gross-profit improvement.`
       );
     } else if (margin >= 2 && revenue >= 0) {
       insights.push(
-        `Gross margin has improved ${Math.abs(margin).toFixed(1)}% while revenue increased ${Math.abs(revenue).toFixed(1)}%. The business is generating better economics on its sales base.`
+        `Gross margin has improved ${formatPercentValue(Math.abs(margin))}% while revenue increased ${formatPercentValue(Math.abs(revenue))}%. The business is generating better economics on its sales base.`
       );
     }
   }
 
   if (typeof mro === "number" && Math.abs(mro) >= 5) {
     insights.push(
-      `MRO / Repairs changed ${mro >= 0 ? "up" : "down"} ${Math.abs(mro).toFixed(1)}% across the recent periods. A sustained move can affect operating leverage and deserves a driver-level review.`
+      `MRO / Repairs changed ${mro >= 0 ? "up" : "down"} ${formatPercentValue(Math.abs(mro))}% across the recent periods. A sustained move can affect operating leverage and deserves a driver-level review.`
     );
   }
 
   if (typeof unusual === "number" && Math.abs(unusual) >= 5) {
     insights.push(
-      `Unusual spend changed ${unusual >= 0 ? "up" : "down"} ${Math.abs(unusual).toFixed(1)}% across the recent periods. Management should determine whether the movement is isolated or becoming recurring.`
+      `Unusual spend changed ${unusual >= 0 ? "up" : "down"} ${formatPercentValue(Math.abs(unusual))}% across the recent periods. Management should determine whether the movement is isolated or becoming recurring.`
     );
   }
 
@@ -539,11 +544,11 @@ function buildTrendInsights(
         : "";
 
       if (rising >= Math.max(2, diffs.length - 1)) {
-        insights.push(`${series.name} has risen consistently${span}, increasing ${Math.abs(change).toFixed(1)}% over the displayed span.`);
+        insights.push(`${series.name} has risen consistently${span}, increasing ${formatPercentValue(Math.abs(change))}% over the displayed span.`);
       } else if (falling >= Math.max(2, diffs.length - 1)) {
-        insights.push(`${series.name} has declined consistently${span}, decreasing ${Math.abs(change).toFixed(1)}% over the displayed span.`);
+        insights.push(`${series.name} has declined consistently${span}, decreasing ${formatPercentValue(Math.abs(change))}% over the displayed span.`);
       } else if (Math.abs(change) >= 5) {
-        insights.push(`${series.name} is volatile across the displayed periods, with a net ${change >= 0 ? "increase" : "decrease"} of ${Math.abs(change).toFixed(1)}%.`);
+        insights.push(`${series.name} is volatile across the displayed periods, with a net ${change >= 0 ? "increase" : "decrease"} of ${formatPercentValue(Math.abs(change))}%.`);
       }
       if (insights.length >= 3) break;
     }
@@ -551,7 +556,7 @@ function buildTrendInsights(
 
   if (!insights.length && fallbackRevenueChange !== 0) {
     insights.push(
-      `Revenue changed ${Math.abs(fallbackRevenueChange).toFixed(1)}% versus the prior period, but the available history does not support a stronger multi-period relationship.`
+      `Revenue changed ${formatPercentValue(Math.abs(fallbackRevenueChange))}% versus the prior period, but the available history does not support a stronger multi-period relationship.`
     );
   }
 
@@ -1487,11 +1492,7 @@ function analyzeWorkbook(
       revenueChange + 3
   ) {
     const message =
-      `Inventory is growing ${inventoryChange.toFixed(
-        1
-      )}% while revenue is changing ${revenueChange.toFixed(
-        1
-      )}%.`;
+      `Inventory is growing ${formatPercentValue(inventoryChange)}% while revenue is changing ${formatPercentValue(revenueChange)}%.`;
 
     alerts.push(message);
 
@@ -1527,11 +1528,9 @@ function analyzeWorkbook(
 
   if (cashChange < -5) {
     const message =
-      `Cash declined ${Math.abs(
+      `Cash declined ${formatPercentValue(Math.abs(
         cashChange
-      ).toFixed(
-        1
-      )}% from the prior period.`;
+      ))}% from the prior period.`;
 
     alerts.push(message);
 
@@ -1550,11 +1549,7 @@ function analyzeWorkbook(
     operatingExpenseChange > 5
   ) {
     const message =
-      `Operating expenses increased ${operatingExpenseChange.toFixed(
-        1
-      )}% while revenue changed ${revenueChange.toFixed(
-        1
-      )}%.`;
+      `Operating expenses increased ${formatPercentValue(operatingExpenseChange)}% while revenue changed ${formatPercentValue(revenueChange)}%.`;
 
     alerts.push(message);
 
@@ -1771,7 +1766,7 @@ function analyzeWorkbook(
       id: "inventory-growth",
       category: "Inventory",
       title: "Inventory is outpacing revenue",
-      observation: `Inventory increased ${inventoryChange.toFixed(1)}% while revenue changed ${revenueChange.toFixed(1)}%.`,
+      observation: `Inventory increased ${formatPercentValue(inventoryChange)}% while revenue changed ${formatPercentValue(revenueChange)}%.`,
       evidence: [
         `Inventory growth: ${percent(inventoryChange)}`,
         `Revenue change: ${percent(revenueChange)}`,
@@ -1792,7 +1787,7 @@ function analyzeWorkbook(
       title: "Gross margin is compressing",
       observation: `Gross margin declined ${Math.abs(marginChange).toFixed(1)} points from the prior period.`,
       evidence: [
-        `Current gross margin: ${grossMargin.toFixed(1)}%`,
+        `Current gross margin: ${formatPercentValue(grossMargin)}%`,
         `Margin change: ${marginChange.toFixed(1)} points`,
         `Revenue change: ${percent(revenueChange)}`,
       ],
@@ -1810,7 +1805,7 @@ function analyzeWorkbook(
       id: "cash-decline",
       category: "Cash",
       title: "Cash is declining",
-      observation: `Cash declined ${Math.abs(cashChange).toFixed(1)}% from the prior period.`,
+      observation: `Cash declined ${formatPercentValue(Math.abs(cashChange))}% from the prior period.`,
       evidence: [
         `Current cash: ${formatCurrency(cash)}`,
         `Cash change: ${percent(cashChange)}`,
@@ -1829,7 +1824,7 @@ function analyzeWorkbook(
       id: "opex-growth",
       category: "Operating Expense",
       title: "Operating expenses are growing faster than revenue",
-      observation: `Operating expenses increased ${operatingExpenseChange.toFixed(1)}% while revenue changed ${revenueChange.toFixed(1)}%.`,
+      observation: `Operating expenses increased ${formatPercentValue(operatingExpenseChange)}% while revenue changed ${formatPercentValue(revenueChange)}%.`,
       evidence: [
         `Operating expense growth: ${percent(operatingExpenseChange)}`,
         `Revenue change: ${percent(revenueChange)}`,
@@ -2016,7 +2011,7 @@ function analyzeWorkbook(
         id: "revenue-trend-no-driver",
         category: "Revenue",
         title: "Revenue is trending downward without a proven operating driver",
-        observation: `Revenue declined ${Math.abs(multiPeriodRevenueChange).toFixed(1)}% across the displayed periods while gross margin remained broadly stable.`,
+        observation: `Revenue declined ${formatPercentValue(Math.abs(multiPeriodRevenueChange))}% across the displayed periods while gross margin remained broadly stable.`,
         evidence: [
           `Multi-period revenue change: ${percent(multiPeriodRevenueChange)}`,
           `Current-period revenue change: ${percent(revenueChange)}`,
@@ -2055,7 +2050,7 @@ function analyzeWorkbook(
         observation: `Gross margin declined ${Math.abs(multiPeriodMarginChange).toFixed(1)} points from the first to latest displayed period.`,
         evidence: [
           `Multi-period margin change: ${multiPeriodMarginChange.toFixed(1)} points`,
-          `Current gross margin: ${grossMargin.toFixed(1)}%`,
+          `Current gross margin: ${formatPercentValue(grossMargin)}%`,
           `Current-period margin change: ${marginChange.toFixed(1)} points`,
         ],
         direction: "down",
@@ -2091,7 +2086,7 @@ function analyzeWorkbook(
         id: "multi-period-cash-deterioration",
         category: "Cash",
         title: "Cash has deteriorated materially across the displayed periods",
-        observation: `Cash declined ${Math.abs(multiPeriodCashChange).toFixed(1)}% from the first to latest displayed period.`,
+        observation: `Cash declined ${formatPercentValue(Math.abs(multiPeriodCashChange))}% from the first to latest displayed period.`,
         evidence: [
           `Multi-period cash change: ${percent(multiPeriodCashChange)}`,
           `Current cash: ${formatCurrency(cash)}`,
@@ -2124,7 +2119,7 @@ function analyzeWorkbook(
         id: "revenue-trend-no-driver",
         category: "Revenue",
         title: `Revenue is ${multiPeriodRevenueChange >= 0 ? "trending upward" : "trending downward"} without a proven operating driver`,
-        observation: `Revenue changed ${Math.abs(multiPeriodRevenueChange).toFixed(1)}% across the displayed periods, but the workbook does not contain enough operating detail to establish what is driving the trend.`,
+        observation: `Revenue changed ${formatPercentValue(Math.abs(multiPeriodRevenueChange))}% across the displayed periods, but the workbook does not contain enough operating detail to establish what is driving the trend.`,
         evidence: [
           `Multi-period revenue change: ${percent(multiPeriodRevenueChange)}`,
           `Latest-period revenue change: ${percent(revenueChange)}`,
@@ -2144,7 +2139,7 @@ function analyzeWorkbook(
         observation: "The supplied data does not show a material exception that clearly dominates the current period.",
         evidence: [
           `Revenue change: ${percent(revenueChange)}`,
-          `Gross margin: ${grossMargin.toFixed(1)}%`,
+          `Gross margin: ${formatPercentValue(grossMargin)}%`,
           `Cash change: ${percent(cashChange)}`,
         ],
         direction: "watch",
@@ -2405,9 +2400,9 @@ function buildDeterministicExecutiveSummary(data: BriefingData): {
   const summaryParts: string[] = [];
 
   if (data.revenueChange < 0) {
-    summaryParts.push(`Revenue is down ${Math.abs(data.revenueChange).toFixed(1)}%`);
+    summaryParts.push(`Revenue is down ${formatPercentValue(Math.abs(data.revenueChange))}%`);
   } else {
-    summaryParts.push(`Revenue is up ${data.revenueChange.toFixed(1)}%`);
+    summaryParts.push(`Revenue is up ${formatPercentValue(data.revenueChange)}%`);
   }
 
   if (data.marginChange < 0) {
@@ -2417,9 +2412,9 @@ function buildDeterministicExecutiveSummary(data: BriefingData): {
   }
 
   if (data.cashChange < 0) {
-    summaryParts.push(`cash is down ${Math.abs(data.cashChange).toFixed(1)}%`);
+    summaryParts.push(`cash is down ${formatPercentValue(Math.abs(data.cashChange))}%`);
   } else {
-    summaryParts.push(`cash is up ${data.cashChange.toFixed(1)}%`);
+    summaryParts.push(`cash is up ${formatPercentValue(data.cashChange)}%`);
   }
 
   const trendContext = data.trendInsights[0] ?? "The available history does not establish a stronger multi-period pattern.";
@@ -2612,7 +2607,25 @@ export default function CFOBriefing() {
         );
       }
 
-      setAiAnalysis(payload.analysis as AIAnalysis);
+      const normalizePercentageText = (value: string): string =>
+        value.replace(/(-?\d+)\.0%\b/g, "$1%");
+
+      const analysis = payload.analysis as AIAnalysis;
+      setAiAnalysis({
+        ...analysis,
+        executiveSummary: normalizePercentageText(analysis.executiveSummary),
+        primaryDriver: normalizePercentageText(analysis.primaryDriver),
+        whyItMatters: normalizePercentageText(analysis.whyItMatters),
+        managementQuestion: normalizePercentageText(analysis.managementQuestion),
+        recommendedAction: normalizePercentageText(analysis.recommendedAction),
+        evidence: analysis.evidence.map(normalizePercentageText),
+        unknowns: analysis.unknowns?.map(normalizePercentageText),
+        actions: analysis.actions.map((action) => ({
+          ...action,
+          title: normalizePercentageText(action.title),
+          rationale: normalizePercentageText(action.rationale),
+        })),
+      });
     } catch (err) {
       setAiError(
         err instanceof Error
@@ -2746,7 +2759,7 @@ export default function CFOBriefing() {
                 {
                   key: "margin" as const,
                   label: "Gross Margin",
-                  value: `${data.grossMargin.toFixed(1)}%`,
+                  value: `${formatPercentValue(data.grossMargin)}%`,
                   change: `${data.marginChange >= 0 ? "+" : ""}${data.marginChange.toFixed(1)} pts`,
                   tone: data.marginChange > 0 ? "text-emerald-600" : data.marginChange < 0 ? "text-red-600" : "text-amber-600",
                   signal: data.marginChange > 0 ? "bg-emerald-500" : data.marginChange < 0 ? "bg-red-500" : "bg-amber-400",
@@ -2818,21 +2831,21 @@ export default function CFOBriefing() {
                 {
                   key: "revenue" as const,
                   label: "Revenue",
-                  detail: `Current revenue is ${currency.format(data.revenue)}. The implied prior-period level is approximately ${currency.format(data.revenue / (1 + data.revenueChange / 100))}, a ${data.revenueChange >= 0 ? "gain" : "decline"} of ${Math.abs(data.revenueChange).toFixed(1)}%.`,
-                  context: `Across the available trend, revenue has ${trendChange >= 0 ? "increased" : "declined"} ${Math.abs(trendChange).toFixed(1)}%.`,
+                  detail: `Current revenue is ${currency.format(data.revenue)}. The implied prior-period level is approximately ${currency.format(data.revenue / (1 + data.revenueChange / 100))}, a ${data.revenueChange >= 0 ? "gain" : "decline"} of ${formatPercentValue(Math.abs(data.revenueChange))}%.`,
+                  context: `Across the available trend, revenue has ${trendChange >= 0 ? "increased" : "declined"} ${formatPercentValue(Math.abs(trendChange))}%.`,
                   why: "Revenue growth is useful context for judging whether costs, margins, and working capital are keeping pace.",
                 },
                 {
                   key: "margin" as const,
                   label: "Gross Margin",
-                  detail: `Current gross margin is ${data.grossMargin.toFixed(1)}%. The implied prior-period margin is approximately ${(data.grossMargin - data.marginChange).toFixed(1)}%, a ${data.marginChange >= 0 ? "gain" : "decline"} of ${Math.abs(data.marginChange).toFixed(1)} points.`,
+                  detail: `Current gross margin is ${formatPercentValue(data.grossMargin)}%. The implied prior-period margin is approximately ${formatPercentValue((data.grossMargin - data.marginChange))}%, a ${data.marginChange >= 0 ? "gain" : "decline"} of ${Math.abs(data.marginChange).toFixed(1)} points.`,
                   context: `Margin is ${data.marginChange >= 0 ? "improving" : "declining"} versus the prior period.`,
                   why: "Margin shows how much of each sales dollar remains after direct costs and helps explain whether revenue growth is translating into gross profit.",
                 },
                 {
                   key: "cash" as const,
                   label: "Cash Position",
-                  detail: `Current cash is ${currency.format(data.cash)}. The implied prior-period position is approximately ${currency.format(data.cash / (1 + data.cashChange / 100))}, a ${data.cashChange >= 0 ? "gain" : "decline"} of ${Math.abs(data.cashChange).toFixed(1)}%.`,
+                  detail: `Current cash is ${currency.format(data.cash)}. The implied prior-period position is approximately ${currency.format(data.cash / (1 + data.cashChange / 100))}, a ${data.cashChange >= 0 ? "gain" : "decline"} of ${formatPercentValue(Math.abs(data.cashChange))}%.`,
                   context: "Cash should be read alongside inventory, receivables, payables, and operating performance.",
                   why: "A stronger cash balance is useful, but the source and sustainability of the movement matter.",
                 },
@@ -3102,7 +3115,7 @@ export default function CFOBriefing() {
                     const latest = values.at(-1) ?? 0;
                     const prior = values.at(-2) ?? latest;
                     const formatTrendValue = (value: number) =>
-                      isMargin ? `${value.toFixed(1)}%` : formatCurrency(value);
+                      isMargin ? `${formatPercentValue(value)}%` : formatCurrency(value);
 
                     // Use every available period as a real data point. The axis
                     // labels are intentionally sparse so the chart stays readable.
@@ -3176,7 +3189,7 @@ export default function CFOBriefing() {
                     const chartBottom = 142;
                     const chartHeight = chartBottom - chartTop;
                     const yTicks = [maxValue, (maxValue + minValue) / 2, minValue];
-                    const tickLabels = yTicks.map((value) => isMargin ? `${value.toFixed(1)}%` : formatCurrency(value));
+                    const tickLabels = yTicks.map((value) => isMargin ? `${formatPercentValue(value)}%` : formatCurrency(value));
                     const xFor = (index: number) => values.length === 1
                       ? (chartLeft + chartRight) / 2
                       : chartLeft + (index / (values.length - 1)) * (chartRight - chartLeft);
