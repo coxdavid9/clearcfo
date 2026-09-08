@@ -1,0 +1,71 @@
+name: Apply ClearCFO Phase 2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'phase 2 hardening') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply Phase 2 hardening
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/CFOBriefing.tsx')
+          s = p.read_text()
+
+          old = '''  const [data, setData] =\n    useState<BriefingData>(\n      demoData\n    );\n\n  const [uploading, setUploading] ='''
+          new = '''  const [data, setData] =\n    useState<BriefingData>(\n      demoData\n    );\n\n  const [hasValidAnalysis, setHasValidAnalysis] =\n    useState(true);\n\n  const [uploading, setUploading] ='''
+          if old not in s:
+              raise SystemExit('state anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''    setUploading(true);\n    setError(\"\");\n    setAiError(\"\");'''
+          new = '''    setUploading(true);\n    setHasValidAnalysis(false);\n    setError(\"\");\n    setAiError(\"\");'''
+          if old not in s:
+              raise SystemExit('upload-start anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''      setData(analyzed);\n      await generateAIAnalysis(analyzed);'''
+          new = '''      setData(analyzed);\n      setHasValidAnalysis(true);\n      await generateAIAnalysis(analyzed);'''
+          if old not in s:
+              raise SystemExit('upload-success anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''    } catch (err) {\n      setError(\n        err instanceof Error\n          ? err.message\n          : \"We couldn't read that workbook. Please check the file format and sheet names.\"\n      );'''
+          new = '''    } catch (err) {\n      setHasValidAnalysis(false);\n      setError(\n        err instanceof Error\n          ? err.message\n          : \"We couldn't read that workbook. Please check the file format and sheet names.\"\n      );'''
+          if old not in s:
+              raise SystemExit('upload-catch anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''  return (\n    <div className=\"px-5 py-8 sm:px-8 sm:py-12 lg:py-16\">'''
+          new = '''  if (!hasValidAnalysis) {\n    return (\n      <div className=\"px-5 py-8 sm:px-8 sm:py-12 lg:py-16\">\n        <input\n          ref={fileRef}\n          type=\"file\"\n          accept=\".xlsx,.xls,.csv\"\n          className=\"hidden\"\n          onChange={handleUpload}\n        />\n        {error && (\n          <div className=\"mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800\">\n            {error}\n          </div>\n        )}\n        <div className=\"mx-auto w-full max-w-6xl\">\n          {emptyState}\n        </div>\n      </div>\n    );\n  }\n\n  return (\n    <div className=\"px-5 py-8 sm:px-8 sm:py-12 lg:py-16\">'''
+          if old not in s:
+              raise SystemExit('return anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''<p className=\"text-xs font-bold uppercase tracking-[0.18em] text-slate-400\">Underlying account drivers</p>'''
+          new = '''<p className=\"text-xs font-bold uppercase tracking-[0.18em] text-slate-400\">Largest account movements</p>'''
+          if old not in s:
+              raise SystemExit('driver label anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''{aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? \"High\" : aiAnalysis.confidence >= 65 ? \"Moderate\" : \"Limited\"} confidence'''
+          new = '''{data.attention === 0 ? \"Monitor\" : aiAnalysis.priority} priority · {aiAnalysis.confidence >= 85 ? \"High\" : aiAnalysis.confidence >= 65 ? \"Moderate\" : \"Limited\"} confidence'''
+          if old not in s:
+              raise SystemExit('AI priority anchor not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx
+          git commit -m "fix: phase 2 hardening for upload state and analysis labels"
+          git push
