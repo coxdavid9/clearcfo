@@ -1,0 +1,53 @@
+name: Fix trend alias declaration order
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'Fix trend alias declaration order'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move trend ingestion below alias declarations
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('src/components/CFOBriefing.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          start_marker = '  // Uploaded workbooks can store cash and inventory history on a separate Balance Sheet.'
+          end_marker = '  const latestMetricIndex = isMetricRowFormat'
+
+          start = text.find(start_marker)
+          end = text.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('Trend patch block or insertion marker not found')
+
+          block = text[start:end]
+          text_without_block = text[:start] + text[end:]
+
+          alias_marker = '  const inventoryAliases = ['
+          alias_start = text_without_block.find(alias_marker)
+          if alias_start < 0:
+              raise SystemExit('inventoryAliases declaration not found')
+          alias_end = text_without_block.find('\n  ];', alias_start)
+          if alias_end < 0:
+              raise SystemExit('inventoryAliases closing declaration not found')
+          alias_end += len('\n  ];')
+
+          text_without_block = text_without_block[:alias_end] + '\n\n' + block.rstrip() + '\n' + text_without_block[alias_end:]
+          path.write_text(text_without_block, encoding='utf-8')
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx
+          git diff --cached --quiet || git commit -m "Fix trend alias declaration order"
+          git push
