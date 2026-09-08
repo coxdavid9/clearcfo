@@ -6,7 +6,7 @@ on:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'phase 3 layout') }}
+    if: ${{ !contains(github.event.head_commit.message, 'phase 3 layout applied') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,5 +40,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/app/api/cfo-analysis/route.ts src/components/CFOBriefing.tsx
-          git commit -m "fix: phase 3 layout and explanation"
+          git commit -m "fix: phase 3 layout applied"
           git push
