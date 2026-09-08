@@ -23,7 +23,8 @@ jobs:
           addition = anchor + '\n  "Keep whyItMatters to 2 or 3 short sentences and target roughly 55 words or fewer. Do not repeat the executiveSummary, evidence list, recommendedAction, or unknowns verbatim; explain only the business significance of the primary driver.",\n\n  "Use calibrated causal language. Prefer phrases such as coincides with, is consistent with, may contribute to, can indicate, suggests, or warrants investigation. Do not say an event caused another outcome unless the supplied evidence explicitly establishes causation.",\n'
           if anchor not in s:
               raise SystemExit('route anchor not found')
-          s = s.replace(anchor, addition, 1)
+          if 'Keep whyItMatters to 2 or 3 short sentences' not in s:
+              s = s.replace(anchor, addition, 1)
           route.write_text(s)
 
           cfo = Path('src/components/CFOBriefing.tsx')
@@ -34,12 +35,12 @@ jobs:
               raise SystemExit('CFO marker not found')
           if 'function compactWhyItMatters' not in s:
               s = s.replace(marker, helper + marker, 1)
-          import re
-          pattern = r'(<p[^>]*>\\s*)\\{aiAnalysis\\.whyItMatters\\}(\\s*</p>)'
-          s2, count = re.subn(pattern, r'\\1{compactWhyItMatters(aiAnalysis.whyItMatters)}\\2', s, count=1)
-          if count != 1:
-              raise SystemExit(f'Why It Matters render not found: {count}')
-          cfo.write_text(s2)
+          old = '{aiAnalysis.whyItMatters}'
+          new = '{compactWhyItMatters(aiAnalysis.whyItMatters)}'
+          if old not in s:
+              raise SystemExit('Why It Matters expression not found')
+          s = s.replace(old, new, 1)
+          cfo.write_text(s)
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
