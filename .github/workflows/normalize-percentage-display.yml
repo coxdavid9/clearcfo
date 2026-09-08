@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Normalize percentage formatting
-        shell: python
+        shell: python3 {0}
         run: |
           from pathlib import Path
           import re
@@ -50,7 +50,7 @@ jobs:
           # decimal place should suppress an insignificant trailing zero while
           # retaining a meaningful decimal (31.0% -> 31%, 31.1% -> 31.1%).
           text = re.sub(
-              r"\\$\\{([^{}]*?)\\.toFixed\\(\\s*1\\s*\\)\\}%(?!%)",
+              r"\$\{([^{}]*?)\.toFixed\(\s*1\s*\)\}%(?!%)",
               lambda m: "${formatPercentValue(" + m.group(1) + ")}%",
               text,
               flags=re.DOTALL,
@@ -60,7 +60,7 @@ jobs:
           # Normalize only a zero tenth so we do not change meaningful precision.
           old_ai = '      setAiAnalysis(payload.analysis as AIAnalysis);'
           new_ai = '''      const normalizePercentageText = (value: string): string =>
-        value.replace(/(-?\\d+)\\.0%\\b/g, "$1%");
+        value.replace(/(-?\d+)\.0%\b/g, "$1%");
 
       const analysis = payload.analysis as AIAnalysis;
       setAiAnalysis({
