@@ -1,0 +1,47 @@
+name: Apply ClearCFO Trend Improvements
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply trend improvements
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/components/CFOBriefing.tsx')
+          text = path.read_text()
+
+          old_display = 'trendSeries: historicalSeries.slice(-6),'
+          new_display = 'trendSeries: historicalSeries.slice(-12),'
+          if old_display not in text:
+              raise SystemExit('Expected trendSeries display line was not found.')
+          text = text.replace(old_display, new_display, 1)
+
+          marker = '  // a stronger cross-metric interpretation.\n'
+          if 'Detect material one-period spikes' not in text:
+              spike = '''  // Detect material one-period spikes that a simple start-to-end change can hide.\n  // Prefer expense/cost spikes because they are especially useful management signals.\n  if (insights.length < 3) {\n    const spikeCandidates: {\n      series: { name: string; values: number[]; periods: string[] };\n      index: number;\n      score: number;\n      isExpense: boolean;\n    }[] = [];\n\n    for (const series of seriesMap) {\n      const values = series.values;\n      if (values.length < 3) continue;\n\n      const isExpense = /expense|opex|spend|cost|mro/i.test(series.name);\n\n      for (let i = 1; i < values.length - 1; i++) {\n        const before = values[i - 1];\n        const peak = values[i];\n        const after = values[i + 1];\n        if (![before, peak, after].every(Number.isFinite) || before === 0 || peak === 0) continue;\n\n        const rise = ((peak - before) / Math.abs(before)) * 100;\n        const fall = ((peak - after) / Math.abs(peak)) * 100;\n        const neighborAvg = (Math.abs(before) + Math.abs(after)) / 2;\n        const deviation = neighborAvg > 0\n          ? ((Math.abs(peak) - neighborAvg) / neighborAvg) * 100\n          : 0;\n\n        if (rise >= 20 && fall >= 15 && deviation >= 20) {\n          spikeCandidates.push({ series, index: i, score: deviation, isExpense });\n        }\n      }\n    }\n\n    spikeCandidates.sort((a, b) =>\n      Number(b.isExpense) - Number(a.isExpense) || b.score - a.score\n    );\n\n    const candidate = spikeCandidates[0];\n    if (candidate) {\n      const { series, index } = candidate;\n      const peak = series.values[index];\n      const peakPeriod = series.periods[index] ?? 'the period';\n      const endValue = series.values[series.values.length - 1];\n      const endPeriod = series.periods[series.periods.length - 1] ?? 'the latest period';\n\n      insights.push(\n        `${series.name} spiked sharply in ${peakPeriod} to ${formatCurrency(peak)} before falling back to ${formatCurrency(endValue)} in ${endPeriod}. The temporary spike warrants review to determine whether it was driven by a one-time item or a recurring cost issue.`\n      );\n    }\n  }\n\n'''
+              if marker not in text:
+                  raise SystemExit('Expected trend insight marker was not found.')
+              text = text.replace(marker, spike + marker, 1)
+
+          path.write_text(text)
+      - name: Commit source changes and remove this workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/CFOBriefing.tsx .github/workflows/apply-trend-improvements.yml
+          git commit -m 'Improve trend history and spike insights'
+          git push
