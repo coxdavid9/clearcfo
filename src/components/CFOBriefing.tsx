@@ -525,6 +525,59 @@ function buildTrendInsights(
   }
 
   // Only fall back to a generic trend statement when the data does not support
+  // Detect material one-period spikes that a simple start-to-end change can hide.
+  // Prefer expense/cost spikes because they are especially useful management signals.
+  if (insights.length < 3) {
+    const spikeCandidates: {
+      series: { name: string; values: number[]; periods: string[] };
+      index: number;
+      score: number;
+      isExpense: boolean;
+    }[] = [];
+
+    for (const series of seriesMap) {
+      const values = series.values;
+      if (values.length < 3) continue;
+
+      const isExpense = /expense|opex|spend|cost|mro/i.test(series.name);
+
+      for (let i = 1; i < values.length - 1; i++) {
+        const before = values[i - 1];
+        const peak = values[i];
+        const after = values[i + 1];
+        if (![before, peak, after].every(Number.isFinite) || before === 0 || peak === 0) continue;
+
+        const rise = ((peak - before) / Math.abs(before)) * 100;
+        const fall = ((peak - after) / Math.abs(peak)) * 100;
+        const neighborAvg = (Math.abs(before) + Math.abs(after)) / 2;
+        const deviation = neighborAvg > 0
+          ? ((Math.abs(peak) - neighborAvg) / neighborAvg) * 100
+          : 0;
+
+        if (rise >= 20 && fall >= 15 && deviation >= 20) {
+          spikeCandidates.push({ series, index: i, score: deviation, isExpense });
+        }
+      }
+    }
+
+    spikeCandidates.sort((a, b) =>
+      Number(b.isExpense) - Number(a.isExpense) || b.score - a.score
+    );
+
+    const candidate = spikeCandidates[0];
+    if (candidate) {
+      const { series, index } = candidate;
+      const peak = series.values[index];
+      const peakPeriod = series.periods[index] ?? 'the period';
+      const endValue = series.values[series.values.length - 1];
+      const endPeriod = series.periods[series.periods.length - 1] ?? 'the latest period';
+
+      insights.push(
+        `${series.name} spiked sharply in ${peakPeriod} to ${formatCurrency(peak)} before falling back to ${formatCurrency(endValue)} in ${endPeriod}. The temporary spike warrants review to determine whether it was driven by a one-time item or a recurring cost issue.`
+      );
+    }
+  }
+
   // a stronger cross-metric interpretation.
   if (!insights.length) {
     for (const series of seriesMap) {
@@ -2482,7 +2535,7 @@ function analyzeWorkbook(
     relationships,
     detailDrivers,
     trendInsights,
-    trendSeries: historicalSeries.slice(-6),
+    trendSeries: historicalSeries.slice(-12),
     unknowns: unknowns.slice(0, 6),
   };
 }
