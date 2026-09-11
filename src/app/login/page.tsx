@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
