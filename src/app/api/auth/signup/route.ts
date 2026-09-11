@@ -17,8 +17,8 @@ function readProfile(body: Record<string, unknown>) {
     profile[field] = typeof value === "string" ? value.trim().slice(0, 200) : "";
   }
 
-  if (!profile.companyName || !profile.industry || !profile.companySize || !profile.contactName) {
-    return { error: "Company name, industry, company size, and primary contact are required." as const };
+  if (!profile.industry || !profile.companySize || !profile.contactName) {
+    return { error: "Industry, company size, and primary contact are required." as const };
   }
 
   return { profile };
