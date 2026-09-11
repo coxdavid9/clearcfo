@@ -1,21 +1,40 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getAuthCookieNames, getSupabaseUser } from "../../../../lib/supabase-auth";
+import { getAuthCookieNames, getSupabaseUser, refreshSession } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
-  const { AUTH_COOKIE } = getAuthCookieNames();
-  const accessToken = request.headers.get("cookie")?.match(new RegExp(`${AUTH_COOKIE}=([^;]+)`))?.[1];
+export async function GET() {
+  const cookieStore = await cookies();
+  const { AUTH_COOKIE, REFRESH_COOKIE } = getAuthCookieNames();
+  const accessToken = cookieStore.get(AUTH_COOKIE)?.value;
+  const refreshToken = cookieStore.get(REFRESH_COOKIE)?.value;
 
-  if (!accessToken) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+  if (accessToken) {
+    const user = await getSupabaseUser(accessToken);
+    if (user) {
+      return NextResponse.json({ authenticated: true, user: { id: user.id, email: user.email } }, { headers: { "Cache-Control": "no-store" } });
+    }
   }
 
-  const user = await getSupabaseUser(decodeURIComponent(accessToken));
-
-  if (!user) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+  if (!refreshToken) {
+    return NextResponse.json({ authenticated: false }, { headers: { "Cache-Control": "no-store" } });
   }
 
-  return NextResponse.json({ authenticated: true, user: { id: user.id, email: user.email } });
+  const result = await refreshSession(decodeURIComponent(refreshToken));
+
+  if (!result.ok) {
+    const response = NextResponse.json({ authenticated: false }, { headers: { "Cache-Control": "no-store" } });
+    response.cookies.set(AUTH_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", expires: new Date(0), path: "/" });
+    response.cookies.set(REFRESH_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", expires: new Date(0), path: "/" });
+    return response;
+  }
+
+  const response = NextResponse.json({ authenticated: true, user: { id: result.user?.id, email: result.user?.email } }, { headers: { "Cache-Control": "no-store" } });
+  const secure = process.env.NODE_ENV === "production";
+
+  response.cookies.set(AUTH_COOKIE, result.accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: result.expiresIn });
+  response.cookies.set(REFRESH_COOKIE, result.refreshToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+
+  return response;
 }
