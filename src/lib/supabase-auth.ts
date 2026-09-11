@@ -38,18 +38,15 @@ export async function getSupabaseUser(accessToken: string) {
 export async function signInWithPassword(email: string, password: string) {
   const { url, publishableKey } = getSupabaseConfig();
 
-  const response = await fetch(
-    `${url}/auth/v1/token?grant_type=password`,
-    {
-      method: "POST",
-      headers: {
-        apikey: publishableKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      apikey: publishableKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+    cache: "no-store",
+  });
 
   const payload = await response.json().catch(() => ({}));
 
@@ -66,7 +63,15 @@ export async function signInWithPassword(email: string, password: string) {
   };
 }
 
-export async function signUpWithPassword(email: string, password: string) {
+type SignupProfile = {
+  companyName: string;
+  industry: string;
+  companySize: string;
+  contactName: string;
+  contactPhone: string;
+};
+
+export async function signUpWithPassword(email: string, password: string, profile?: SignupProfile) {
   const { url, publishableKey } = getSupabaseConfig();
 
   const response = await fetch(`${url}/auth/v1/signup`, {
@@ -75,7 +80,11 @@ export async function signUpWithPassword(email: string, password: string) {
       apikey: publishableKey,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+      ...(profile ? { data: profile } : {}),
+    }),
     cache: "no-store",
   });
 
@@ -97,18 +106,15 @@ export async function signUpWithPassword(email: string, password: string) {
 export async function refreshSession(refreshToken: string) {
   const { url, publishableKey } = getSupabaseConfig();
 
-  const response = await fetch(
-    `${url}/auth/v1/token?grant_type=refresh_token`,
-    {
-      method: "POST",
-      headers: {
-        apikey: publishableKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: {
+      apikey: publishableKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+    cache: "no-store",
+  });
 
   const payload = await response.json().catch(() => ({}));
 
