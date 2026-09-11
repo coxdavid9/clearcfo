@@ -31,7 +31,7 @@ export default async function ProfilePage() {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Account settings</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Profile &amp; business information</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Keep your company information current. ClearCFO will use this context to personalize your financial intelligence experience.
+            Keep your account and business information current. Company name is optional.
           </p>
         </div>
 
