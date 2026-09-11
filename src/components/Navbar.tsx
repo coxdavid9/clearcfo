@@ -27,7 +27,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
     if (onNavigate) {
       onNavigate(href);
     } else {
-      window.location.hash = href.replace("#", "");
+      window.location.href = `/${href}`;
     }
   };
 
@@ -64,16 +64,22 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
             <Image src="/logo.png" alt="ClearCFO" width={224} height={57} className="h-10 w-auto" priority />
           </button>
         ) : (
-          <a href={profileHref ? "/customer" : "#top"} aria-label="ClearCFO home" className="shrink-0" onClick={() => setMenuOpen(false)}>
+          <a href="/" aria-label="ClearCFO home" className="shrink-0" onClick={() => setMenuOpen(false)}>
             <Image src="/logo.png" alt="ClearCFO" width={224} height={57} className="h-10 w-auto" priority />
           </a>
         )}
 
         <div className="hidden items-center gap-8 md:flex">
           {navItems.map(([label, href]) => (
-            <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">
-              {label}
-            </button>
+            onNavigate ? (
+              <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">
+                {label}
+              </button>
+            ) : (
+              <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">
+                {label}
+              </a>
+            )
           ))}
           {profileHref && (
             <a href={profileHref} className="text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>
@@ -98,7 +104,11 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
         <div className="border-t border-slate-200 bg-white px-5 pb-5 pt-3 shadow-lg md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col">
             {navItems.map(([label, href]) => (
-              <button key={href} type="button" onClick={() => navigate(href)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</button>
+              onNavigate ? (
+                <button key={href} type="button" onClick={() => navigate(href)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</button>
+              ) : (
+                <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</a>
+              )
             ))}
             {profileHref && <a href={profileHref} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>}
             {mobileAuthControl}
