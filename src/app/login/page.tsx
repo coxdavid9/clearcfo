@@ -150,8 +150,8 @@ export default function LoginPage() {
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Company name <span className="text-red-500">*</span></span>
-                <input required value={profile.companyName} onChange={(event) => updateProfile("companyName", event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Your company" />
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Company name <span className="font-normal text-slate-400">(optional)</span></span>
+                <input value={profile.companyName} onChange={(event) => updateProfile("companyName", event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Your company (optional)" />
               </label>
 
               <label className="block">
