@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const navItems = [
   ["Product", "#product"],
@@ -17,10 +17,35 @@ type NavbarProps = {
   loginHref?: string;
   loginLabel?: string;
   profileHref?: string;
+  sessionAware?: boolean;
 };
 
-export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", profileHref }: NavbarProps) {
+export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", profileHref, sessionAware = false }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (!sessionAware) return;
+
+    let active = true;
+    const checkSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
+        const data = await response.json().catch(() => ({}));
+        if (active) setAuthenticated(data?.authenticated === true);
+      } catch {
+        if (active) setAuthenticated(false);
+      }
+    };
+
+    void checkSession();
+    const interval = window.setInterval(checkSession, 10 * 60 * 1000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [sessionAware]);
 
   const navigate = (href: string) => {
     setMenuOpen(false);
@@ -36,24 +61,30 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
     onLogin?.();
   };
 
-  const authControl = loginHref ? (
-    <a href={loginHref} onClick={() => setMenuOpen(false)} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 sm:inline-flex sm:px-5">
-      {loginLabel}
-    </a>
-  ) : (
-    <button type="button" onClick={login} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 sm:inline-flex sm:px-5">
-      {loginLabel}
-    </button>
+  const authenticatedAuthControl = (
+    <>
+      <a href="/customer" className="hidden rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-600 hover:shadow-md sm:inline-flex sm:px-5">CFO Briefing</a>
+      <a href="/profile" className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 sm:inline-flex">Profile</a>
+      <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:inline-flex sm:px-5">Log Out</a>
+    </>
   );
 
-  const mobileAuthControl = loginHref ? (
-    <a href={loginHref} onClick={() => setMenuOpen(false)} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
-      {loginLabel}
-    </a>
+  const authControl = sessionAware && authenticated ? authenticatedAuthControl : loginHref ? (
+    <a href={loginHref} onClick={() => setMenuOpen(false)} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:inline-flex sm:px-5">{loginLabel}</a>
   ) : (
-    <button type="button" onClick={login} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
-      {loginLabel}
-    </button>
+    <button type="button" onClick={login} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:inline-flex sm:px-5">{loginLabel}</button>
+  );
+
+  const mobileAuthControl = sessionAware && authenticated ? (
+    <>
+      <a href="/customer" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">CFO Briefing</a>
+      <a href="/profile" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>
+      <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">Log Out</a>
+    </>
+  ) : loginHref ? (
+    <a href={loginHref} onClick={() => setMenuOpen(false)} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">{loginLabel}</a>
+  ) : (
+    <button type="button" onClick={login} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">{loginLabel}</button>
   );
 
   return (
@@ -72,23 +103,16 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
         <div className="hidden items-center gap-8 md:flex">
           {navItems.map(([label, href]) => (
             onNavigate ? (
-              <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">
-                {label}
-              </button>
+              <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">{label}</button>
             ) : (
-              <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">
-                {label}
-              </a>
+              <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">{label}</a>
             )
           ))}
-          {profileHref && (
-            <a href={profileHref} className="text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>
-          )}
+          {profileHref && <a href={profileHref} className="text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>}
         </div>
 
         <div className="flex items-center gap-3">
           {authControl}
-
           <button type="button" aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 md:hidden">
             <span className="sr-only">Menu</span>
             <span className="flex w-5 flex-col gap-1.5">
