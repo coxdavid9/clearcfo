@@ -30,8 +30,8 @@ export default function CustomerProfile({ email, initialProfile }: Props) {
   const [message, setMessage] = useState("");
 
   const completion = useMemo(() => {
-    const fields = [profile.companyName, profile.industry, profile.companySize, profile.contactName, profile.contactPhone];
-    return Math.round((fields.filter(Boolean).length / fields.length) * 100);
+    const requiredFields = [profile.industry, profile.companySize, profile.contactName];
+    return Math.round((requiredFields.filter(Boolean).length / requiredFields.length) * 100);
   }, [profile]);
 
   function update(field: keyof Profile, value: string) {
@@ -80,7 +80,7 @@ export default function CustomerProfile({ email, initialProfile }: Props) {
                 <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Customer portal</span>
               </div>
               <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">Business information</h2>
-              <p className="mt-1 text-sm text-slate-500">Your account and company details used to personalize ClearCFO.</p>
+              <p className="mt-1 text-sm text-slate-500">Keep the information you want ClearCFO to have about your business and account.</p>
             </div>
           </div>
 
@@ -109,7 +109,7 @@ export default function CustomerProfile({ email, initialProfile }: Props) {
 
       {editing ? (
         <form onSubmit={save} className="grid gap-5 px-5 py-6 sm:grid-cols-2 sm:px-7">
-          <Field label="Company name" value={profile.companyName} placeholder="Your company" onChange={(value) => update("companyName", value)} />
+          <Field label="Company name" value={profile.companyName} placeholder="Optional" onChange={(value) => update("companyName", value)} />
           <Field label="Industry" value={profile.industry} placeholder="e.g. Professional services" onChange={(value) => update("industry", value)} />
           <label className="text-sm font-medium text-slate-700">
             Company size
