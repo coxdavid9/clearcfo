@@ -396,7 +396,7 @@ function findCompany(
     }
   }
 
-  return "Your Business";
+  return "";
 }
 
 function buildDetailDrivers(
