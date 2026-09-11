@@ -3,6 +3,27 @@ import { getAuthCookieNames, signUpWithPassword } from "../../../../lib/supabase
 
 export const runtime = "nodejs";
 
+const profileFields = ["companyName", "industry", "companySize", "contactName", "contactPhone"] as const;
+type ProfileField = (typeof profileFields)[number];
+
+function readProfile(body: Record<string, unknown>) {
+  const profile = {} as Record<ProfileField, string>;
+
+  for (const field of profileFields) {
+    const value = body[field];
+    if (value !== undefined && typeof value !== "string") {
+      return { error: `Invalid ${field}.` as const };
+    }
+    profile[field] = typeof value === "string" ? value.trim().slice(0, 200) : "";
+  }
+
+  if (!profile.companyName || !profile.industry || !profile.companySize || !profile.contactName) {
+    return { error: "Company name, industry, company size, and primary contact are required." as const };
+  }
+
+  return { profile };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -17,7 +38,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
     }
 
-    const result = await signUpWithPassword(email, password);
+    const profileResult = readProfile(body);
+    if ("error" in profileResult) {
+      return NextResponse.json({ error: profileResult.error }, { status: 400 });
+    }
+
+    const result = await signUpWithPassword(email, password, profileResult.profile);
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
