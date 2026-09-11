@@ -16,9 +16,10 @@ type NavbarProps = {
   onLogin?: () => void;
   loginHref?: string;
   loginLabel?: string;
+  profileHref?: string;
 };
 
-export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In" }: NavbarProps) {
+export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", profileHref }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navigate = (href: string) => {
@@ -63,7 +64,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
             <Image src="/logo.png" alt="ClearCFO" width={224} height={57} className="h-10 w-auto" priority />
           </button>
         ) : (
-          <a href="#top" aria-label="ClearCFO home" className="shrink-0" onClick={() => setMenuOpen(false)}>
+          <a href={profileHref ? "/customer" : "#top"} aria-label="ClearCFO home" className="shrink-0" onClick={() => setMenuOpen(false)}>
             <Image src="/logo.png" alt="ClearCFO" width={224} height={57} className="h-10 w-auto" priority />
           </a>
         )}
@@ -74,18 +75,15 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
               {label}
             </button>
           ))}
+          {profileHref && (
+            <a href={profileHref} className="text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
           {authControl}
 
-          <button
-            type="button"
-            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 md:hidden"
-          >
+          <button type="button" aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 md:hidden">
             <span className="sr-only">Menu</span>
             <span className="flex w-5 flex-col gap-1.5">
               <span className={`block h-0.5 w-full rounded-full bg-current transition-transform ${menuOpen ? "translate-y-2 rotate-45" : ""}`} />
@@ -100,10 +98,9 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
         <div className="border-t border-slate-200 bg-white px-5 pb-5 pt-3 shadow-lg md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col">
             {navItems.map(([label, href]) => (
-              <button key={href} type="button" onClick={() => navigate(href)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">
-                {label}
-              </button>
+              <button key={href} type="button" onClick={() => navigate(href)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</button>
             ))}
+            {profileHref && <a href={profileHref} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>}
             {mobileAuthControl}
           </div>
         </div>
