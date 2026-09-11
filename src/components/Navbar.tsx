@@ -63,7 +63,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
 
   const authenticatedAuthControl = (
     <>
-      {profileHref && <a href={profileHref} className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 sm:inline-flex">Profile</a>}
+      <a href={profileHref ?? "/profile"} className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 sm:inline-flex">Profile</a>
       <a href="/customer" className="hidden rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-600 hover:shadow-md sm:inline-flex sm:px-5">CFO Briefing</a>
       <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:inline-flex sm:px-5">Log Out</a>
     </>
@@ -77,7 +77,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
 
   const mobileAuthControl = sessionAware && authenticated ? (
     <>
-      {profileHref && <a href={profileHref} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>}
+      <a href={profileHref ?? "/profile"} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>
       <a href="/customer" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">CFO Briefing</a>
       <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">Log Out</a>
     </>
