@@ -3,13 +3,13 @@ const REFRESH_COOKIE = "clearcfo_refresh_token";
 
 function getSupabaseConfig() {
   const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 
-  if (!url || !anonKey) {
+  if (!url || !publishableKey) {
     throw new Error("Supabase authentication is not configured.");
   }
 
-  return { url: url.replace(/\/$/, ""), anonKey };
+  return { url: url.replace(/\/$/, ""), publishableKey };
 }
 
 export function getAuthCookieNames() {
@@ -17,12 +17,12 @@ export function getAuthCookieNames() {
 }
 
 export async function getSupabaseUser(accessToken: string) {
-  const { url, anonKey } = getSupabaseConfig();
+  const { url, publishableKey } = getSupabaseConfig();
 
   const response = await fetch(`${url}/auth/v1/user`, {
     method: "GET",
     headers: {
-      apikey: anonKey,
+      apikey: publishableKey,
       Authorization: `Bearer ${accessToken}`,
     },
     cache: "no-store",
@@ -36,14 +36,14 @@ export async function getSupabaseUser(accessToken: string) {
 }
 
 export async function signInWithPassword(email: string, password: string) {
-  const { url, anonKey } = getSupabaseConfig();
+  const { url, publishableKey } = getSupabaseConfig();
 
   const response = await fetch(
     `${url}/auth/v1/token?grant_type=password`,
     {
       method: "POST",
       headers: {
-        apikey: anonKey,
+        apikey: publishableKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
@@ -67,12 +67,12 @@ export async function signInWithPassword(email: string, password: string) {
 }
 
 export async function signUpWithPassword(email: string, password: string) {
-  const { url, anonKey } = getSupabaseConfig();
+  const { url, publishableKey } = getSupabaseConfig();
 
   const response = await fetch(`${url}/auth/v1/signup`, {
     method: "POST",
     headers: {
-      apikey: anonKey,
+      apikey: publishableKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ email, password }),
@@ -95,14 +95,14 @@ export async function signUpWithPassword(email: string, password: string) {
 }
 
 export async function refreshSession(refreshToken: string) {
-  const { url, anonKey } = getSupabaseConfig();
+  const { url, publishableKey } = getSupabaseConfig();
 
   const response = await fetch(
     `${url}/auth/v1/token?grant_type=refresh_token`,
     {
       method: "POST",
       headers: {
-        apikey: anonKey,
+        apikey: publishableKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
