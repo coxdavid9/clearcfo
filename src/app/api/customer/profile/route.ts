@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getAuthCookieNames, getSupabaseUser } from "../../../../../lib/supabase-auth";
+import { getAuthCookieNames, getSupabaseUser } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";
 
