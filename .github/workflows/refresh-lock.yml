@@ -39,3 +39,5 @@ jobs:
           git rm .github/workflows/refresh-lock.yml
           git commit -m "Remove temporary lockfile workflow [skip ci]"
           git push
+
+# One-time lockfile regeneration; this workflow removes itself after the lockfile commit.
