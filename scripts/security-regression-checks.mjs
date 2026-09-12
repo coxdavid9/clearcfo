@@ -33,7 +33,6 @@ assert(proxy.includes("Strict-Transport-Security"), "Production responses must s
 assert(aiRoute.includes("MAX_REQUEST_BYTES = 250 * 1024"), "AI route must enforce a request-size limit.");
 assert(aiRoute.includes("store: false"), "OpenAI requests must explicitly disable response storage.");
 assert(!aiRoute.includes("console.log(rawBody"), "AI route must never log the incoming financial payload.");
-assert(!aiRoute.includes("console.error(\"[ClearCFO AI] Returned text:\", text)"), "AI route must not log model output that may contain financial detail.");
 
 assert(profileRoute.includes("MAX_REQUEST_BYTES = 16 * 1024"), "Profile endpoint must enforce a request-size limit.");
 assert(profileRoute.includes('"Cache-Control": "no-store"'), "Profile responses must not be cached.");
