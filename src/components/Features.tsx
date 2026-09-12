@@ -1,3 +1,5 @@
+import ScrollReveal from "./ScrollReveal";
+
 const features = [
   {
     icon: "📊",
@@ -35,19 +37,21 @@ export default function Features() {
   return (
     <section className="px-5 py-20 sm:px-8 lg:py-24">
       <div className="mx-auto max-w-6xl">
-        <div className="mx-auto max-w-2xl text-center">
+        <ScrollReveal className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-600">What You Receive</p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">What ClearCFO gives you.</h2>
           <p className="mt-4 leading-7 text-slate-600">A clear view of the numbers, the changes that matter, and the actions worth considering next.</p>
-        </div>
+        </ScrollReveal>
 
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div key={feature.title} className="group rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl transition-all duration-300 group-hover:bg-blue-100 group-hover:scale-105">{feature.icon}</div>
-              <h3 className="mt-5 text-lg font-bold text-slate-900">{feature.title}</h3>
-              <p className="mt-3 leading-6 text-slate-600">{feature.text}</p>
-            </div>
+          {features.map((feature, index) => (
+            <ScrollReveal key={feature.title} delay={index * 90} y={18}>
+              <div className="group h-full rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl transition-all duration-300 group-hover:scale-105 group-hover:bg-blue-100">{feature.icon}</div>
+                <h3 className="mt-5 text-lg font-bold text-slate-900">{feature.title}</h3>
+                <p className="mt-3 leading-6 text-slate-600">{feature.text}</p>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>
