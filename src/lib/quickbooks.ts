@@ -19,6 +19,7 @@ type StoredConnection = {
   refresh_token_encrypted: string;
   access_token_expires_at: string;
   refresh_token_expires_at: string | null;
+  created_at: string;
 };
 
 function config() {
