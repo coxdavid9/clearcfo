@@ -1,3 +1,5 @@
+import ScrollReveal from "./ScrollReveal";
+
 const steps = [
   {
     title: "CONNECT",
@@ -5,7 +7,7 @@ const steps = [
     icon: (
       <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
         <path d="M24 68h48c9 0 16-7 16-16 0-8-6-15-14-16-2-12-12-20-24-20-11 0-20 7-23 17-10 1-17 8-17 18 0 10 8 17 18 17Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M38 64V48m0 0-6 6m6-6 6 6M50 64V40m0 0-6 6m6-6 6 6M62 64V45m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M38 64V48m0 0-6 6m6-6 6 6M50 64V40m0 0-6 6m6-6 6 6M62 64V45m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -52,41 +54,38 @@ const steps = [
 export default function HowItWorks() {
   return (
     <section className="mx-auto max-w-[1200px] px-6 py-20 sm:py-24">
-      <div className="mx-auto max-w-3xl text-center">
+      <ScrollReveal className="mx-auto max-w-3xl text-center">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-600">
           How It Works
         </p>
-
         <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
           From Financial Data to Clear Decisions.
         </h2>
-
         <p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-600">
           ClearCFO turns your financial data into insights you can actually
           use — without spending hours digging through reports.
         </p>
-      </div>
+      </ScrollReveal>
 
       <div className="mt-14 grid gap-0 md:grid-cols-4">
         {steps.map((step, index) => (
-          <div
-            key={step.title}
-            className={`group px-6 py-6 text-center transition-transform duration-300 hover:-translate-y-1 sm:px-8 ${
-              index > 0 ? "border-slate-200 md:border-l" : ""
-            }`}
-          >
-            <div className="mx-auto flex h-24 items-center justify-center text-blue-600 transition-transform duration-300 group-hover:scale-105 sm:h-28">
-              {step.icon}
+          <ScrollReveal key={step.title} delay={index * 110} y={18}>
+            <div
+              className={`group px-6 py-6 text-center transition-transform duration-300 hover:-translate-y-1 sm:px-8 ${
+                index > 0 ? "border-slate-200 md:border-l" : ""
+              }`}
+            >
+              <div className="mx-auto flex h-24 items-center justify-center text-blue-600 transition-transform duration-300 group-hover:scale-105 sm:h-28">
+                {step.icon}
+              </div>
+              <h3 className="mt-4 text-xl font-extrabold tracking-wide text-[#0B2F8A]">
+                {step.title}
+              </h3>
+              <p className="mx-auto mt-3 max-w-[220px] text-base leading-6 text-slate-600">
+                {step.description}
+              </p>
             </div>
-
-            <h3 className="mt-4 text-xl font-extrabold tracking-wide text-[#0B2F8A]">
-              {step.title}
-            </h3>
-
-            <p className="mx-auto mt-3 max-w-[220px] text-base leading-6 text-slate-600">
-              {step.description}
-            </p>
-          </div>
+          </ScrollReveal>
         ))}
       </div>
     </section>
