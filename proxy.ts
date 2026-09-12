@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const AUTH_COOKIE = "clearcfo_access_token";
+const REFRESH_COOKIE = "clearcfo_refresh_token";
 
 async function isAuthenticated(accessToken: string) {
   const url = process.env.SUPABASE_URL;
@@ -45,15 +46,25 @@ function addSecurityHeaders(response: NextResponse) {
   return response;
 }
 
+function refreshRedirect(request: NextRequest) {
+  const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const refreshUrl = new URL("/api/auth/refresh", request.url);
+  refreshUrl.searchParams.set("next", next);
+  return addSecurityHeaders(NextResponse.redirect(refreshUrl));
+}
+
 export async function proxy(request: NextRequest) {
   const accessToken = request.cookies.get(AUTH_COOKIE)?.value;
+  const hasRefreshToken = Boolean(request.cookies.get(REFRESH_COOKIE)?.value);
   const pathname = request.nextUrl.pathname;
   const customerRoute = pathname.startsWith("/customer");
 
   if (!accessToken) {
     return addSecurityHeaders(
       customerRoute
-        ? NextResponse.redirect(new URL("/login", request.url))
+        ? hasRefreshToken
+          ? refreshRedirect(request)
+          : NextResponse.redirect(new URL("/login", request.url))
         : NextResponse.json({ error: "Authentication required." }, { status: 401 })
     );
   }
@@ -61,7 +72,9 @@ export async function proxy(request: NextRequest) {
   if (!(await isAuthenticated(accessToken))) {
     return addSecurityHeaders(
       customerRoute
-        ? NextResponse.redirect(new URL("/login", request.url))
+        ? hasRefreshToken
+          ? refreshRedirect(request)
+          : NextResponse.redirect(new URL("/login", request.url))
         : NextResponse.json({ error: "Authentication required." }, { status: 401 })
     );
   }
