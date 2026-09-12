@@ -64,13 +64,16 @@ export async function GET() {
 
     const parsed = parseProfitAndLoss(pnl);
 
-    return NextResponse.json({
-      ok: true,
-      syncedAt: new Date().toISOString(),
-      periods: parsed.periods,
-      metrics: parsed.metrics,
-      reports: { profitAndLoss: pnl, balanceSheet },
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        syncedAt: new Date().toISOString(),
+        periods: parsed.periods,
+        metrics: parsed.metrics,
+        reports: { profitAndLoss: pnl, balanceSheet },
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error("[ClearCFO QuickBooks] Sync failed:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "QuickBooks sync failed." }, { status: 500 });
