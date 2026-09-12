@@ -4,6 +4,8 @@ import { getAuthCookieNames, getSupabaseUser } from "../../../../lib/supabase-au
 
 export const runtime = "nodejs";
 
+const MAX_REQUEST_BYTES = 16 * 1024;
+
 const allowedFields = [
   "companyName",
   "industry",
@@ -28,8 +30,25 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Session expired." }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== "object") {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Profile request is too large." }, { status: 413 });
+  }
+
+  const rawBody = await request.text();
+  if (new TextEncoder().encode(rawBody).length > MAX_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Profile request is too large." }, { status: 413 });
+  }
+
+  const body = (() => {
+    try {
+      return JSON.parse(rawBody) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid profile data." }, { status: 400 });
   }
 
@@ -81,8 +100,11 @@ export async function PUT(request: Request) {
     );
   }
 
-  return NextResponse.json({
-    ok: true,
-    profile: payload?.user_metadata || profile,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      profile: payload?.user_metadata || profile,
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
