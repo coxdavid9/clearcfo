@@ -25,6 +25,9 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Run security regression checks
+        run: npm run test:security
+
       - name: Run deterministic financial engine regression tests
         run: node scripts/financial-engine-scenarios.mjs
 
