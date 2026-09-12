@@ -55,7 +55,6 @@ export async function GET() {
       start_date: isoDate(start),
       end_date: isoDate(end),
       summarize_column_by: "Month",
-      date_macro: "",
     });
 
     const balanceSheet = await quickBooksReport(user.id, "BalanceSheet", {
