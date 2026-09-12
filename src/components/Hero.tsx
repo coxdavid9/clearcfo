@@ -1,3 +1,5 @@
+import ScrollReveal from "./ScrollReveal";
+
 export default function Hero() {
   const metrics = [
     ["Revenue", "$933,000", "↓ 6.7%", "border-red-100 bg-red-50/40", "text-red-600"],
@@ -8,7 +10,7 @@ export default function Hero() {
   return (
     <section className="relative overflow-hidden px-5 pb-16 pt-14 sm:px-8 sm:pt-20 lg:pb-24 lg:pt-24">
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-blue-100/50 blur-3xl" />
-      <div className="relative mx-auto max-w-5xl text-center">
+      <ScrollReveal className="relative mx-auto max-w-5xl text-center" y={16}>
         <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
           <span className="h-2 w-2 rounded-full bg-blue-600" /> AI-powered financial intelligence
         </div>
@@ -22,9 +24,9 @@ export default function Hero() {
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a href="#how-it-works" className="rounded-xl bg-blue-600 px-7 py-3.5 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See How It Works →</a>
         </div>
-      </div>
+      </ScrollReveal>
 
-      <div className="relative mx-auto mt-14 max-w-6xl sm:mt-16">
+      <ScrollReveal className="relative mx-auto mt-14 max-w-6xl sm:mt-16" delay={120} y={28}>
         <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-[0_30px_90px_-45px_rgba(15,23,42,0.35)] sm:p-6">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 sm:p-7">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -37,8 +39,8 @@ export default function Hero() {
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-3">
-              {metrics.map(([label, value, change, tone, changeTone]) => (
-                <div key={label} className={`rounded-2xl border p-5 text-left ${tone}`}>
+              {metrics.map(([label, value, change, tone, changeTone], index) => (
+                <div key={label} className={`rounded-2xl border p-5 text-left transition-transform duration-300 hover:-translate-y-0.5 ${tone}`} style={{ transitionDelay: `${index * 60}ms` }}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-600">{label}</p>
                     <span className={`text-xs font-bold ${changeTone}`}>{change}</span>
@@ -49,7 +51,7 @@ export default function Hero() {
               ))}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-5 text-left shadow-sm sm:p-6">
+            <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-5 text-left shadow-sm transition-shadow duration-300 hover:shadow-md sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">ClearCFO recommendation</p>
@@ -68,7 +70,7 @@ export default function Hero() {
             </div>
           </div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
