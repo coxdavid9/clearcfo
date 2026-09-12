@@ -3,6 +3,12 @@ import { getAuthCookieNames, refreshSession } from "../../../../lib/supabase-aut
 
 export const runtime = "nodejs";
 
+function safeNextPath(value: string | null) {
+  if (!value) return "/customer";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/customer";
+  return value;
+}
+
 export async function GET(request: Request) {
   const { AUTH_COOKIE, REFRESH_COOKIE } = getAuthCookieNames();
   const refreshToken = request.headers.get("cookie")?.match(new RegExp(`${REFRESH_COOKIE}=([^;]+)`))?.[1];
@@ -20,7 +26,7 @@ export async function GET(request: Request) {
     return response;
   }
 
-  const next = new URL(request.url).searchParams.get("next") || "/customer";
+  const next = safeNextPath(new URL(request.url).searchParams.get("next"));
   const response = NextResponse.redirect(new URL(next, request.url));
   const secure = process.env.NODE_ENV === "production";
 
