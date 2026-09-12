@@ -30,16 +30,34 @@ function config() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!clientId || !clientSecret || !redirectUri || !encryptionKey || !supabaseUrl || !serviceRoleKey) {
-    throw new Error("QuickBooks is not configured. Add the QuickBooks OAuth, encryption, and Supabase server credentials.");
+  const missing = [
+    ["QUICKBOOKS_CLIENT_ID", clientId],
+    ["QUICKBOOKS_CLIENT_SECRET", clientSecret],
+    ["QUICKBOOKS_REDIRECT_URI", redirectUri],
+    ["QUICKBOOKS_TOKEN_ENCRYPTION_KEY", encryptionKey],
+    ["SUPABASE_URL", supabaseUrl],
+    ["SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missing.length) {
+    throw new Error(`QuickBooks is not configured. Missing environment variables: ${missing.join(", ")}`);
   }
 
-  const key = Buffer.from(encryptionKey, "base64");
+  const key = Buffer.from(encryptionKey!, "base64");
   if (key.length !== 32) {
     throw new Error("QUICKBOOKS_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
   }
 
-  return { clientId, clientSecret, redirectUri, key, supabaseUrl: supabaseUrl.replace(/\/$/, ""), serviceRoleKey };
+  return {
+    clientId: clientId!,
+    clientSecret: clientSecret!,
+    redirectUri: redirectUri!,
+    key,
+    supabaseUrl: supabaseUrl!.replace(/\/$/, ""),
+    serviceRoleKey: serviceRoleKey!,
+  };
 }
 
 function authHeader(clientId: string, clientSecret: string) {
