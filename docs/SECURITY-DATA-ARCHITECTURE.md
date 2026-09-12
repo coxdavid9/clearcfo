@@ -33,7 +33,9 @@ The uploaded workbook itself is not intentionally persisted by the current appli
 - HTTP-only authentication cookies.
 - `SameSite=Lax` authentication cookies.
 - Production `Secure` cookies.
-- QuickBooks OAuth state bound to the authenticated ClearCFO user and protected with an HMAC signature.
+- Expired customer access sessions can refresh through the existing refresh-token flow.
+- Refresh redirects are restricted to same-site relative paths.
+- QuickBooks OAuth state is bound to the authenticated ClearCFO user and protected with an HMAC signature.
 - AES-256-GCM encryption for QuickBooks OAuth tokens at rest.
 - Supabase RLS enabled on the QuickBooks connection table with no browser-facing policy.
 - OpenAI Responses API requests explicitly use `store: false`.
@@ -41,13 +43,12 @@ The uploaded workbook itself is not intentionally persisted by the current appli
 - Customer profile request body limit of 16 KB.
 - `Cache-Control: no-store` on customer profile and QuickBooks financial responses.
 - Production security headers including HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy` on protected routes.
-- Automated dependency audit and security regression checks in CI.
+- Automated full dependency audit and security regression checks in CI.
 
 ## Remaining security work
 
 - Complete active penetration/security testing against the deployed application.
 - Add robust distributed rate limiting for authentication and AI requests before public launch.
-- Review authentication refresh behavior for long-lived sessions.
 - Remove any remaining logging that could expose derived financial detail.
 - Confirm Render/Supabase/OpenAI retention and logging settings against the final privacy policy.
 - Complete a final third-party security/privacy review before onboarding paying customers.
