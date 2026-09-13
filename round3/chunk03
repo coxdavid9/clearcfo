@@ -1,0 +1,94 @@
++        evidence: [
++          `Spike period: ${spikePeriod}${windowLabel}`,
++          `Peak operating expenses: ${formatCurrency(detection.peak)}`,
++          `Estimated excess versus surrounding periods: ${formatCurrency(spikeImpact)}`,
++        ],
++        direction: "up",
++        severity: severityLevel,
++        impact: spikeImpact,
++        confidence: 94,
++        managementQuestion: "What caused the operating expense spike, and was it truly non-recurring?",
++      });
++      alerts.push(`An operating expense spike was detected in ${spikePeriod} and has since recovered.`);
++      priorities.push({ level: severityLevel === "High" ? "high" : "medium", message: `An operating expense spike was detected in ${spikePeriod} and has since recovered.` });
+     }
+   }
+ 
+ diff --git a/src/lib/scenario-detection.ts b/src/lib/scenario-detection.ts
+ new file mode 100644
+ index 0000000..5dcfec4
+ --- /dev/null
+ +++ b/src/lib/scenario-detection.ts
+ @@ -0,0 +1,151 @@
++/**
++ * scenario-detection.ts
++ *
++ * Pure, framework-free financial-pattern detectors shared by the client
++ * workbook parser (CFOBriefing) and the /api/cfo-analysis route.
++ *
++ * Keeping the math in one place means the browser-side driver detection and
++ * the server-side deterministic signals can never drift apart.
++ */
++
++export type SpikeDetection = {
++  /** Start index of the spike window within the value series. */
++  index: number;
++  /** Number of periods in the spike window (1 = single-period spike). */
++  length: number;
++  /** Highest value observed inside the spike window. */
++  peak: number;
++  /** Surrounding-period baseline the spike is measured against. */
++  baseline: number;
++  /** Estimated excess dollars versus baseline across the window. */
++  excess: number;
++};
++
++function mean(values: number[]): number {
++  return values.reduce((sum, value) => sum + value, 0) / values.length;
++}
++
++/**
++ * Detect an operating-expense spike followed by a return toward baseline.
++ *
++ * Handles two shapes:
++ *  - single-period: one period at >=150% of its immediate neighbors, with the
++ *    next period back within 20% of that baseline (the historical behavior).
++ *  - plateau: 2-6 consecutive elevated periods (>=112% of the pre-spike
++ *    baseline on average, every period >=105%) followed by a return to
++ *    within 30% of the pre-spike baseline. Real expense spikes (a legal
++ *    bill spread over a quarter, a multi-month project) rarely last exactly
++ *    one period, so the single-period detector alone misses them.
++ *
++ * Returns the strongest detection (by excess dollars) or null.
++ */
++export function detectExpenseSpikeRecovery(
++  values: number[],
++  opts: {
++    singlePeriodRatio?: number;
++    singlePeriodRecoveryTolerance?: number;
++    plateauMinAvgRatio?: number;
++    plateauMinPeriodRatio?: number;
++    plateauRecoveryTolerance?: number;
++    maxPlateauLength?: number;
++    minExcessDollars?: number;
++  } = {}
++): SpikeDetection | null {
++  const {
++    singlePeriodRatio = 1.5,
++    singlePeriodRecoveryTolerance = 0.2,
++    plateauMinAvgRatio = 1.12,
++    plateauMinPeriodRatio = 1.05,
++    plateauRecoveryTolerance = 0.3,
++    maxPlateauLength = 6,
++    minExcessDollars = 0,
++  } = opts;
++
++  const clean = values.filter((value) => Number.isFinite(value));
++  if (clean.length < 4) return null;
++
++  let best: SpikeDetection | null = null;
++  const consider = (candidate: SpikeDetection) => {
++    if (candidate.excess < minExcessDollars) return;
++    if (!best || candidate.excess > best.excess) best = candidate;
++  };
++
