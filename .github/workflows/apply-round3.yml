@@ -20,6 +20,7 @@ jobs:
         run: |
           cat round3/chunk* > /tmp/round3.patch
           sed -i \
+            -e '/placeholder removed by next chunk/d' \
             -e 's/^ diff --git/diff --git/' \
             -e 's/^ new file mode/new file mode/' \
             -e 's/^ index/index/' \
