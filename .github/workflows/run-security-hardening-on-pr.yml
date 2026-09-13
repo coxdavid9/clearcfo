@@ -1,0 +1,48 @@
+name: Run security hardening patch on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply embedded patch
+        env:
+          WORKFLOW_FILE: .github/workflows/apply-security-hardening.yml
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path(".github/workflows/apply-security-hardening.yml")
+          text = p.read_text()
+          start = text.index("          PATCH: |\n") + len("          PATCH: |\n")
+          end = text.index("      - name: Write patch and apply", start)
+          block = text[start:end]
+          patch = "".join(line[12:] if line.startswith("            ") else line for line in block.splitlines(True))
+          Path("/tmp/security-fixes.patch").write_text(patch)
+          PY
+          if test -f src/lib/rate-limit.ts; then
+            echo "Patch appears to have already been applied; cleaning up temporary workflows."
+          else
+            git apply --check /tmp/security-fixes.patch
+            git apply /tmp/security-fixes.patch
+          fi
+          rm -f .github/workflows/apply-security-hardening.yml .github/workflows/run-security-hardening-on-pr.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add proxy.ts src/app/api/auth/login/route.ts src/app/api/auth/signup/route.ts src/app/api/cfo-analysis/route.ts src/lib/quickbooks.ts src/lib/rate-limit.ts .github/workflows/apply-security-hardening.yml .github/workflows/run-security-hardening-on-pr.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "Harden rate limits, logging, QuickBooks disconnect, and CSP"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
