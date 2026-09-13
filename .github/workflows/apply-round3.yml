@@ -30,8 +30,8 @@ jobs:
             /tmp/round3.patch
       - name: Apply patch
         run: |
-          git apply --check /tmp/round3.patch
-          git apply /tmp/round3.patch
+          git apply --check --recount /tmp/round3.patch
+          git apply --recount /tmp/round3.patch
       - name: Commit applied patch
         run: |
           rm -rf round3 .github/workflows/apply-round3.yml
