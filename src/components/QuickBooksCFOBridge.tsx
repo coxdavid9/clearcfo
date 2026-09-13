@@ -43,17 +43,33 @@ function rows(node: any, output: { label: string; values: number[] }[] = []) {
   return output;
 }
 
-function makeWorkbook(payload: SyncPayload) {
+function canonicalPnlLabel(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "income") return "Revenue";
+  if (normalized === "expenses") return "Operating Expenses";
+  if (normalized === "cost of goods sold") return "Cost of Goods Sold";
+  if (normalized === "gross profit") return "Gross Profit";
+  return label;
+}
+
+function canonicalBalanceLabel(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (/^total cash and cash equivalents$|^cash and cash equivalents$|^cash equivalents$/.test(normalized)) return "Cash";
+  if (/^inventory asset$|^total inventory$|^inventory$/.test(normalized)) return "Inventory";
+  return label;
+}
+
+function makeWorkbook(payload: SyncPayload, companyName: string) {
   const pnlPeriods = columns(payload.reports.profitAndLoss);
   const pnlRows = rows(payload.reports.profitAndLoss);
-  const pnl: (string | number)[][] = [["Metric", ...pnlPeriods]];
-  pnlRows.forEach((row) => pnl.push([row.label, ...row.values]));
+  const pnl: (string | number)[][] = [["Company", companyName || "QuickBooks Online company"], ["Metric", ...pnlPeriods]];
+  pnlRows.forEach((row) => pnl.push([canonicalPnlLabel(row.label), ...row.values]));
 
   const current = rows(payload.reports.balanceSheet);
   const prior = rows(payload.reports.balanceSheetPrior);
-  const priorMap = new Map(prior.map((row) => [row.label.toLowerCase(), row.values[0] ?? 0]));
+  const priorMap = new Map(prior.map((row) => [canonicalBalanceLabel(row.label).toLowerCase(), row.values[0] ?? 0]));
   const balance: (string | number)[][] = [["Account", "Current", "Prior"]];
-  current.forEach((row) => balance.push([row.label, row.values[row.values.length - 1] ?? 0, priorMap.get(row.label.toLowerCase()) ?? 0]));
+  current.forEach((row) => balance.push([canonicalBalanceLabel(row.label), row.values[row.values.length - 1] ?? 0, priorMap.get(canonicalBalanceLabel(row.label).toLowerCase()) ?? 0]));
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(pnl), "Monthly P&L");
@@ -61,8 +77,8 @@ function makeWorkbook(payload: SyncPayload) {
   return workbook;
 }
 
-function loadIntoBriefing(payload: SyncPayload) {
-  const bytes = XLSX.write(makeWorkbook(payload), { bookType: "xlsx", type: "array" });
+function loadIntoBriefing(payload: SyncPayload, companyName: string) {
+  const bytes = XLSX.write(makeWorkbook(payload, companyName), { bookType: "xlsx", type: "array" });
   const file = new File([bytes], "clearcfo-quickbooks.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const input = document.querySelector<HTMLInputElement>('input[type="file"][accept=".xlsx,.xls,.csv"]');
   if (!input) throw new Error("CFO Briefing is not ready to receive QuickBooks data.");
@@ -88,7 +104,7 @@ export default function QuickBooksCFOBridge() {
         if (!syncResponse.ok) throw new Error((payload as any).error || "QuickBooks sync failed.");
 
         if (cancelled) return;
-        loadIntoBriefing(payload);
+        loadIntoBriefing(payload, status.connection.companyName || "QuickBooks Online company");
       } catch (bridgeError) {
         if (!cancelled) setError(bridgeError instanceof Error ? bridgeError.message : "QuickBooks data could not be loaded into the CFO Briefing.");
       }
