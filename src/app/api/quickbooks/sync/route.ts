@@ -51,6 +51,9 @@ export async function GET() {
     start.setMonth(start.getMonth() - 5);
     start.setDate(1);
 
+    const priorBalanceEnd = new Date(end);
+    priorBalanceEnd.setDate(0);
+
     const pnl = await quickBooksReport(user.id, "ProfitAndLoss", {
       start_date: isoDate(start),
       end_date: isoDate(end),
@@ -62,6 +65,11 @@ export async function GET() {
       end_date: isoDate(end),
     });
 
+    const balanceSheetPrior = await quickBooksReport(user.id, "BalanceSheet", {
+      start_date: isoDate(priorBalanceEnd),
+      end_date: isoDate(priorBalanceEnd),
+    });
+
     const parsed = parseProfitAndLoss(pnl);
 
     return NextResponse.json(
@@ -70,7 +78,7 @@ export async function GET() {
         syncedAt: new Date().toISOString(),
         periods: parsed.periods,
         metrics: parsed.metrics,
-        reports: { profitAndLoss: pnl, balanceSheet },
+        reports: { profitAndLoss: pnl, balanceSheet, balanceSheetPrior },
       },
       { headers: { "Cache-Control": "no-store" } }
     );
