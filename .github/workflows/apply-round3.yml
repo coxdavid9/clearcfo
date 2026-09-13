@@ -1,0 +1,41 @@
+name: Apply Round 3 diagnosis patch
+
+on:
+  push:
+    branches:
+      - round3-diagnosis-fix-2026-09-13-pr3
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[round3-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Assemble patch
+        run: |
+          cat round3/chunk* > /tmp/round3.patch
+          sed -i \
+            -e 's/^ diff --git/diff --git/' \
+            -e 's/^ new file mode/new file mode/' \
+            -e 's/^ index/index/' \
+            -e 's/^ --- /--- /' \
+            -e 's/^ +++ /+++ /' \
+            -e 's/^ @@/@@/' \
+            /tmp/round3.patch
+      - name: Apply patch
+        run: |
+          git apply --check /tmp/round3.patch
+          git apply /tmp/round3.patch
+      - name: Commit applied patch
+        run: |
+          rm -rf round3 .github/workflows/apply-round3.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Apply Round 3 diagnosis fix [round3-applied]'
+          git push origin HEAD:round3-diagnosis-fix-2026-09-13-pr3
