@@ -3,6 +3,8 @@ import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";
 
 export const runtime = "nodejs";
 
+const MAX_REQUEST_BYTES = 250 * 1024;
+
 const analysisSchema = {
   type: "object",
   additionalProperties: false,
@@ -49,20 +51,8 @@ const instructions = [
   "Return only the requested structured analysis.",
 ].join(" ");
 
-type FinancialDriverInput = {
-  id?: unknown;
-  title?: unknown;
-  observation?: unknown;
-  evidence?: unknown;
-  severity?: unknown;
-};
-
-type TrendSeries = {
-  name?: unknown;
-  values?: unknown;
-  periods?: unknown;
-};
-
+type FinancialDriverInput = { id?: unknown; title?: unknown; observation?: unknown; evidence?: unknown; severity?: unknown };
+type TrendSeries = { name?: unknown; values?: unknown; periods?: unknown };
 type ScenarioSignals = {
   inventoryBuildup: FinancialDriverInput | null;
   expenseSpikeRecovery: FinancialDriverInput | null;
@@ -80,15 +70,13 @@ function asTrendSeries(body: Record<string, unknown>): { name: string; values: n
     .filter((item): item is TrendSeries => !!item && typeof item === "object")
     .map((item) => ({
       name: String(item.name ?? ""),
-      values: Array.isArray(item.values)
-        ? item.values.map(asFiniteNumber).filter((value): value is number => value !== null)
-        : [],
+      values: Array.isArray(item.values) ? item.values.map(asFiniteNumber).filter((value): value is number => value !== null) : [],
       periods: Array.isArray(item.periods) ? item.periods.map(String) : [],
     }))
     .filter((series) => series.name && series.values.length >= 3);
 }
 
-function makeDriver(input: Partial<FinancialDriverInput> & { id: string; title: string; observation: string; evidence: string[] }): FinancialDriverInput {
+function makeDriver(input: { id: string; title: string; observation: string; evidence: string[] }): FinancialDriverInput {
   return input;
 }
 
@@ -101,17 +89,12 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
   const inventorySeries = series.find((item) => /inventory/i.test(item.name));
   const expenseSeries = series.find((item) => /operating expense|opex/i.test(item.name));
 
-  let inventoryBuildup = drivers.find((driver) =>
-    driver.id === "inventory-growth" || /inventory.*outpacing|inventory.*growth/i.test(String(driver.title ?? ""))
-  ) ?? null;
-
-  // The prior round only looked for a current-period inventory driver. Detect the
-  // actual historical pattern from the displayed Inventory and Revenue series too.
+  let inventoryBuildup = drivers.find((driver) => driver.id === "inventory-growth" || /inventory.*outpacing|inventory.*growth/i.test(String(driver.title ?? ""))) ?? null;
   if (!inventoryBuildup && inventorySeries && revenueSeries) {
     const n = Math.min(inventorySeries.values.length, revenueSeries.values.length);
-    const invStart = inventorySeries.values[n - n];
+    const invStart = inventorySeries.values[0];
     const invEnd = inventorySeries.values[n - 1];
-    const revStart = revenueSeries.values[n - n];
+    const revStart = revenueSeries.values[0];
     const revEnd = revenueSeries.values[n - 1];
     const invGrowth = invStart > 0 ? ((invEnd - invStart) / Math.abs(invStart)) * 100 : 0;
     const revGrowth = revStart > 0 ? ((revEnd - revStart) / Math.abs(revStart)) * 100 : 0;
@@ -120,22 +103,12 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
         id: "historical-inventory-buildup",
         title: "Inventory is building faster than revenue",
         observation: `Inventory increased ${invGrowth.toFixed(1)}% across the displayed periods while revenue increased ${revGrowth.toFixed(1)}%.`,
-        evidence: [
-          `Inventory growth across displayed periods: ${invGrowth.toFixed(1)}%`,
-          `Revenue growth across displayed periods: ${revGrowth.toFixed(1)}%`,
-          `Inventory outpaced revenue by ${(invGrowth - revGrowth).toFixed(1)} points`,
-        ],
+        evidence: [`Inventory growth across displayed periods: ${invGrowth.toFixed(1)}%`, `Revenue growth across displayed periods: ${revGrowth.toFixed(1)}%`, `Inventory outpaced revenue by ${(invGrowth - revGrowth).toFixed(1)} points`],
       });
     }
   }
 
-  let expenseSpikeRecovery = drivers.find((driver) =>
-    driver.id === "historical-opex-spike" || /operating expense spike/i.test(String(driver.title ?? ""))
-  ) ?? null;
-
-  // Do not let a current-period OPEX growth driver hide a prior-month spike.
-  // Look for a material peak with both neighboring periods and the latest period
-  // back near the local baseline.
+  let expenseSpikeRecovery = drivers.find((driver) => driver.id === "historical-opex-spike" || /operating expense spike/i.test(String(driver.title ?? ""))) ?? null;
   if (!expenseSpikeRecovery && expenseSeries) {
     const values = expenseSeries.values;
     let best: { index: number; peak: number; baseline: number; score: number } | null = null;
@@ -147,9 +120,7 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
       const baseline = (before + after) / 2;
       const deviation = baseline > 0 ? (peak - baseline) / baseline : 0;
       const recovery = baseline > 0 ? Math.abs(after - baseline) / baseline : 1;
-      if (deviation >= 0.5 && recovery <= 0.2 && (!best || deviation > best.score)) {
-        best = { index: i, peak, baseline, score: deviation };
-      }
+      if (deviation >= 0.5 && recovery <= 0.2 && (!best || deviation > best.score)) best = { index: i, peak, baseline, score: deviation };
     }
     if (best) {
       const period = expenseSeries.periods[best.index] || "a prior period";
@@ -158,11 +129,7 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
         id: "historical-opex-spike",
         title: "Operating expenses spiked and then recovered",
         observation: `Operating expenses peaked at ${Math.round(best.peak).toLocaleString("en-US")} in ${period} and then returned near the surrounding-period baseline of ${Math.round(best.baseline).toLocaleString("en-US")}.`,
-        evidence: [
-          `Spike period: ${period}`,
-          `Peak operating expenses: $${Math.round(best.peak).toLocaleString("en-US")}`,
-          `Estimated excess versus surrounding periods: $${excess.toLocaleString("en-US")}`,
-        ],
+        evidence: [`Spike period: ${period}`, `Peak operating expenses: $${Math.round(best.peak).toLocaleString("en-US")}`, `Estimated excess versus surrounding periods: $${excess.toLocaleString("en-US")}`],
       });
     }
   }
@@ -170,18 +137,12 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
   const rawRevenueTrend = Array.isArray(body.recentRevenueTrend) ? body.recentRevenueTrend : [];
   const revenueValues = rawRevenueTrend.map(asFiniteNumber).filter((value): value is number => value !== null && value > 0);
   const volatilityValues = revenueValues.length >= 6 ? revenueValues : (revenueSeries?.values.filter((value) => value > 0) ?? []);
-  if (volatilityValues.length < 6) {
-    return { inventoryBuildup, expenseSpikeRecovery, revenueVolatility: null };
-  }
+  if (volatilityValues.length < 6) return { inventoryBuildup, expenseSpikeRecovery, revenueVolatility: null };
   const min = Math.min(...volatilityValues);
   const max = Math.max(...volatilityValues);
   const range = max - min;
   const maxMinRatio = min > 0 ? max / min : 0;
-  return {
-    inventoryBuildup,
-    expenseSpikeRecovery,
-    revenueVolatility: maxMinRatio >= 1.5 ? { min, max, range, maxMinRatio, periods: volatilityValues.length } : null,
-  };
+  return { inventoryBuildup, expenseSpikeRecovery, revenueVolatility: maxMinRatio >= 1.5 ? { min, max, range, maxMinRatio, periods: volatilityValues.length } : null };
 }
 
 function extractOutputText(payload: any): string {
@@ -190,9 +151,7 @@ function extractOutputText(payload: any): string {
   if (Array.isArray(payload?.output)) {
     for (const outputItem of payload.output) {
       if (!Array.isArray(outputItem?.content)) continue;
-      for (const contentItem of outputItem.content) {
-        if (contentItem?.type === "output_text" && typeof contentItem?.text === "string") text += contentItem.text;
-      }
+      for (const contentItem of outputItem.content) if (contentItem?.type === "output_text" && typeof contentItem?.text === "string") text += contentItem.text;
     }
   }
   return text.trim();
@@ -212,9 +171,7 @@ function normalizeScenarioAnalysis(analysis: Record<string, any>, signals: Scena
     normalized.primaryDriver = String(driver.title ?? "Inventory is building faster than revenue");
     normalized.whyItMatters = String(driver.observation ?? "Inventory is growing faster than revenue.");
     normalized.managementQuestion = "Which inventory categories or SKUs are driving the build, and are current purchases supported by demand?";
-    normalized.recommendedAction = typeof body.currentRecommendation === "string" && body.currentRecommendation.trim()
-      ? body.currentRecommendation
-      : "Review inventory aging, purchasing cadence, demand support, and slow-moving stock to determine whether inventory growth is absorbing working capital without matching sales.";
+    normalized.recommendedAction = typeof body.currentRecommendation === "string" && body.currentRecommendation.trim() ? body.currentRecommendation : "Review inventory aging, purchasing cadence, demand support, and slow-moving stock to determine whether inventory growth is absorbing working capital without matching sales.";
     if (!evidence.some((item) => /inventory/i.test(item))) evidence.push(...(Array.isArray(driver.evidence) ? driver.evidence.map(String) : []));
     if (!unknowns.some((item) => /inventory/i.test(item))) unknowns.unshift("The workbook does not identify which inventory categories or SKUs are driving the increase.");
     normalized.executiveSummary = `${normalized.executiveSummary} ClearCFO specifically detected inventory building faster than revenue, so inventory is the primary working-capital pattern to investigate.`.trim();
@@ -257,12 +214,9 @@ export async function POST(request: Request) {
     console.error("[ClearCFO AI] OPENAI_API_KEY is missing.");
     return NextResponse.json({ error: "AI analysis is not configured." }, { status: 503 });
   }
-
   try {
     const rawBody = await request.text();
-    if (new TextEncoder().encode(rawBody).length > 250 * 1024) {
-      return NextResponse.json({ error: "The financial analysis payload is too large." }, { status: 413 });
-    }
+    if (new TextEncoder().encode(rawBody).length > MAX_REQUEST_BYTES) return NextResponse.json({ error: "The financial analysis payload is too large. Please upload a smaller workbook or reduce the analysis data." }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(rawBody); } catch { return NextResponse.json({ error: "Invalid analysis payload." }, { status: 400 }); }
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid analysis payload." }, { status: 400 });
@@ -279,13 +233,7 @@ export async function POST(request: Request) {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        store: false,
-        instructions: `${instructions} ${scenarioDirectives}`.trim(),
-        input: JSON.stringify(bodyObject),
-        text: { format: { type: "json_schema", name: "clearcfo_cfo_analysis", strict: true, schema: analysisSchema } },
-      }),
+      body: JSON.stringify({ model, store: false, instructions: `${instructions} ${scenarioDirectives}`.trim(), input: JSON.stringify(bodyObject), text: { format: { type: "json_schema", name: "clearcfo_cfo_analysis", strict: true, schema: analysisSchema } } }),
     });
 
     const rawResponse = await response.text();
@@ -298,13 +246,11 @@ export async function POST(request: Request) {
       console.error("[ClearCFO AI] OpenAI request failed:", { status: response.status, statusText: response.statusText, error: payload?.error });
       return NextResponse.json({ error: typeof payload?.error?.message === "string" ? payload.error.message : `OpenAI request failed with status ${response.status}.` }, { status: 502 });
     }
-
     const text = extractOutputText(payload);
     if (!text) {
       console.error("[ClearCFO AI] OpenAI returned no output text.");
       return NextResponse.json({ error: "OpenAI returned an empty analysis." }, { status: 502 });
     }
-
     let analysis: unknown;
     try { analysis = JSON.parse(text); } catch (error) {
       console.error("[ClearCFO AI] Could not parse structured output:", error instanceof Error ? error.message : "Unknown parse error");
@@ -312,7 +258,6 @@ export async function POST(request: Request) {
     }
     const analysisObject = asAnalysisObject(analysis);
     if (!analysisObject) return NextResponse.json({ error: "OpenAI returned an invalid analysis structure." }, { status: 502 });
-
     const normalizedAnalysis = normalizeScenarioAnalysis(analysisObject, scenarioSignals, bodyObject);
     console.log("[ClearCFO AI] Analysis completed successfully.");
     return NextResponse.json({ analysis: normalizedAnalysis });
