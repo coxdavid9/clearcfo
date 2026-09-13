@@ -276,8 +276,44 @@ export async function getQuickBooksConnection(userId: string) {
 }
 
 export async function disconnectQuickBooks(userId: string) {
+  try {
+    const connection = await getConnection(userId);
+    if (connection) {
+      await revokeIntuitTokens(decrypt(connection.refresh_token_encrypted));
+    }
+  } catch (error) {
+    console.error(
+      "[ClearCFO QuickBooks] Pre-disconnect revocation skipped:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
+
   const response = await supabaseRequest(`quickbooks_connections?user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE" });
   if (!response.ok) throw new Error(`Could not disconnect QuickBooks (${response.status}).`);
+}
+
+async function revokeIntuitTokens(refreshToken: string): Promise<void> {
+  try {
+    const { clientId, clientSecret } = config();
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const response = await fetch(QB_REVOKE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({ token: refreshToken }).toString(),
+    });
+    if (!response.ok) {
+      console.error(`[ClearCFO QuickBooks] Token revocation failed (${response.status}).`);
+    }
+  } catch (error) {
+    console.error(
+      "[ClearCFO QuickBooks] Token revocation error:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
 }
 
 export async function quickBooksReport(userId: string, reportName: string, params: Record<string, string>) {

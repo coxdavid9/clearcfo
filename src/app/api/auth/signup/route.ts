@@ -26,6 +26,10 @@ function readProfile(body: Record<string, unknown>) {
 }
 
 export async function POST(request: Request) {
+  // Rate limit: slows fake-account floods.
+  const limited = checkRateLimit(request, authRateLimit);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
