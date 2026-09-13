@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { authRateLimit, checkRateLimit } from "../../../../lib/rate-limit";
 import { getAuthCookieNames, signInWithPassword } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Rate limit: slows brute-force login attempts.
+  const limited = checkRateLimit(request, authRateLimit);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";

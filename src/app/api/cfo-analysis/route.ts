@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -290,6 +291,10 @@ function extractOutputText(payload: any): string {
 }
 
 export async function POST(request: Request) {
+  // Rate limit: each analysis call costs OpenAI API money.
+  const limited = checkRateLimit(request, aiRateLimit);
+  if (limited) return limited;
+
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -425,8 +430,7 @@ export async function POST(request: Request) {
       payload = JSON.parse(rawResponse);
     } catch {
       console.error(
-        "[ClearCFO AI] OpenAI returned non-JSON:",
-        rawResponse
+        `[ClearCFO AI] OpenAI returned a non-JSON response (length: ${rawResponse.length}).`
       );
 
       return NextResponse.json(
@@ -483,11 +487,7 @@ export async function POST(request: Request) {
       );
 
       console.error(
-        JSON.stringify(
-          payload,
-          null,
-          2
-        )
+        `[ClearCFO AI] Payload keys: ${payload && typeof payload === "object" ? Object.keys(payload).join(", ") : typeof payload}.`
       );
 
       return NextResponse.json(
@@ -512,12 +512,11 @@ export async function POST(request: Request) {
     } catch (parseError) {
       console.error(
         "[ClearCFO AI] Could not parse structured output:",
-        parseError
+        parseError instanceof Error ? parseError.message : "Unknown parse error"
       );
 
       console.error(
-        "[ClearCFO AI] Returned text:",
-        text
+        `[ClearCFO AI] Unparseable output length: ${text.length}.`
       );
 
       return NextResponse.json(
@@ -575,7 +574,7 @@ export async function POST(request: Request) {
 
     console.error(
       "[ClearCFO AI] Unexpected server error:",
-      error
+      error instanceof Error ? error.message : "Unknown error"
     );
 
     return NextResponse.json(
