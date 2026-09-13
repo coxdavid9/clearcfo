@@ -3,13 +3,21 @@
  *
  * Pure, framework-free financial-pattern detectors shared by the client
  * workbook parser (CFOBriefing) and the /api/cfo-analysis route.
+ *
+ * Keeping the math in one place means the browser-side driver detection and
+ * the server-side deterministic signals can never drift apart.
  */
 
 export type SpikeDetection = {
+  /** Start index of the spike window within the value series. */
   index: number;
+  /** Number of periods in the spike window (1 = single-period spike). */
   length: number;
+  /** Highest value observed inside the spike window. */
   peak: number;
+  /** Surrounding-period baseline the spike is measured against. */
   baseline: number;
+  /** Estimated excess dollars versus baseline across the window. */
   excess: number;
 };
 
@@ -17,6 +25,20 @@ function mean(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+/**
+ * Detect an operating-expense spike followed by a return toward baseline.
+ *
+ * Handles two shapes:
+ *  - single-period: one period at >=150% of its immediate neighbors, with the
+ *    next period back within 20% of that baseline (the historical behavior).
+ *  - plateau: 2-6 consecutive elevated periods (>=112% of the pre-spike
+ *    baseline on average, every period >=105%) followed by a return to
+ *    within 30% of the pre-spike baseline. Real expense spikes (a legal
+ *    bill spread over a quarter, a multi-month project) rarely last exactly
+ *    one period, so the single-period detector alone misses them.
+ *
+ * Returns the strongest detection (by excess dollars) or null.
+ */
 export function detectExpenseSpikeRecovery(
   values: number[],
   opts: {
@@ -48,6 +70,7 @@ export function detectExpenseSpikeRecovery(
     if (!best || candidate.excess > best.excess) best = candidate;
   };
 
+  // Single-period spikes.
   for (let i = 1; i < clean.length - 1; i += 1) {
     const before = clean[i - 1];
     const peak = clean[i];
@@ -62,6 +85,7 @@ export function detectExpenseSpikeRecovery(
     }
   }
 
+  // Multi-period plateaus: k consecutive elevated periods, then recovery.
   for (let k = 2; k <= maxPlateauLength; k += 1) {
     for (let i = 1; i + k + 1 < clean.length; i += 1) {
       const pre = clean.slice(Math.max(0, i - 3), i);
@@ -94,6 +118,15 @@ export type InventoryOutpacing = {
   revGrowth: number;
 };
 
+/**
+ * Compare historical inventory growth against historical revenue growth.
+ * Returns the growth rates when inventory is materially outpacing revenue:
+ * inventory must be growing in absolute terms (at least `minAbsoluteGrowth`
+ * percent) and ahead of revenue by more than `minGapPoints` percentage
+ * points. The absolute gate keeps mild inventory drift during a revenue
+ * decline (where the demand story dominates) from being misread as a buildup.
+ * Returns null otherwise.
+ */
 export function inventoryOutpacesRevenue(
   inventoryValues: number[],
   revenueValues: number[],
