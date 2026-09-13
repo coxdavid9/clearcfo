@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import { detectExpenseSpikeRecovery } from "../lib/scenario-detection";
 
 type BriefingData = {
   companyName: string;
@@ -1447,6 +1448,45 @@ function analyzeWorkbook(
     }
   }
 
+  // Cross-sheet inventory recovery: workbooks may keep inventory history on a
+  // dedicated sheet (for example "Inventory_Summary") rather than on a sheet
+  // named like a Balance Sheet. Scan every sheet for an inventory metric row
+  // when no Inventory series has been found yet. This never invents values.
+  if (!historicalSeries.some((series) => clean(series.name) === "inventory")) {
+    for (const sheetName of workbook.SheetNames) {
+      if (historicalSeries.some((series) => clean(series.name) === "inventory")) break;
+      const sheetMatrix = asMatrix(workbook, sheetName);
+      let sheetHeaderRow = -1;
+      let sheetMetricIndex = -1;
+      for (let r = 0; r < Math.min(sheetMatrix.length, 25); r++) {
+        const row = sheetMatrix[r] ?? [];
+        const idx = row.findIndex((value) => metricHeaderAliases.includes(clean(value)));
+        if (idx >= 0) { sheetHeaderRow = r; sheetMetricIndex = idx; break; }
+      }
+      if (sheetHeaderRow < 0 || sheetMetricIndex < 0) continue;
+      const sheetHeader = sheetMatrix[sheetHeaderRow] ?? [];
+      const sheetColumns = sheetHeader
+        .map((value, index) => ({ value, index }))
+        .filter(({ index, value }) => index !== sheetMetricIndex && String(value ?? "").trim() !== "");
+      if (sheetColumns.length < 3) continue;
+      const inventoryRow = sheetMatrix.slice(sheetHeaderRow + 1).find((candidate) => {
+        const metric = clean(candidate[sheetMetricIndex]);
+        return inventoryAliases.some((alias) => {
+          const target = clean(alias);
+          return metric === target || metric.includes(target) || target.includes(metric);
+        });
+      });
+      if (!inventoryRow) continue;
+      const inventoryValues = sheetColumns.map(({ index }) => toNumber(inventoryRow[index]));
+      if (inventoryValues.filter((value) => Number.isFinite(value) && value !== 0).length < 3) continue;
+      historicalSeries.push({
+        name: "Inventory",
+        values: inventoryValues.slice(-12),
+        periods: sheetColumns.map(({ value }) => formatPeriod(value)).slice(-12),
+      });
+    }
+  }
+
   const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
   historicalSeries.sort((a, b) => {
     const ai = coreTrendOrder.indexOf(a.name);
@@ -1532,14 +1572,45 @@ function analyzeWorkbook(
     previousCashFromFinancials ??
     cash;
 
+  const inventoryTrendSeries =
+    historicalSeries.find(
+      (series) =>
+        clean(series.name) ===
+        "inventory"
+    );
+  const inventoryFromTrend =
+    inventoryTrendSeries &&
+    inventoryTrendSeries.values
+      .length >= 2
+      ? inventoryTrendSeries
+          .values[
+          inventoryTrendSeries
+            .values.length -
+            1
+        ]
+      : null;
+  const previousInventoryFromTrend =
+    inventoryTrendSeries &&
+    inventoryTrendSeries.values
+      .length >= 2
+      ? inventoryTrendSeries
+          .values[
+          inventoryTrendSeries
+            .values.length -
+            2
+        ]
+      : null;
+
   const inventory =
     inventoryFromBalanceSheet ??
     inventoryFromFinancials ??
+    inventoryFromTrend ??
     0;
 
   const previousInventory =
     previousInventoryFromBalanceSheet ??
     previousInventoryFromFinancials ??
+    previousInventoryFromTrend ??
     inventory;
 
   const hasCashSignal = workbookContainsFinancialSignal(workbook, cashAliases);
@@ -1930,7 +2001,7 @@ function analyzeWorkbook(
 
   const drivers: FinancialDriver[] = [];
 
-  if (inventory > 0 && previousInventory > 0 && inventoryChange > 0 && inventoryChange > revenueChange + 3) {
+  if (inventory > 0 && previousInventory > 0 && inventoryChange >= 15 && inventoryChange > revenueChange + 3) {
     const inventoryImpact = Math.max(0, Math.round(inventory - previousInventory));
     drivers.push({
       id: "inventory-growth",
@@ -2045,63 +2116,57 @@ function analyzeWorkbook(
     });
   }
 
-  // Detect isolated historical operating-expense spikes even when the latest
-  // period has normalized. This matters for workbooks where the anomaly
-  // occurred in the prior month rather than the current month.
+  // Detect historical operating-expense spikes — single-period spikes and
+  // multi-period plateaus — even when the latest period has normalized or a
+  // separate current-period opex-growth driver already exists. The spike
+  // pattern is diagnosed on its own terms, distinct from revenue movement.
+  //
+  // Detection runs on the full-length operating-expense history, not the
+  // display-truncated 12-period slice: a spike that began more than 12
+  // periods ago (with recovery since) would otherwise be invisible.
   const expenseSeries = historicalSeries.find(
     (series) => clean(series.name) === "operating expenses"
   );
-
-  if (expenseSeries && expenseSeries.values.length >= 3) {
-    const values = expenseSeries.values;
-    let spikeIndex = -1;
-    let spikeValue = 0;
-    let spikeBaseline = 0;
-
-    for (let i = 1; i < values.length - 1; i += 1) {
-      const prior = values[i - 1];
-      const current = values[i];
-      const next = values[i + 1];
-      if (prior <= 0 || current <= 0 || next <= 0) continue;
-
-      const baseline = (prior + next) / 2;
-      if (baseline > 0 && current >= baseline * 1.5) {
-        const normalizedNext = Math.abs(next - baseline) / baseline;
-        if (normalizedNext <= 0.2 && current > spikeValue) {
-          spikeIndex = i;
-          spikeValue = current;
-          spikeBaseline = baseline;
-        }
-      }
+  let expenseValues: number[] = expenseSeries?.values ?? [];
+  let expensePeriodLabels: string[] = expenseSeries?.periods ?? [];
+  if (isMetricRowFormat) {
+    const fullExpenseRow = metricRows.find(({ metric }) =>
+      operatingExpenseAliases.some((alias) => clean(alias) === clean(metric))
+    );
+    if (fullExpenseRow && fullExpenseRow.values.length >= 4) {
+      expenseValues = fullExpenseRow.values.map(toNumber);
+      expensePeriodLabels = periods;
     }
+  }
 
-    if (spikeIndex >= 0) {
-      const spikeImpact = Math.max(0, Math.round(spikeValue - spikeBaseline));
-      const spikePeriod = expenseSeries.periods[spikeIndex] || "a prior period";
-      const alreadyCovered = drivers.some(
-        (driver) => driver.id === "opex-growth" || driver.id === "unusual-spend"
-      );
+  if (expenseValues.length >= 4) {
+    const detection = detectExpenseSpikeRecovery(expenseValues);
 
-      if (!alreadyCovered) {
-        drivers.push({
-          id: "historical-opex-spike",
-          category: "Unusual Spend",
-          title: "A one-period operating expense spike was detected",
-          observation: `Operating expenses spiked to ${formatCurrency(spikeValue)} in ${spikePeriod}, then returned near the surrounding-period baseline of ${formatCurrency(spikeBaseline)}.`,
-          evidence: [
-            `Spike period: ${spikePeriod}`,
-            `Peak operating expenses: ${formatCurrency(spikeValue)}`,
-            `Estimated excess versus surrounding periods: ${formatCurrency(spikeImpact)}`,
-          ],
-          direction: "up",
-          severity: spikeImpact >= Math.max(25000, revenue * 0.05) ? "High" : "Medium",
-          impact: spikeImpact,
-          confidence: 94,
-          managementQuestion: "What caused the one-period operating expense spike, and was it truly non-recurring?",
-        });
-        alerts.push(`A one-period operating expense spike was detected in ${spikePeriod}.`);
-        priorities.push({ level: spikeImpact >= Math.max(25000, revenue * 0.05) ? "high" : "medium", message: `A one-period operating expense spike was detected in ${spikePeriod}.` });
-      }
+    if (detection) {
+      const spikePeriod = expensePeriodLabels[detection.index] || "a prior period";
+      const spikeImpact = Math.max(0, Math.round(detection.excess));
+      const windowLabel = detection.length > 1 ? ` over ${detection.length} periods` : "";
+      const severityLevel = spikeImpact >= Math.max(25000, revenue * 0.05) ? "High" : "Medium";
+      drivers.push({
+        id: "historical-opex-spike",
+        category: "Unusual Spend",
+        title: detection.length > 1
+          ? `Operating expense spike${windowLabel}, then recovered`
+          : "A one-period operating expense spike was detected",
+        observation: `Operating expenses spiked to ${formatCurrency(detection.peak)} in ${spikePeriod}${windowLabel}, then returned near the surrounding-period baseline of ${formatCurrency(detection.baseline)}.`,
+        evidence: [
+          `Spike period: ${spikePeriod}${windowLabel}`,
+          `Peak operating expenses: ${formatCurrency(detection.peak)}`,
+          `Estimated excess versus surrounding periods: ${formatCurrency(spikeImpact)}`,
+        ],
+        direction: "up",
+        severity: severityLevel,
+        impact: spikeImpact,
+        confidence: 94,
+        managementQuestion: "What caused the operating expense spike, and was it truly non-recurring?",
+      });
+      alerts.push(`An operating expense spike was detected in ${spikePeriod} and has since recovered.`);
+      priorities.push({ level: severityLevel === "High" ? "high" : "medium", message: `An operating expense spike was detected in ${spikePeriod} and has since recovered.` });
     }
   }
 
