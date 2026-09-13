@@ -1,0 +1,104 @@
+name: Apply diagnosis improvements
+
+on:
+  push:
+    branches: [analysis-pattern-detection-2026-09-13]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch diagnosis layer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/CFOBriefing.tsx')
+          s = p.read_text()
+
+          s = s.replace('  unknowns: string[];\n};', '  unknowns: string[];\n  diagnosisSignals?: DiagnosisSignals;\n};', 1)
+
+          marker = 'type ExpandedMetric =\n  | "revenue"\n  | "margin"\n  | "cash"\n  | "attention"\n  | null;'
+          addition = marker + '''\n\ntype DiagnosisSignals = {\n  inventoryBuildup?: {\n    multiPeriodInventoryChange: number;\n    multiPeriodRevenueChange: number;\n    multiPeriodCogsChange: number | null;\n    latestInventoryDays: number | null;\n    latestInventoryToRevenue: number | null;\n  };\n  operatingExpenseSpikeRecovery?: {\n    peakPeriod: string;\n    peakValue: number;\n    baselineValue: number;\n    excessImpact: number;\n    recoveryPct: number;\n  };\n  revenueVolatility?: {\n    min: number;\n    max: number;\n    range: number;\n    maxMinRatio: number;\n    periodCount: number;\n    possibleSeasonality: boolean;\n  };\n};'''
+          if marker not in s:
+              raise SystemExit('ExpandedMetric marker not found')
+          s = s.replace(marker, addition, 1)
+
+          # Include COGS as a historical series so inventory days and working-capital context can be calculated.
+          s = s.replace('      ["Revenue", revenueAliases],\n      ["Gross margin", grossMarginAliases],', '      ["Revenue", revenueAliases],\n      ["COGS", cogsAliases],\n      ["Gross margin", grossMarginAliases],', 1)
+          s = s.replace('      ["Revenue", revenueAliases],\n      ["Gross margin", grossMarginAliases],', '      ["Revenue", revenueAliases],\n      ["COGS", cogsAliases],\n      ["Gross margin", grossMarginAliases],', 1)
+
+          fn_marker = '\nfunction workbookContainsFinancialSignal('
+          fn = r'''\nfunction buildDiagnosisSignals(\n  seriesMap: { name: string; values: number[]; periods: string[] }[],\n  fallbackRevenueChange: number\n): DiagnosisSignals {\n  const signals: DiagnosisSignals = {};\n  const find = (name: string) => seriesMap.find((series) => clean(series.name) === clean(name));\n  const multiChange = (values: number[]): number => {\n    const usable = values.filter((value) => Number.isFinite(value));\n    if (usable.length < 3 || usable[0] === 0) return 0;\n    return ((usable[usable.length - 1] - usable[0]) / Math.abs(usable[0])) * 100;\n  };\n\n  const inventory = find("Inventory");\n  const revenue = find("Revenue");\n  const cogs = find("COGS");\n\n  if (inventory && revenue && inventory.values.length >= 3 && revenue.values.length >= 3) {\n    const inventoryChange = multiChange(inventory.values);\n    const revenueChange = multiChange(revenue.values);\n    const cogsChange = cogs && cogs.values.length >= 3 ? multiChange(cogs.values) : null;\n    const latestInventory = inventory.values.at(-1) ?? 0;\n    const latestRevenue = revenue.values.at(-1) ?? 0;\n    const latestCogs = cogs?.values.at(-1) ?? 0;\n    const latestInventoryDays = latestInventory > 0 && latestCogs > 0\n      ? (latestInventory / (latestCogs * 12)) * 365\n      : null;\n    const latestInventoryToRevenue = latestRevenue !== 0\n      ? latestInventory / Math.abs(latestRevenue)\n      : null;\n\n    if (inventoryChange >= 8 && inventoryChange > revenueChange + 3 && (cogsChange === null || inventoryChange > cogsChange + 3)) {\n      signals.inventoryBuildup = {\n        multiPeriodInventoryChange: inventoryChange,\n        multiPeriodRevenueChange: revenueChange,\n        multiPeriodCogsChange: cogsChange,\n        latestInventoryDays,\n        latestInventoryToRevenue,\n      };\n    }\n  }\n\n  const opex = find("Operating Expenses");\n  if (opex && opex.values.length >= 4) {\n    const values = opex.values;\n    let best: DiagnosisSignals["operatingExpenseSpikeRecovery"] = undefined;\n    for (let i = 1; i < values.length - 2; i += 1) {\n      const prior = values[i - 1];\n      const peak = values[i];\n      const next = values[i + 1];\n      if (prior <= 0 || peak <= 0 || next <= 0) continue;\n      const baseline = (prior + next) / 2;\n      if (baseline <= 0 || peak < baseline * 1.3) continue;\n      const recoveryPct = ((peak - next) / peak) * 100;\n      const latest = values.at(-1) ?? next;\n      const laterValues = values.slice(i + 1);\n      const recovered = laterValues.length >= 2 && latest <= peak * 0.9 && laterValues.filter((value) => value <= peak * 0.9).length >= Math.max(2, Math.ceil(laterValues.length * 0.6));\n      if (recoveryPct >= 10 && recovered) {\n        const candidate = {\n          peakPeriod: opex.periods[i] || "a prior period",\n          peakValue: peak,\n          baselineValue: baseline,\n          excessImpact: Math.max(0, Math.round(peak - baseline)),\n          recoveryPct,\n        };\n        if (!best || candidate.excessImpact > best.excessImpact) best = candidate;\n      }\n    }\n    if (best) signals.operatingExpenseSpikeRecovery = best;\n  }\n\n  if (revenue && revenue.values.length >= 6) {\n    const usable = revenue.values.filter((value) => Number.isFinite(value) && value > 0);\n    if (usable.length >= 6) {\n      const min = Math.min(...usable);\n      const max = Math.max(...usable);\n      const ratio = min > 0 ? max / min : 0;\n      if (ratio >= 1.5) {\n        const diffs = usable.slice(1).map((value, index) => Math.abs(value - usable[index]) / Math.max(usable[index], 1));\n        const highVariance = diffs.filter((value) => value >= 0.2).length >= Math.max(2, Math.floor(diffs.length / 3));\n        signals.revenueVolatility = {\n          min,\n          max,\n          range: max - min,\n          maxMinRatio: ratio,\n          periodCount: usable.length,\n          possibleSeasonality: highVariance && usable.length >= 12,\n        };\n      }\n    }\n  }\n\n  return signals;\n}\n'''
+          if fn_marker not in s:
+              raise SystemExit('workbookContainsFinancialSignal marker not found')
+          s = s.replace(fn_marker, fn + fn_marker, 1)
+
+          # Build signals after all historical series are available.
+          marker2 = '  const trendInsights = buildTrendInsights(historicalSeries, revenueChange);'
+          repl2 = marker2 + '\n  const diagnosisSignals = buildDiagnosisSignals(historicalSeries, revenueChange);'
+          if marker2 not in s:
+              raise SystemExit('trendInsights marker not found')
+          s = s.replace(marker2, repl2, 1)
+
+          # Add concrete diagnostic drivers after the existing historical opex-spike block and before multi-period context.
+          marker3 = '''  /*\n   * ------------------------------------------------------------\n   * MULTI-PERIOD CONTEXT DRIVERS\n'''
+          driver_block = r'''  const inventorySignal = diagnosisSignals.inventoryBuildup;\n  if (inventorySignal && !drivers.some((driver) => driver.id === "inventory-growth")) {\n    const impact = Math.max(0, Math.round((inventory.values.at(-1) ?? inventory) - (inventory.values[0] ?? inventory)));\n    drivers.push({\n      id: "multi-period-inventory-buildup",\n      category: "Inventory",\n      title: "Inventory is accumulating faster than the sales base",\n      observation: `Inventory increased ${formatPercentValue(inventorySignal.multiPeriodInventoryChange)}% across the displayed periods while revenue changed ${formatPercentValue(inventorySignal.multiPeriodRevenueChange)}%.`,\n      evidence: [\n        `Multi-period inventory change: ${percent(inventorySignal.multiPeriodInventoryChange)}`,\n        `Multi-period revenue change: ${percent(inventorySignal.multiPeriodRevenueChange)}`,\n        inventorySignal.multiPeriodCogsChange === null ? "COGS history was not available for comparison." : `Multi-period COGS change: ${percent(inventorySignal.multiPeriodCogsChange)}`,\n        inventorySignal.latestInventoryDays === null ? "Inventory days could not be calculated from the supplied data." : `Latest inventory days: ${Math.round(inventorySignal.latestInventoryDays)} days`,\n      ],\n      direction: "up",\n      severity: inventorySignal.multiPeriodInventoryChange - inventorySignal.multiPeriodRevenueChange >= 8 ? "High" : "Medium",\n      impact,\n      confidence: 95,\n      managementQuestion: "Which inventory categories are accumulating, and is the current purchasing cadence supported by demand?",\n    });\n  }\n\n  const opexRecovery = diagnosisSignals.operatingExpenseSpikeRecovery;\n  if (opexRecovery && !drivers.some((driver) => driver.id === "historical-opex-spike")) {\n    drivers.push({\n      id: "opex-spike-recovery",\n      category: "Operating Expense",\n      title: "Operating expenses show a spike followed by recovery",\n      observation: `Operating expenses peaked at ${formatCurrency(opexRecovery.peakValue)} in ${opexRecovery.peakPeriod} and have since fallen ${formatPercentValue(opexRecovery.recoveryPct)}% from the peak.`,\n      evidence: [\n        `Peak operating expenses: ${formatCurrency(opexRecovery.peakValue)}`,\n        `Peak period: ${opexRecovery.peakPeriod}`,\n        `Estimated excess versus surrounding-period baseline: ${formatCurrency(opexRecovery.excessImpact)}`,\n        `Recovery from peak: ${formatPercentValue(opexRecovery.recoveryPct)}%`,\n      ],\n      direction: "mixed",\n      severity: opexRecovery.excessImpact >= Math.max(25000, revenue * 0.05) ? "High" : "Medium",\n      impact: opexRecovery.excessImpact,\n      confidence: 95,\n      managementQuestion: "What caused the operating expense spike, and is the recovery likely to hold or recur?",\n    });\n    alerts.push(`Operating expenses spiked in ${opexRecovery.peakPeriod} and have since recovered.`);\n    priorities.push({ level: opexRecovery.excessImpact >= Math.max(25000, revenue * 0.05) ? "high" : "medium", message: `Operating expenses spiked in ${opexRecovery.peakPeriod} and have since recovered.` });\n  }\n\n  const volatilitySignal = diagnosisSignals.revenueVolatility;\n  if (volatilitySignal && !drivers.some((driver) => driver.id === "revenue-volatility")) {\n    drivers.push({\n      id: "revenue-volatility",\n      category: "Revenue",\n      title: volatilitySignal.possibleSeasonality ? "Revenue is highly volatile and may reflect seasonality" : "Revenue is highly volatile across the displayed periods",\n      observation: `Revenue ranged from ${formatCurrency(volatilitySignal.min)} to ${formatCurrency(volatilitySignal.max)}, a ${volatilitySignal.maxMinRatio.toFixed(1)}x spread across ${volatilitySignal.periodCount} periods.`,\n      evidence: [\n        `Minimum revenue: ${formatCurrency(volatilitySignal.min)}`,\n        `Maximum revenue: ${formatCurrency(volatilitySignal.max)}`,\n        `Max/min range: ${volatilitySignal.maxMinRatio.toFixed(1)}x`,\n      ],\n      direction: "mixed",\n      severity: volatilitySignal.maxMinRatio >= 2 ? "High" : "Medium",\n      impact: Math.round(volatilitySignal.range),\n      confidence: volatilitySignal.possibleSeasonality ? 84 : 92,\n      managementQuestion: volatilitySignal.possibleSeasonality ? "How much of the revenue swing is seasonal, and what does that imply for staffing, inventory, and cash planning?" : "What customer, product, pricing, or timing factors explain the large revenue swings?",\n    });\n  }\n\n'''
+          if marker3 not in s:
+              raise SystemExit('multi-period marker not found')
+          s = s.replace(marker3, driver_block + marker3, 1)
+
+          # Make these new signals visible to the AI and ensure recommendation prioritizes them.
+          marker4 = '          multiPeriodInsights: inputData.trendInsights,\n          knownUnknowns: inputData.unknowns,'
+          repl4 = '          multiPeriodInsights: inputData.trendInsights,\n          diagnosisSignals: inputData.diagnosisSignals,\n          knownUnknowns: inputData.unknowns,'
+          if marker4 not in s:
+              raise SystemExit('AI payload marker not found')
+          s = s.replace(marker4, repl4, 1)
+
+          # P2: do not present missing cash as $0.
+          s = s.replace('                  value: currency.format(data.cash),\n                  change: percent(data.cashChange),', '                  value: data.cash === 0 && data.source === "upload" ? "N/A" : currency.format(data.cash),\n                  change: data.cash === 0 && data.source === "upload" ? "No cash data" : percent(data.cashChange),', 1)
+
+          # P1: expose upload directly from the full-analysis overlay.
+          overlay_marker = '<h3 className="mt-1 text-xl font-bold text-slate-900">What changed, why it matters, and what to do next.</h3>'
+          overlay_repl = overlay_marker + '\n            <div className="mt-4 flex flex-wrap gap-2">\n              <button type="button" onClick={() => { setShowAnalysis(false); window.setTimeout(() => fileRef.current?.click(), 0); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:bg-slate-50">Upload another workbook</button>\n              <button type="button" onClick={() => setShowAnalysis(false)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">Back to Briefing</button>\n            </div>'
+          if overlay_marker not in s:
+              raise SystemExit('overlay marker not found')
+          s = s.replace(overlay_marker, overlay_repl, 1)
+
+          # Return signals with the analyzed data.
+          marker5 = '    trendSeries: historicalSeries.slice(-12),\n    unknowns: unknowns.slice(0, 6),'
+          repl5 = '    trendSeries: historicalSeries.slice(-12),\n    unknowns: unknowns.slice(0, 6),\n    diagnosisSignals, '
+          if marker5 not in s:
+              raise SystemExit('return marker not found')
+          s = s.replace(marker5, repl5, 1)
+
+          p.write_text(s)
+          PY
+      - name: Add AI diagnosis instructions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/api/cfo-analysis/route.ts')
+          s = p.read_text()
+          marker = '  "Use multiPeriodInsights as the historical-pattern layer.",'
+          addition = marker + '\n\n  "Use diagnosisSignals as a deterministic pattern-detection layer. When a diagnosis signal is present, name that supported pattern explicitly in the primary driver, executive summary, evidence, and recommended action where relevant.",\n\n  "For inventoryBuildup, explicitly discuss inventory accumulating faster than revenue or COGS and use inventory days when supplied. Do not convert this into a specific purchase reduction unless the evidence supports it.",\n\n  "For operatingExpenseSpikeRecovery, distinguish the historical spike from the subsequent recovery and include the supplied dollar impact. Do not mistake a revenue spike for the expense pattern.",\n\n  "For revenueVolatility, prioritize the observed range and volatility over a simple straight-line trend. If possibleSeasonality is true, describe seasonality as a possibility rather than a proven cause unless comparable periods establish it.",'
+          if marker not in s:
+              raise SystemExit('instructions marker not found')
+          s = s.replace(marker, addition, 1)
+          p.write_text(s)
+          PY
+      - name: Typecheck build
+        run: |
+          npm ci
+          npx tsc --noEmit
+      - name: Commit changes and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx src/app/api/cfo-analysis/route.ts
+          git rm .github/workflows/apply-diagnosis-improvements.yml
+          git commit -m "Add deterministic financial pattern detection"
+          git push
