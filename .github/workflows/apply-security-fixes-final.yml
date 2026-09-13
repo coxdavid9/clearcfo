@@ -1,0 +1,62 @@
+name: Apply final security fixes
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          # CFO analysis rate limit.
+          p = Path("src/app/api/cfo-analysis/route.ts")
+          t = p.read_text()
+          if "const limited = checkRateLimit(request, aiRateLimit);" not in t:
+              t = t.replace("export async function POST(request: Request) {\n  const apiKey = process.env.OPENAI_API_KEY;", "export async function POST(request: Request) {\n  // Rate limit: each analysis call costs OpenAI API money.\n  const limited = checkRateLimit(request, aiRateLimit);\n  if (limited) return limited;\n\n  const apiKey = process.env.OPENAI_API_KEY;", 1)
+          t = t.replace('console.error(\n        "[ClearCFO AI] OpenAI returned non-JSON:",\n        rawResponse\n      );', 'console.error(\n        `[ClearCFO AI] OpenAI returned a non-JSON response (length: ${rawResponse.length}).`\n      );', 1)
+          t = re.sub(r'console\.error\(\n\s*JSON\.stringify\(\n\s*payload,\n\s*null,\n\s*2\n\s*\)\n\s*\);', 'console.error(\n        `[ClearCFO AI] Payload keys: ${payload && typeof payload === "object" ? Object.keys(payload).join(", ") : typeof payload}.`\n      );', t, count=1)
+          t = t.replace('console.error(\n        "[ClearCFO AI] Could not parse structured output:",\n        parseError\n      );\n\n      console.error(\n        "[ClearCFO AI] Returned text:",\n        text\n      );', 'console.error(\n        "[ClearCFO AI] Could not parse structured output:",\n        parseError instanceof Error ? parseError.message : "Unknown parse error"\n      );\n\n      console.error(\n        `[ClearCFO AI] Unparseable output length: ${text.length}.`\n      );', 1)
+          t = re.sub(r'(console\.error\(\n\s*"\[ClearCFO AI\] Unexpected server error:",\n\s*)error(\n\s*\);)', r'\1error instanceof Error ? error.message : "Unknown error"\2', t, count=1)
+          p.write_text(t)
+
+          # Auth signup rate limit.
+          p = Path("src/app/api/auth/signup/route.ts")
+          t = p.read_text()
+          if "const limited = checkRateLimit(request, authRateLimit);" not in t:
+              t = t.replace("export async function POST(request: Request) {\n  try {", "export async function POST(request: Request) {\n  // Rate limit: slows fake-account floods.\n  const limited = checkRateLimit(request, authRateLimit);\n  if (limited) return limited;\n\n  try {", 1)
+              p.write_text(t)
+
+          # QuickBooks Intuit token revocation on disconnect.
+          p = Path("src/lib/quickbooks.ts")
+          t = p.read_text()
+          if "revokeIntuitTokens" not in t:
+              old = '''export async function disconnectQuickBooks(userId: string) {\n  const response = await supabaseRequest(`quickbooks_connections?user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE" });\n  if (!response.ok) throw new Error(`Could not disconnect QuickBooks (${response.status}).`);\n}'''
+              new = '''export async function disconnectQuickBooks(userId: string) {\n  try {\n    const connection = await getConnection(userId);\n    if (connection) {\n      await revokeIntuitTokens(decrypt(connection.refresh_token_encrypted));\n    }\n  } catch (error) {\n    console.error(\n      "[ClearCFO QuickBooks] Pre-disconnect revocation skipped:",\n      error instanceof Error ? error.message : "Unknown error"\n    );\n  }\n\n  const response = await supabaseRequest(`quickbooks_connections?user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE" });\n  if (!response.ok) throw new Error(`Could not disconnect QuickBooks (${response.status}).`);\n}\n\nasync function revokeIntuitTokens(refreshToken: string): Promise<void> {\n  try {\n    const { clientId, clientSecret } = config();\n    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");\n    const response = await fetch(QB_REVOKE_URL, {\n      method: "POST",\n      headers: {\n        Authorization: `Basic ${credentials}`,\n        "Content-Type": "application/x-www-form-urlencoded",\n        Accept: "application/json",\n      },\n      body: new URLSearchParams({ token: refreshToken }).toString(),\n    });\n    if (!response.ok) {\n      console.error(`[ClearCFO QuickBooks] Token revocation failed (${response.status}).`);\n    }\n  } catch (error) {\n    console.error(\n      "[ClearCFO QuickBooks] Token revocation error:",\n      error instanceof Error ? error.message : "Unknown error"\n    );\n  }\n}'''
+              if old not in t:
+                  raise SystemExit("QuickBooks disconnect anchor not found")
+              t = t.replace(old, new, 1)
+              p.write_text(t)
+          PY
+
+          # Remove all temporary workflow machinery.
+          rm -f .github/workflows/apply-security-hardening.yml .github/workflows/run-security-hardening-on-pr.yml .github/workflows/finish-security-hardening.yml .github/workflows/commit-security-hardening.yml .github/workflows/finalize-security-hardening.yml .github/workflows/apply-security-fixes-final.yml SECURITY_PATCH_TRIGGER.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add proxy.ts src/app/api/auth/login/route.ts src/app/api/auth/signup/route.ts src/app/api/cfo-analysis/route.ts src/lib/quickbooks.ts src/lib/rate-limit.ts .github/workflows SECURITY_PATCH_TRIGGER.md
+          git commit -m "Harden rate limits, logging, QuickBooks disconnect, and CSP"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
