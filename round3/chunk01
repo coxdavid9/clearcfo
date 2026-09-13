@@ -1,0 +1,91 @@
++      for (let r = 0; r < Math.min(sheetMatrix.length, 25); r++) {
++        const row = sheetMatrix[r] ?? [];
++        const idx = row.findIndex((value) => metricHeaderAliases.includes(clean(value)));
++        if (idx >= 0) { sheetHeaderRow = r; sheetMetricIndex = idx; break; }
++      }
++      if (sheetHeaderRow < 0 || sheetMetricIndex < 0) continue;
++      const sheetHeader = sheetMatrix[sheetHeaderRow] ?? [];
++      const sheetColumns = sheetHeader
++        .map((value, index) => ({ value, index }))
++        .filter(({ index, value }) => index !== sheetMetricIndex && String(value ?? "").trim() !== "");
++      if (sheetColumns.length < 3) continue;
++      const inventoryRow = sheetMatrix.slice(sheetHeaderRow + 1).find((candidate) => {
++        const metric = clean(candidate[sheetMetricIndex]);
++        return inventoryAliases.some((alias) => {
++          const target = clean(alias);
++          return metric === target || metric.includes(target) || target.includes(metric);
++        });
++      });
++      if (!inventoryRow) continue;
++      const inventoryValues = sheetColumns.map(({ index }) => toNumber(inventoryRow[index]));
++      if (inventoryValues.filter((value) => Number.isFinite(value) && value !== 0).length < 3) continue;
++      historicalSeries.push({
++        name: "Inventory",
++        values: inventoryValues.slice(-12),
++        periods: sheetColumns.map(({ value }) => formatPeriod(value)).slice(-12),
++      });
++    }
++  }
++
+   const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];
+   historicalSeries.sort((a, b) => {
+     const ai = coreTrendOrder.indexOf(a.name);
+@@ -1532,14 +1572,45 @@ function analyzeWorkbook(
+     previousCashFromFinancials ??
+     cash;
+ 
++  const inventoryTrendSeries =
++    historicalSeries.find(
++      (series) =>
++        clean(series.name) ===
++        "inventory"
++    );
++  const inventoryFromTrend =
++    inventoryTrendSeries &&
++    inventoryTrendSeries.values
++      .length >= 2
++      ? inventoryTrendSeries
++          .values[
++          inventoryTrendSeries
++            .values.length -
++            1
++        ]
++      : null;
++  const previousInventoryFromTrend =
++    inventoryTrendSeries &&
++    inventoryTrendSeries.values
++      .length >= 2
++      ? inventoryTrendSeries
++          .values[
++          inventoryTrendSeries
++            .values.length -
++            2
++        ]
++      : null;
++
+   const inventory =
+     inventoryFromBalanceSheet ??
+     inventoryFromFinancials ??
++    inventoryFromTrend ??
+     0;
+ 
+   const previousInventory =
+     previousInventoryFromBalanceSheet ??
+     previousInventoryFromFinancials ??
++    previousInventoryFromTrend ??
+     inventory;
+ 
+   const hasCashSignal = workbookContainsFinancialSignal(workbook, cashAliases);
+@@ -1930,7 +2001,7 @@ function analyzeWorkbook(
+ 
+   const drivers: FinancialDriver[] = [];
+ 
+-  if (inventory > 0 && previousInventory > 0 && inventoryChange > 0 && inventoryChange > revenueChange + 3) {
++  if (inventory > 0 && previousInventory > 0 && inventoryChange >= 15 && inventoryChange > revenueChange + 3) {
+     const inventoryImpact = Math.max(0, Math.round(inventory - previousInventory));
+     drivers.push({
+       id: "inventory-growth",
+@@ -2045,63 +2116,57 @@ function analyzeWorkbook(
+     });
+   }
+ 
