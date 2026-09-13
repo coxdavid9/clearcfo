@@ -1,0 +1,74 @@
+name: Round 3 clean reconstruction
+on:
+  push:
+    branches: [round3-diagnosis-fix-2026-09-13-clean]
+permissions:
+  contents: write
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Reconstruct Round 3 changes
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          route = Path('src/app/api/cfo-analysis/route.ts')
+          s = route.read_text()
+          s = s.replace('import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";\n', 'import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";\nimport { detectExpenseSpikeRecovery, inventoryOutpacesRevenue } from "../../../lib/scenario-detection";\n', 1)
+          old_inv = '''    const n = Math.min(inventorySeries.values.length, revenueSeries.values.length);\n    const invStart = inventorySeries.values[0];\n    const invEnd = inventorySeries.values[n - 1];\n    const revStart = revenueSeries.values[0];\n    const revEnd = revenueSeries.values[n - 1];\n    const invGrowth = invStart > 0 ? ((invEnd - invStart) / Math.abs(invStart)) * 100 : 0;\n    const revGrowth = revStart > 0 ? ((revEnd - revStart) / Math.abs(revStart)) * 100 : 0;\n    if (invGrowth > 0 && invGrowth > revGrowth + 3) {'''
+          new_inv = '''    const outpacing = inventoryOutpacesRevenue(inventorySeries.values, revenueSeries.values);\n    if (outpacing) {\n      const { invGrowth, revGrowth } = outpacing;'''
+          if old_inv not in s: raise SystemExit('route inventory block not found')
+          s = s.replace(old_inv, new_inv, 1)
+          start = s.index('  if (!expenseSpikeRecovery && expenseSeries) {')
+          end = s.index('\n  const rawRevenueTrend', start)
+          new_exp = '''  if (!expenseSpikeRecovery && expenseSeries) {\n    const detection = detectExpenseSpikeRecovery(expenseSeries.values);\n    if (detection) {\n      const period = expenseSeries.periods[detection.index] || "a prior period";\n      const excess = Math.max(0, Math.round(detection.excess));\n      const windowLabel = detection.length > 1 ? ` over ${detection.length} periods` : "";\n      expenseSpikeRecovery = makeDriver({\n        id: "historical-opex-spike",\n        title: detection.length > 1 ? `Operating expense spike${windowLabel}, then recovered` : "Operating expenses spiked and then recovered",\n        observation: `Operating expenses peaked at ${Math.round(detection.peak).toLocaleString("en-US")} in ${period}${windowLabel} and then returned near the surrounding-period baseline of ${Math.round(detection.baseline).toLocaleString("en-US")}.`,\n        evidence: [`Spike period: ${period}${windowLabel}`, `Peak operating expenses: $${Math.round(detection.peak).toLocaleString("en-US")}`, `Estimated excess versus surrounding periods: $${excess.toLocaleString("en-US")}`],\n      });\n    }\n  }'''
+          s = s[:start] + new_exp + s[end:]
+          route.write_text(s)
+
+          comp = Path('src/components/CFOBriefing.tsx')
+          s = comp.read_text()
+          s = s.replace('import Footer from "./Footer";\n', 'import Footer from "./Footer";\nimport { detectExpenseSpikeRecovery } from "../lib/scenario-detection";\n', 1)
+          marker = '  const coreTrendOrder = ["Revenue", "Inventory", "Operating Expenses", "Cash"];'
+          cross = '''  // Recover inventory history from dedicated sheets such as Inventory_Summary.\n  if (!historicalSeries.some((series) => clean(series.name) === "inventory")) {\n    for (const sheetName of workbook.SheetNames) {\n      if (historicalSeries.some((series) => clean(series.name) === "inventory")) break;\n      const sheetMatrix = asMatrix(workbook, sheetName);\n      let sheetHeaderRow = -1;\n      let sheetMetricIndex = -1;\n      for (let r = 0; r < Math.min(sheetMatrix.length, 25); r++) {\n        const row = sheetMatrix[r] ?? [];\n        const idx = row.findIndex((value) => metricHeaderAliases.includes(clean(value)));\n        if (idx >= 0) { sheetHeaderRow = r; sheetMetricIndex = idx; break; }\n      }\n      if (sheetHeaderRow < 0 || sheetMetricIndex < 0) continue;\n      const sheetHeader = sheetMatrix[sheetHeaderRow] ?? [];\n      const sheetColumns = sheetHeader\n        .map((value, index) => ({ value, index }))\n        .filter(({ index, value }) => index !== sheetMetricIndex && String(value ?? "").trim() !== "");\n      if (sheetColumns.length < 3) continue;\n      const inventoryRow = sheetMatrix.slice(sheetHeaderRow + 1).find((candidate) => {\n        const metric = clean(candidate[sheetMetricIndex]);\n        return inventoryAliases.some((alias) => {\n          const target = clean(alias);\n          return metric === target || metric.includes(target) || target.includes(metric);\n        });\n      });\n      if (!inventoryRow) continue;\n      const inventoryValues = sheetColumns.map(({ index }) => toNumber(inventoryRow[index]));\n      if (inventoryValues.filter((value) => Number.isFinite(value) && value !== 0).length < 3) continue;\n      historicalSeries.push({\n        name: "Inventory",\n        values: inventoryValues.slice(-12),\n        periods: sheetColumns.map(({ value }) => formatPeriod(value)).slice(-12),\n      });\n    }\n  }\n\n'''
+          if marker not in s: raise SystemExit('component trend marker not found')
+          s = s.replace(marker, cross + marker, 1)
+          inv_marker = '''  const inventory =\n    inventoryFromBalanceSheet ??\n    inventoryFromFinancials ??\n    0;'''
+          inv_repl = '''  const inventoryTrendSeries = historicalSeries.find((series) => clean(series.name) === "inventory");\n  const inventoryFromTrend = inventoryTrendSeries && inventoryTrendSeries.values.length >= 2\n    ? inventoryTrendSeries.values[inventoryTrendSeries.values.length - 1]\n    : null;\n  const previousInventoryFromTrend = inventoryTrendSeries && inventoryTrendSeries.values.length >= 2\n    ? inventoryTrendSeries.values[inventoryTrendSeries.values.length - 2]\n    : null;\n\n  const inventory =\n    inventoryFromBalanceSheet ??\n    inventoryFromFinancials ??\n    inventoryFromTrend ??\n    0;'''
+          if inv_marker not in s: raise SystemExit('component inventory marker not found')
+          s = s.replace(inv_marker, inv_repl, 1)
+          s = s.replace('''  const previousInventory =\n    previousInventoryFromBalanceSheet ??\n    previousInventoryFromFinancials ??\n    inventory;''', '''  const previousInventory =\n    previousInventoryFromBalanceSheet ??\n    previousInventoryFromFinancials ??\n    previousInventoryFromTrend ??\n    inventory;''', 1)
+          s = s.replace('inventoryChange > 0 && inventoryChange > revenueChange + 3', 'inventoryChange >= 15 && inventoryChange > revenueChange + 3', 1)
+          start = s.index('  // Detect isolated historical operating-expense spikes')
+          end = s.index('\n  /*\n   * ------------------------------------------------------------\n   * MULTI-PERIOD CONTEXT DRIVERS', start)
+          new_block = '''  // Detect historical operating-expense spikes — single-period spikes and\n  // multi-period plateaus — even when the latest period has normalized.\n  const expenseSeries = historicalSeries.find(\n    (series) => clean(series.name) === "operating expenses"\n  );\n  let expenseValues: number[] = expenseSeries?.values ?? [];\n  let expensePeriodLabels: string[] = expenseSeries?.periods ?? [];\n  if (isMetricRowFormat) {\n    const fullExpenseRow = metricRows.find(({ metric }) =>\n      operatingExpenseAliases.some((alias) => clean(alias) === clean(metric))\n    );\n    if (fullExpenseRow && fullExpenseRow.values.length >= 4) {\n      expenseValues = fullExpenseRow.values.map(toNumber);\n      expensePeriodLabels = periods;\n    }\n  }\n\n  if (expenseValues.length >= 4) {\n    const detection = detectExpenseSpikeRecovery(expenseValues);\n    if (detection) {\n      const spikePeriod = expensePeriodLabels[detection.index] || "a prior period";\n      const spikeImpact = Math.max(0, Math.round(detection.excess));\n      const windowLabel = detection.length > 1 ? ` over ${detection.length} periods` : "";\n      const severityLevel = spikeImpact >= Math.max(25000, revenue * 0.05) ? "High" : "Medium";\n      drivers.push({\n        id: "historical-opex-spike",\n        category: "Unusual Spend",\n        title: detection.length > 1 ? `Operating expense spike${windowLabel}, then recovered` : "A one-period operating expense spike was detected",\n        observation: `Operating expenses spiked to ${formatCurrency(detection.peak)} in ${spikePeriod}${windowLabel}, then returned near the surrounding-period baseline of ${formatCurrency(detection.baseline)}.`,\n        evidence: [\n          `Spike period: ${spikePeriod}${windowLabel}`,\n          `Peak operating expenses: ${formatCurrency(detection.peak)}`,\n          `Estimated excess versus surrounding periods: ${formatCurrency(spikeImpact)}`,\n        ],\n        direction: "up",\n        severity: severityLevel,\n        impact: spikeImpact,\n        confidence: 94,\n        managementQuestion: "What caused the operating expense spike, and was it truly non-recurring?",\n      });\n      alerts.push(`An operating expense spike was detected in ${spikePeriod} and has since recovered.`);\n      priorities.push({ level: severityLevel === "High" ? "high" : "medium", message: `An operating expense spike was detected in ${spikePeriod} and has since recovered.` });\n    }\n  }\n'''
+          s = s[:start] + new_block + s[end:]
+          comp.write_text(s)
+          PY
+
+          git diff --check
+          git status --short
+      - name: Run full CI locally
+        run: |
+          npx tsc --noEmit
+          npm run test:security
+          node scripts/financial-engine-scenarios.mjs
+          npm run test:reasoning
+          npm run test:trends
+          npm run build
+      - name: Commit validated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/round3-clean-build.yml
+          git add src/app/api/cfo-analysis/route.ts src/components/CFOBriefing.tsx src/lib/scenario-detection.ts .github/workflows/round3-clean-build.yml
+          git commit -m "Fix Round 3 scenario diagnosis [skip ci]"
+          git push origin HEAD
