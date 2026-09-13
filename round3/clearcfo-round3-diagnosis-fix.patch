@@ -1,0 +1,67 @@
+diff --git a/src/app/api/cfo-analysis/route.ts b/src/app/api/cfo-analysis/route.ts
+index e10eac7..7f4ba86 100644
+--- a/src/app/api/cfo-analysis/route.ts
++++ b/src/app/api/cfo-analysis/route.ts
+@@ -1,5 +1,6 @@
+ import { NextResponse } from "next/server";
+ import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";
++import { detectExpenseSpikeRecovery, inventoryOutpacesRevenue } from "../../../lib/scenario-detection";
+ 
+ export const runtime = "nodejs";
+ 
+@@ -91,14 +92,9 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
+ 
+   let inventoryBuildup = drivers.find((driver) => driver.id === "inventory-growth" || /inventory.*outpacing|inventory.*growth/i.test(String(driver.title ?? ""))) ?? null;
+   if (!inventoryBuildup && inventorySeries && revenueSeries) {
+-    const n = Math.min(inventorySeries.values.length, revenueSeries.values.length);
+-    const invStart = inventorySeries.values[0];
+-    const invEnd = inventorySeries.values[n - 1];
+-    const revStart = revenueSeries.values[0];
+-    const revEnd = revenueSeries.values[n - 1];
+-    const invGrowth = invStart > 0 ? ((invEnd - invStart) / Math.abs(invStart)) * 100 : 0;
+-    const revGrowth = revStart > 0 ? ((revEnd - revStart) / Math.abs(revStart)) * 100 : 0;
+-    if (invGrowth > 0 && invGrowth > revGrowth + 3) {
++    const outpacing = inventoryOutpacesRevenue(inventorySeries.values, revenueSeries.values);
++    if (outpacing) {
++      const { invGrowth, revGrowth } = outpacing;
+       inventoryBuildup = makeDriver({
+         id: "historical-inventory-buildup",
+         title: "Inventory is building faster than revenue",
+@@ -110,26 +106,16 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
+ 
+   let expenseSpikeRecovery = drivers.find((driver) => driver.id === "historical-opex-spike" || /operating expense spike/i.test(String(driver.title ?? ""))) ?? null;
+   if (!expenseSpikeRecovery && expenseSeries) {
+-    const values = expenseSeries.values;
+-    let best: { index: number; peak: number; baseline: number; score: number } | null = null;
+-    for (let i = 1; i < values.length - 1; i += 1) {
+-      const before = values[i - 1];
+-      const peak = values[i];
+-      const after = values[i + 1];
+-      if (before <= 0 || peak <= 0 || after <= 0) continue;
+-      const baseline = (before + after) / 2;
+-      const deviation = baseline > 0 ? (peak - baseline) / baseline : 0;
+-      const recovery = baseline > 0 ? Math.abs(after - baseline) / baseline : 1;
+-      if (deviation >= 0.5 && recovery <= 0.2 && (!best || deviation > best.score)) best = { index: i, peak, baseline, score: deviation };
+-    }
+-    if (best) {
+-      const period = expenseSeries.periods[best.index] || "a prior period";
+-      const excess = Math.max(0, Math.round(best.peak - best.baseline));
++    const detection = detectExpenseSpikeRecovery(expenseSeries.values);
++    if (detection) {
++      const period = expenseSeries.periods[detection.index] || "a prior period";
++      const excess = Math.max(0, Math.round(detection.excess));
++      const windowLabel = detection.length > 1 ? ` over ${detection.length} periods` : "";
+       expenseSpikeRecovery = makeDriver({
+         id: "historical-opex-spike",
+-        title: "Operating expenses spiked and then recovered",
+-        observation: `Operating expenses peaked at ${Math.round(best.peak).toLocaleString("en-US")} in ${period} and then returned near the surrounding-period baseline of ${Math.round(best.baseline).toLocaleString("en-US")}.`,
+-        evidence: [`Spike period: ${period}`, `Peak operating expenses: $${Math.round(best.peak).toLocaleString("en-US")}`, `Estimated excess versus surrounding periods: $${excess.toLocaleString("en-US")}`],
++        title: detection.length > 1 ? `Operating expense spike${windowLabel}, then recovered` : "Operating expenses spiked and then recovered",
++        observation: `Operating expenses peaked at ${Math.round(detection.peak).toLocaleString("en-US")} in ${period}${windowLabel} and then returned near the surrounding-period baseline of ${Math.round(detection.baseline).toLocaleString("en-US")}.`,
++        evidence: [`Spike period: ${period}${windowLabel}`, `Peak operating expenses: $${Math.round(detection.peak).toLocaleString("en-US")}`, `Estimated excess versus surrounding periods: $${excess.toLocaleString("en-US")}`],
+       });
+     }
+   }
+@@ -174,3 +160,0 @@ function deriveScenarioSignals(body: Record<string, unknown>): ScenarioSignals {
+ 
+*** End Patch
