@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authRateLimit, checkRateLimit } from "../../../../lib/rate-limit";
 import { getAuthCookieNames, signUpWithPassword } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";

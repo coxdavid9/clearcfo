@@ -35,6 +35,7 @@ function addSecurityHeaders(response: NextResponse) {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()"
   );
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy());
 
   if (process.env.NODE_ENV === "production") {
     response.headers.set(
@@ -44,6 +45,40 @@ function addSecurityHeaders(response: NextResponse) {
   }
 
   return response;
+}
+
+/**
+ * Content-Security-Policy: blocks cross-site scripting by allowlisting where
+ * each resource type may load from. Notes on the choices:
+ * - script-src keeps 'unsafe-inline' because Next.js emits inline scripts;
+ *   no 'unsafe-eval' is needed.
+ * - style-src keeps 'unsafe-inline' for React inline styles.
+ * - connect-src allows same-origin API routes plus Supabase (auth/database).
+ * - QuickBooks OAuth is a top-level navigation, which CSP does not restrict.
+ */
+function buildContentSecurityPolicy(): string {
+  let connectSrc = "connect-src 'self'";
+  try {
+    const supabaseUrl =
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (supabaseUrl) {
+      connectSrc += ` ${new URL(supabaseUrl).origin}`;
+    }
+  } catch {
+    // If the Supabase URL is missing or invalid, fall back to 'self' only.
+  }
+
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    connectSrc,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
 }
 
 function refreshRedirect(request: NextRequest) {
