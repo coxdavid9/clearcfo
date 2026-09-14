@@ -89,14 +89,24 @@ function signState(value: string) {
 }
 
 function verifyState(value: string) {
-  const [payload, signature] = value.split(".");
-  if (!payload || !signature) return null;
+  const separator = value.lastIndexOf(".");
+  if (separator <= 0) return null;
+
+  const payload = value.slice(0, separator);
+  const signature = value.slice(separator + 1);
+  if (!signature) return null;
+
   const expected = signState(payload);
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  const providedBuffer = Buffer.from(signature, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  if (providedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
+    return null;
+  }
+
   try {
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
     if (!decoded.userId || !decoded.exp || decoded.exp < Date.now()) return null;
-    return decoded as { userId: string; exp: number };
+    return decoded as { userId: string; exp: number; nonce?: string };
   } catch {
     return null;
   }
@@ -131,7 +141,11 @@ export async function requireCurrentUser() {
 
 export async function createQuickBooksConnectUrl(userId: string) {
   config();
-  const payload = Buffer.from(JSON.stringify({ userId, exp: Date.now() + STATE_MAX_AGE * 1000 })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    userId,
+    exp: Date.now() + STATE_MAX_AGE * 1000,
+    nonce: crypto.randomBytes(16).toString("base64url"),
+  })).toString("base64url");
   const state = `${payload}.${signState(payload)}`;
   const cookieStore = await cookies();
   cookieStore.set(STATE_COOKIE, state, {
@@ -204,15 +218,17 @@ export async function saveQuickBooksConnection(userId: string, realmId: string, 
 }
 
 export async function completeQuickBooksCallback(code: string, realmId: string, state: string) {
-  const cookieStore = await cookies();
-  const storedState = cookieStore.get(STATE_COOKIE)?.value;
-  cookieStore.delete(STATE_COOKIE);
-  if (!storedState || storedState !== state) throw new Error("QuickBooks authorization state did not match.");
+  // The signed state contains the authenticated user's ID and expiration, so it
+  // can safely bind the OAuth response to the initiating user without depending
+  // on the browser preserving the OAuth cookie across the Intuit redirect.
   const verified = verifyState(state);
   if (!verified) throw new Error("QuickBooks authorization state is invalid or expired.");
 
   const user = await getCurrentUser();
   if (!user || user.id !== verified.userId) throw new Error("Your ClearCFO session is no longer valid.");
+
+  const cookieStore = await cookies();
+  cookieStore.delete(STATE_COOKIE);
 
   const tokens = await exchangeCode(code);
   return saveQuickBooksConnection(user.id, realmId, tokens);
