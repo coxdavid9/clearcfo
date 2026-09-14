@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import CFOBriefing from "../../components/CFOBriefing";
 import QuickBooksConnection from "../../components/QuickBooksConnection";
+import QuickBooksCFOBridge from "../../components/QuickBooksCFOBridge";
 import TrendDetailOverlay from "../../components/TrendDetailOverlay";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
@@ -27,6 +28,7 @@ export default async function CustomerPage() {
     <main id="customer" className="min-h-screen bg-slate-50 text-slate-900">
       <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" />
       <QuickBooksConnection />
+      <QuickBooksCFOBridge />
       <CFOBriefing />
       <TrendDetailOverlay enabled />
     </main>
