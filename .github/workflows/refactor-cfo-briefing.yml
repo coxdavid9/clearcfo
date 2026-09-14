@@ -62,7 +62,7 @@ jobs:
               flags=re.M,
           )
 
-          engine = 'import * as XLSX from "xlsx";\n\n' + exported
+          engine = 'import * as XLSX from "xlsx";\nimport { detectExpenseSpikeRecovery } from "../../lib/scenario-detection";\n\n' + exported
           engine_path = Path("src/lib/briefing/engine.ts")
           engine_path.parent.mkdir(parents=True, exist_ok=True)
           engine_path.write_text(engine)
