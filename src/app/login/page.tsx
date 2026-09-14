@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 type SignupProfile = {
   companyName: string;
@@ -28,6 +28,12 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("mode") === "signup") {
+      setMode("signup");
+    }
+  }, []);
 
   function switchMode(nextMode: "login" | "signup") {
     setMode(nextMode);
@@ -161,7 +167,7 @@ export default function LoginPage() {
 
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-slate-700">Company size <span className="text-red-500">*</span></span>
-                <select required value={profile.companySize} onChange={(event) => updateProfile("companySize", event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100">
+                <select required value={profile.companySize} onChange={(event) => updateProfile("companySize", event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100">
                   <option value="">Select company size</option>
                   <option value="1-10">1–10 employees</option>
                   <option value="11-50">11–50 employees</option>
