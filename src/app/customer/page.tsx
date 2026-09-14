@@ -27,7 +27,9 @@ export default async function CustomerPage() {
     <main id="customer" className="min-h-screen bg-slate-50 text-slate-900">
       <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" />
       <QuickBooksConnection />
-      <CFOBriefing />
+      <div id="cfo-briefing">
+        <CFOBriefing />
+      </div>
       <TrendDetailOverlay enabled />
     </main>
   );
