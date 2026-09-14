@@ -136,6 +136,12 @@ export default function LoginPage() {
                 <input type="password" autoComplete={signup ? "new-password" : "current-password"} minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="At least 8 characters" />
               </label>
 
+              {!signup && (
+                <div className="-mt-2 text-right">
+                  <a href="/forgot-password" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Forgot password?</a>
+                </div>
+              )}
+
               {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
               {message && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</p>}
 
@@ -161,7 +167,7 @@ export default function LoginPage() {
 
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-slate-700">Company size <span className="text-red-500">*</span></span>
-                <select required value={profile.companySize} onChange={(event) => updateProfile("companySize", event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100">
+                <select required value={profile.companySize} onChange={(event) => updateProfile("companySize", event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100">
                   <option value="">Select company size</option>
                   <option value="1-10">1–10 employees</option>
                   <option value="11-50">11–50 employees</option>
