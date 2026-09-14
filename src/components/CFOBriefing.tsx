@@ -27,6 +27,9 @@ export default function CFOBriefing() {
       demoData
     );
 
+  const [liveSource, setLiveSource] =
+    useState<"demo" | "upload" | "quickbooks">("demo");
+
   const [hasValidAnalysis, setHasValidAnalysis] =
     useState(true);
 
@@ -97,6 +100,56 @@ export default function CFOBriefing() {
   }, [showAnalysis]);
 
 
+  async function loadQuickBooksBriefing() {
+    try {
+      const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+      const statusPayload = await statusResponse.json();
+      if (!statusResponse.ok || !statusPayload?.connection?.connected) return;
+
+      const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok || !payload?.briefing) {
+        throw new Error(payload?.error || "ClearCFO could not load your QuickBooks financial data.");
+      }
+
+      setData(payload.briefing as BriefingData);
+      setLiveSource("quickbooks");
+      setHasValidAnalysis(true);
+      setError("");
+      setAiError("");
+      setAiAnalysis(null);
+      await generateAIAnalysis(payload.briefing as BriefingData);
+    } catch (err) {
+      setHasValidAnalysis(false);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "ClearCFO could not load your QuickBooks financial data."
+      );
+    }
+  }
+
+  useEffect(() => {
+    loadQuickBooksBriefing();
+
+    const handleSync = () => {
+      loadQuickBooksBriefing();
+    };
+    const handleDisconnect = () => {
+      setLiveSource("demo");
+      setHasValidAnalysis(false);
+      setError("");
+    };
+
+    window.addEventListener("clearcfo:quickbooks-sync", handleSync);
+    window.addEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+
+    return () => {
+      window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
+      window.removeEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+    };
+  }, []);
+
   const toggleMetric = (metric: ExpandedMetric) => {
     setExpandedMetric((current) =>
       current === metric ? null : metric
@@ -133,6 +186,7 @@ export default function CFOBriefing() {
         );
 
       setData(analyzed);
+      setLiveSource("upload");
       setHasValidAnalysis(true);
       await generateAIAnalysis(analyzed);
     } catch (err) {
@@ -294,7 +348,7 @@ export default function CFOBriefing() {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Financial briefing</span>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">{data.source === "upload" ? `Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo financial data"}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{liveSource === "quickbooks" ? "QuickBooks financial data" : liveSource === "upload" ? `Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo financial data"}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -310,7 +364,7 @@ export default function CFOBriefing() {
         <div className="mb-8">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Today&apos;s CFO Briefing</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Hello, David — here&apos;s what deserves your attention today.</h2>
-          <p className="mt-1 text-sm text-slate-500">{data.source === "upload" ? data.companyName : "Your financial data"}</p>
+          <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}</p>
         </div>
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
