@@ -5,10 +5,21 @@ export default function Contact() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-600">Contact ClearCFO</p>
         <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Have questions about ClearCFO?</h2>
         <p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-600">
-          We’re building a simpler way for owners to understand their financials and make better decisions. Contact details will be added here as we finalize the customer communication channel.
+          Whether you’re exploring ClearCFO for your business or already a customer, we’re here to help.
         </p>
-        <div className="mt-7 inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500">
-          Contact information coming soon
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a
+            href="mailto:contact@theclearcfo.com"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Email ClearCFO
+          </a>
+          <a
+            href="mailto:contact@theclearcfo.com"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            contact@theclearcfo.com
+          </a>
         </div>
       </div>
     </section>
