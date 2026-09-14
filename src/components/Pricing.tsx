@@ -64,8 +64,9 @@ export default function Pricing() {
 
         <div className="mx-auto mt-12 grid max-w-4xl gap-5 md:grid-cols-2">
           {plans.map((plan, index) => {
-            const price = annual ? Math.round((plan.monthly * 10) / 1) : plan.monthly;
+            const price = annual ? plan.monthly * 10 : plan.monthly;
             const period = annual ? "/year" : "/mo";
+            const annualEquivalent = (price / 12).toFixed(2);
 
             return (
               <ScrollReveal key={plan.name} delay={index * 120}>
@@ -79,7 +80,7 @@ export default function Pricing() {
                     </p>
                     {annual && <span className="mb-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">17% annual discount</span>}
                   </div>
-                  {annual && <p className="mt-2 text-xs text-slate-500">Equivalent to ${Math.round(plan.monthly * 0.83)}/month when billed annually.</p>}
+                  {annual && <p className="mt-2 text-xs text-slate-500">Equivalent to ${annualEquivalent}/month when billed annually.</p>}
 
                   <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm">
                     <p className="font-semibold text-slate-900">7-day free trial</p>
