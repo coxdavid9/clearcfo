@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { quickBooksReport, requireCurrentUser } from "../../../../lib/quickbooks";
+import { quickBooksReport, requireCurrentUser, getQuickBooksConnection } from "../../../../lib/quickbooks";
+import { buildQuickBooksBriefing } from "../../../../lib/quickbooks-briefing";
 
 export const runtime = "nodejs";
 
@@ -51,25 +52,29 @@ export async function GET() {
     start.setMonth(start.getMonth() - 5);
     start.setDate(1);
 
-    const pnl = await quickBooksReport(user.id, "ProfitAndLoss", {
+    const reportParams = {
       start_date: isoDate(start),
       end_date: isoDate(end),
       summarize_column_by: "Month",
-    });
+    };
 
-    const balanceSheet = await quickBooksReport(user.id, "BalanceSheet", {
-      start_date: isoDate(end),
-      end_date: isoDate(end),
-    });
+    const [pnl, balanceSheet, connection] = await Promise.all([
+      quickBooksReport(user.id, "ProfitAndLoss", reportParams),
+      quickBooksReport(user.id, "BalanceSheet", reportParams),
+      getQuickBooksConnection(user.id),
+    ]);
 
     const parsed = parseProfitAndLoss(pnl);
+    const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection?.companyName || null);
 
     return NextResponse.json(
       {
         ok: true,
         syncedAt: new Date().toISOString(),
+        source: "quickbooks",
         periods: parsed.periods,
         metrics: parsed.metrics,
+        briefing,
         reports: { profitAndLoss: pnl, balanceSheet },
       },
       { headers: { "Cache-Control": "no-store" } }

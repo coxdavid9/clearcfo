@@ -52,6 +52,7 @@ export default function QuickBooksConnection() {
       const revenue = data.metrics?.Income?.at(-1);
       const netIncome = data.metrics?.["Net Income"]?.at(-1);
       setMessage(`Connection test passed. Latest period revenue: ${typeof revenue === "number" ? revenue.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) : "available"}. Net income: ${typeof netIncome === "number" ? netIncome.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) : "available"}.`);
+      window.dispatchEvent(new Event("clearcfo:quickbooks-sync"));
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "QuickBooks sync failed.");
     } finally {
@@ -68,6 +69,7 @@ export default function QuickBooksConnection() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to disconnect QuickBooks.");
       setConnection(null);
+      window.dispatchEvent(new Event("clearcfo:quickbooks-disconnected"));
       setMessage("QuickBooks disconnected. Your stored connection credentials were removed from ClearCFO.");
     } catch (disconnectError) {
       setError(disconnectError instanceof Error ? disconnectError.message : "Unable to disconnect QuickBooks.");
