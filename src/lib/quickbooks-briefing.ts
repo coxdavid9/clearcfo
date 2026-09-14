@@ -49,11 +49,22 @@ function periods(report: any): string[] {
 }
 
 function findRow(rows: ReportRow[], patterns: RegExp[]): ReportRow | null {
+  let fallback: ReportRow | null = null;
+
   for (const row of rows) {
     const normalized = clean(row.label);
-    if (patterns.some((pattern) => pattern.test(normalized))) return row;
+    if (!patterns.some((pattern) => pattern.test(normalized))) continue;
+
+    // QuickBooks reports can contain summary/group rows with the same label
+    // as a populated detail row. Prefer a matching row with an actual value
+    // so a zero-valued summary row does not hide the real account balance.
+    if (!fallback) fallback = row;
+    if (row.values.some((value) => Number.isFinite(value) && value !== 0)) {
+      return row;
+    }
   }
-  return null;
+
+  return fallback;
 }
 
 function align(values: number[], length: number): number[] {
