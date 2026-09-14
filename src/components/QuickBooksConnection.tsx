@@ -130,7 +130,7 @@ export default function QuickBooksConnection() {
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Financial data connection</p>
               <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">QuickBooks Online</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-                ClearCFO requests read-only accounting access so it can analyze your books without changing your QuickBooks data.
+                ClearCFO uses the QuickBooks accounting access needed to read your financial reports and build your analysis. It does not need to make changes to your books.
               </p>
             </div>
 
@@ -170,7 +170,7 @@ export default function QuickBooksConnection() {
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-emerald-800">
                 <span className="font-semibold">Next:</span>
-                <a href="#cfo-briefing" className="underline underline-offset-2 hover:no-underline">Review your CFO Briefing below</a>
+                <span>Review your CFO Briefing below.</span>
               </div>
             </div>
           )}
