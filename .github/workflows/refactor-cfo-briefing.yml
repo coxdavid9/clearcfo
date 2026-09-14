@@ -1,0 +1,112 @@
+name: Refactor CFO Briefing Phase 1
+
+on:
+  push:
+    branches:
+      - refactor/cfo-briefing-phase1
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refactor CFO briefing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          path = Path("src/components/CFOBriefing.tsx")
+          text = path.read_text()
+
+          if Path("src/lib/briefing/engine.ts").exists():
+              print("Phase 1 refactor already exists; nothing to do.")
+              raise SystemExit(0)
+
+          match = re.search(r"^export default function ", text, re.M)
+          if not match:
+              match = re.search(r"^export function CFOBriefing", text, re.M)
+          if not match:
+              raise SystemExit("Could not locate CFOBriefing component declaration safely.")
+
+          component_start = match.start()
+          prefix = text[:component_start]
+          component = text[component_start:]
+
+          marker = re.search(r"^type BriefingData", prefix, re.M)
+          if not marker:
+              raise SystemExit("Could not locate the briefing declarations safely.")
+
+          imports = prefix[:marker.start()].rstrip() + "\n"
+          declarations = prefix[marker.start():].strip() + "\n"
+
+          # Export only top-level declarations that were moved. Indented declarations
+          # inside functions/objects are untouched.
+          declaration_kinds = {}
+          for m in re.finditer(r"^(type|interface|const|let|var|function)\\s+([A-Za-z_$][\\w$]*)", declarations, re.M):
+              kind, name = m.group(1), m.group(2)
+              declaration_kinds[name] = kind
+          exported = re.sub(
+              r"^(type|interface|const|let|var|function)\\s+([A-Za-z_$][\\w$]*)",
+              lambda m: "export " + m.group(0),
+              declarations,
+              flags=re.M,
+          )
+
+          engine = '''import * as XLSX from "xlsx";\n\n''' + exported
+          engine_path = Path("src/lib/briefing/engine.ts")
+          engine_path.parent.mkdir(parents=True, exist_ok=True)
+          engine_path.write_text(engine)
+
+          # Only import moved declarations actually referenced by the component body.
+          referenced = []
+          for name, kind in declaration_kinds.items():
+              if re.search(r"\\b" + re.escape(name) + r"\\b", component):
+                  referenced.append((name, kind))
+
+          imports_lines = []
+          for name, kind in referenced:
+              if kind in {"type", "interface"}:
+                  imports_lines.append(f"type {name}")
+              else:
+                  imports_lines.append(name)
+
+          if imports_lines:
+              generated_import = "import {\n  " + ",\n  ".join(imports_lines) + "\n} from \"../lib/briefing/engine\";\n"
+              new_text = imports + generated_import + "\n" + component
+          else:
+              new_text = imports + component
+
+          path.write_text(new_text)
+
+          # Validate that the moved declarations are not accidentally duplicated.
+          if "type BriefingData" in component or "const demoData" in component:
+              raise SystemExit("Refactor validation failed: declarations still remain in CFOBriefing.tsx.")
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit refactor and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx src/lib/briefing/engine.ts .github/workflows/refactor-cfo-briefing.yml
+          git commit -m "refactor: split CFO briefing engine from UI" --author="github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          git push
