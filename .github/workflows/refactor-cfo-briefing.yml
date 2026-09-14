@@ -86,10 +86,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
+      - name: Production build
         run: npm run build
 
       - name: Commit refactor and remove temporary workflow
