@@ -84,12 +84,12 @@ export default function QuickBooksConnection() {
         <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50 via-white to-emerald-50 px-5 py-6 sm:px-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Welcome to ClearCFO</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Financial data</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                Let’s get your CFO Briefing ready.
+                Connect your financial data
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Connect your QuickBooks Online account and ClearCFO will use your financial history to identify what is driving performance, where money is being lost, and what deserves your attention.
+                Connect QuickBooks Online for automatic updates, or upload an Excel file if you do not use QuickBooks. ClearCFO uses whichever source you choose to build your CFO Briefing.
               </p>
             </div>
             <div className="shrink-0 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-sm shadow-sm">
@@ -101,8 +101,8 @@ export default function QuickBooksConnection() {
           <ol className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="ClearCFO setup progress">
             {[
               [1, "Create account", "Your ClearCFO workspace is ready."],
-              [2, "Connect QuickBooks", connection ? "Your books are connected." : "Securely connect your books."],
-              [3, "Review your briefing", connection ? "Your live financial analysis is next." : "Your briefing unlocks after connection."],
+              [2, "Choose your data source", connection ? "QuickBooks is connected." : "Connect QuickBooks or upload Excel."],
+              [3, "Review your briefing", connection ? "Your live financial analysis is next." : "Your briefing starts after you provide data."],
             ].map(([step, title, detail]) => {
               const number = Number(step);
               const complete = number < setupStep || (number === 2 && !!connection);
@@ -125,70 +125,78 @@ export default function QuickBooksConnection() {
         </div>
 
         <div className="p-5 sm:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Financial data connection</p>
-              <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">QuickBooks Online</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-                ClearCFO uses the QuickBooks accounting access needed to read your financial reports and build your analysis. It does not need to make changes to your books.
-              </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Recommended</p>
+                  <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">QuickBooks Online</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Automatically pull your financial history and keep your CFO Briefing current without repeatedly uploading files.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700">Automatic</span>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                {loading ? (
+                  <div className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-500">Checking connection…</div>
+                ) : connection ? (
+                  <>
+                    <button onClick={testSync} disabled={syncing} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">
+                      {syncing ? "Testing sync…" : "Sync now"}
+                    </button>
+                    <button onClick={disconnect} disabled={disconnecting} className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                      {disconnecting ? "Disconnecting…" : "Disconnect"}
+                    </button>
+                  </>
+                ) : (
+                  <a href="/api/quickbooks/connect" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                    Connect QuickBooks
+                  </a>
+                )}
+              </div>
+
+              {connection && (
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-white/80 px-4 py-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      <span className="font-semibold text-emerald-900">Connected</span>
+                      <span className="text-emerald-800">{connection.companyName || "QuickBooks Online company"}</span>
+                    </div>
+                    <span className="text-xs text-emerald-700">
+                      Connected {new Date(connection.connectedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex shrink-0 flex-wrap gap-3">
-              {loading ? (
-                <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-500">Checking connection…</div>
-              ) : connection ? (
-                <>
-                  <button onClick={testSync} disabled={syncing} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">
-                    {syncing ? "Testing sync…" : "Test sync"}
-                  </button>
-                  <button onClick={disconnect} disabled={disconnecting} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
-                    {disconnecting ? "Disconnecting…" : "Disconnect"}
-                  </button>
-                </>
-              ) : (
-                <a href="/api/quickbooks/connect" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
-                  Connect QuickBooks
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Alternative</p>
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">Upload an Excel file</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Do not use QuickBooks? No problem. Upload your financial workbook and ClearCFO will analyze it and build your briefing from the data you provide.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <a href="#cfo-briefing" className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-white hover:text-blue-700">
+                  Upload Excel below
                 </a>
-              )}
+                <span className="text-xs text-slate-500">Best for businesses without QuickBooks</span>
+              </div>
             </div>
           </div>
 
-          {connection && (
-            <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  <div>
-                    <span className="font-semibold text-emerald-900">Connected</span>
-                    <span className="ml-2 text-emerald-800">{connection.companyName || "QuickBooks Online company"}</span>
-                  </div>
-                </div>
-                <span className="text-xs text-emerald-700">
-                  Connected {new Date(connection.connectedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </span>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-800">
-                <span className="font-semibold">Next:</span>
-                <span>Review your CFO Briefing below.</span>
-              </div>
+          {!connection && !loading && (
+            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm leading-6 text-blue-800">
+              <span className="font-semibold">Choose one source.</span> QuickBooks is the best option for ongoing automatic updates. Excel works when you prefer to provide the financial data yourself.
             </div>
           )}
 
-          {!connection && !loading && (
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">1. Connect</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Sign in to QuickBooks and choose the company you want ClearCFO to analyze.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">2. Sync</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">ClearCFO retrieves the accounting reports it needs for your financial analysis.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">3. Understand</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Your CFO Briefing turns the numbers into the few things that deserve your attention.</p>
-              </div>
+          {connection && (
+            <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+              <span className="font-semibold">QuickBooks is your active source.</span> Your CFO Briefing below can use the connected books. Excel remains available if you intentionally want to analyze a separate workbook.
             </div>
           )}
 
