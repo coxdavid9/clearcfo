@@ -25,6 +25,36 @@ function collectRows(node: any, output: any[] = []) {
   return output;
 }
 
+function summarizeReport(report: any) {
+  const columns = report?.Columns?.Column || [];
+  const rows = collectRows(report?.Rows);
+  const labels = rows
+    .map((row) => String(row?.ColData?.[0]?.value || "").trim())
+    .filter(Boolean);
+  const nonZeroCells = rows.reduce((count, row) => {
+    const values = (row?.ColData || []).slice(1);
+    return count + values.filter((cell: any) => {
+      const value = Number(cell?.value || 0);
+      return Number.isFinite(value) && value !== 0;
+    }).length;
+  }, 0);
+
+  return {
+    header: report?.Header
+      ? {
+          startPeriod: report.Header.StartPeriod || null,
+          endPeriod: report.Header.EndPeriod || null,
+          time: report.Header.Time || null,
+          reportName: report.Header.ReportName || null,
+        }
+      : null,
+    columns: columns.map((column: any) => column?.ColTitle || ""),
+    rowCount: rows.length,
+    nonZeroCells,
+    sampleLabels: labels.slice(0, 30),
+  };
+}
+
 function parseProfitAndLoss(report: any) {
   const columns = report?.Columns?.Column || [];
   const rawPeriods = columns.slice(1).map((column: any) => column?.ColTitle || "");
@@ -96,6 +126,17 @@ export async function GET() {
       quickBooksReport(user.id, "BalanceSheet", reportParams),
       getQuickBooksConnection(user.id),
     ]);
+
+    const pnlSummary = summarizeReport(pnl);
+    const balanceSummary = summarizeReport(balanceSheet);
+    console.info("[ClearCFO QuickBooks] Report diagnostics", {
+      environment: process.env.QUICKBOOKS_ENVIRONMENT || "unknown",
+      company: connection?.companyName || null,
+      realmId: connection?.realmId || null,
+      reportParams,
+      profitAndLoss: pnlSummary,
+      balanceSheet: balanceSummary,
+    });
 
     if (!reportHasFinancialValues(pnl)) {
       throw new Error(
