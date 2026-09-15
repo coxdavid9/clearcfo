@@ -27,9 +27,13 @@ function collectRows(node: any, output: any[] = []) {
 
 function parseProfitAndLoss(report: any) {
   const columns = report?.Columns?.Column || [];
-  const periods = columns.slice(1).map((column: any) => column?.ColTitle || "");
+  const rawPeriods = columns.slice(1).map((column: any) => column?.ColTitle || "");
   const rows = collectRows(report?.Rows);
-  const wanted = new Set(["Income", "Total Income", "Revenue", "Sales", "Cost of Goods Sold", "Gross Profit", "Expenses", "Total Expenses", "Operating Expenses", "Net Operating Income", "Other Income", "Other Expense", "Net Income"]);
+  const wanted = new Set([
+    "Income", "Total Income", "Revenue", "Sales",
+    "Cost of Goods Sold", "Gross Profit", "Expenses", "Total Expenses", "Operating Expenses",
+    "Net Operating Income", "Other Income", "Other Expense", "Net Income",
+  ]);
   const metrics: Record<string, number[]> = {};
 
   for (const row of rows) {
@@ -38,6 +42,21 @@ function parseProfitAndLoss(report: any) {
     if (!wanted.has(label)) continue;
     metrics[label] = cells.slice(1).map((cell: any) => Number(cell?.value || 0) || 0);
   }
+
+  // QuickBooks can include the current partial month as the last column.
+  // Do not report that empty period as the "latest" financial result.
+  let end = rawPeriods.length;
+  while (end > 1) {
+    const hasValue = Object.values(metrics).some((values) => {
+      const value = values[end - 1];
+      return typeof value === "number" && Number.isFinite(value) && value !== 0;
+    });
+    if (hasValue) break;
+    end -= 1;
+  }
+
+  const periods = rawPeriods.slice(0, end);
+  for (const key of Object.keys(metrics)) metrics[key] = metrics[key].slice(0, end);
 
   return { periods, metrics };
 }
@@ -60,8 +79,6 @@ export async function GET() {
 
     const end = new Date();
     const isSandbox = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox";
-    // Sandbox data is for testing, so use the full available report history.
-    // Production stays focused on the most recent twelve months.
     const start = isSandbox ? new Date("2000-01-01T00:00:00Z") : new Date(end);
     if (!isSandbox) {
       start.setMonth(start.getMonth() - 12);
