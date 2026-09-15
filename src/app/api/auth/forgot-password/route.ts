@@ -23,10 +23,10 @@ export async function POST(request: Request) {
     const origin = new URL(request.url).origin;
     const redirectTo = `${origin}/reset-password`;
 
-    const response = await fetch(`${url}/auth/v1/recover`, {
+    const response = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
       method: "POST",
       headers: { apikey: publishableKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, redirect_to: redirectTo }),
+      body: JSON.stringify({ email }),
       cache: "no-store",
     });
 
