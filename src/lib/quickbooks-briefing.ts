@@ -35,9 +35,6 @@ function collectRows(node: any, output: ReportRow[] = []): ReportRow[] {
   }
   if (typeof node !== "object") return output;
 
-  // QuickBooks report totals are commonly stored at the report/group level in
-  // Summary.ColData rather than inside Row.ColData. These totals are the rows
-  // ClearCFO needs for Revenue, Gross Profit, Expenses and Net Income.
   const summaryCells = node.Summary?.ColData || [];
   const summaryLabel = String(summaryCells[0]?.value || "").trim();
   if (summaryLabel) {
@@ -80,7 +77,6 @@ function findAggregateRow(
   preferredPatterns: RegExp[],
   componentPatterns: RegExp[]
 ): ReportRow | null {
-  // Prefer an explicit total so component accounts are not double-counted.
   const preferred = findRow(rows, preferredPatterns);
   if (preferred) return preferred;
 
@@ -129,7 +125,6 @@ function trimTrailingEmptyPeriods(
 
 function reportMatrix(report: any, mappings: { name: string; patterns: RegExp[] }[]): { periods: string[]; rows: (string | number)[][] } {
   const reportPeriods = periods(report);
-  // Pass the whole report so report-level Summary.ColData totals are included.
   const collected = collectRows(report);
   const rows = mappings.flatMap(({ name, patterns }) => {
     const row = findRow(collected, patterns);
@@ -140,8 +135,9 @@ function reportMatrix(report: any, mappings: { name: string; patterns: RegExp[] 
 
 /**
  * Convert the QuickBooks report response into the same normalized input shape
- * used by Excel uploads. This keeps the financial calculations and management
- * logic in one place instead of creating a second CFO engine for QuickBooks.
+ * used by Excel uploads. Balance-sheet metrics are merged into the normalized
+ * monthly sheet so the shared briefing engine can calculate KPIs and changes
+ * from the same current/prior periods.
  */
 export function buildQuickBooksBriefing(
   profitAndLoss: any,
@@ -170,38 +166,25 @@ export function buildQuickBooksBriefing(
   const inventory = findRow(balanceCollected, [
     /^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/
   ]);
-  const balanceRows = [
-    cash ? ["Cash", ...align(cash.values, balancePeriods.length)] : null,
-    inventory ? ["Inventory", ...align(inventory.values, balancePeriods.length)] : null,
-  ].filter((row): row is (string | number)[] => row !== null);
-  const balance = trimTrailingEmptyPeriods(balancePeriods, balanceRows);
+
+  const cashValues = cash ? align(cash.values, pnl.periods.length) : null;
+  const inventoryValues = inventory ? align(inventory.values, pnl.periods.length) : null;
+
+  const mergedRows: (string | number)[][] = [...pnl.rows];
+  if (cashValues) mergedRows.push(["Cash", ...cashValues]);
+  if (inventoryValues) mergedRows.push(["Inventory", ...inventoryValues]);
 
   const workbook = XLSX.utils.book_new();
   const pnlSheet = XLSX.utils.aoa_to_sheet([
     ["Metric", ...pnl.periods],
-    ...pnl.rows,
+    ...mergedRows,
   ]);
   XLSX.utils.book_append_sheet(workbook, pnlSheet, "Monthly P&L");
-
-  if (balance.rows.length) {
-    const currentIndex = Math.max(0, balance.periods.length - 1);
-    const priorIndex = Math.max(0, currentIndex - 1);
-    const normalizedBalanceRows = balance.rows.map(([name, ...values]) => [
-      name,
-      toNumber(values[currentIndex]),
-      toNumber(values[priorIndex]),
-    ]);
-
-    const balanceSheet = XLSX.utils.aoa_to_sheet([
-      ["Account", "Current", "Prior"],
-      ...normalizedBalanceRows,
-    ]);
-    XLSX.utils.book_append_sheet(workbook, balanceSheet, "Balance Sheet");
-  }
 
   const briefing = analyzeWorkbook(workbook);
   return {
     ...briefing,
     companyName: companyName || briefing.companyName || "Your business",
+    source: "upload",
   };
 }
