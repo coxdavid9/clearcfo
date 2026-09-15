@@ -78,6 +78,9 @@ export default function LoginPage() {
         return;
       }
 
+      if (mode === "signup") {
+        window.localStorage.removeItem("clearcfo_setup_onboarding_seen");
+      }
       window.location.href = "/customer";
     } catch {
       setError("We could not reach ClearCFO. Please try again.");
