@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import CustomerProfile from "../../components/CustomerProfile";
+import SetupPreference from "../../components/SetupPreference";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,8 @@ export default async function ProfilePage() {
             contactPhone: metadata.contactPhone,
           }}
         />
+
+        <SetupPreference />
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-base font-semibold text-slate-900">Account security</h2>
