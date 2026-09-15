@@ -18,7 +18,7 @@ export default async function FinancialDataPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" />
+      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware />
       <div className="mx-auto max-w-7xl py-8 sm:py-10">
         <div className="px-5 sm:px-8 lg:px-10">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Financial data</p>
