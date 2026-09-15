@@ -19,6 +19,15 @@ const emptyProfile: SignupProfile = {
   contactPhone: "",
 };
 
+function passwordChecks(password: string) {
+  return {
+    length: password.length >= 8,
+    mixedCase: /[a-z]/.test(password) && /[A-Z]/.test(password),
+    number: /\d/.test(password),
+    symbol: /[^A-Za-z0-9]/.test(password),
+  };
+}
+
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
@@ -53,8 +62,13 @@ export default function LoginPage() {
   function continueSignup(event: FormEvent) {
     event.preventDefault();
     setError("");
-    if (!email.trim() || password.length < 8) {
-      setError("Enter a valid email and a password of at least 8 characters.");
+    const checks = passwordChecks(password);
+    if (!email.trim()) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (!Object.values(checks).every(Boolean)) {
+      setError("Create a stronger password using all four requirements below.");
       return;
     }
     setSignupStep(2);
@@ -102,6 +116,8 @@ export default function LoginPage() {
   }
 
   const signup = mode === "signup";
+  const checks = passwordChecks(password);
+  const passwordReady = Object.values(checks).every(Boolean);
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-10 text-slate-900 sm:py-16">
@@ -165,8 +181,25 @@ export default function LoginPage() {
 
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-slate-700">Password</span>
-                    <input type="password" autoComplete={signup ? "new-password" : "current-password"} minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="At least 8 characters" />
+                    <input type="password" autoComplete={signup ? "new-password" : "current-password"} minLength={signup ? 8 : 1} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder={signup ? "Create a strong password" : "Your password"} />
                   </label>
+
+                  {signup && (
+                    <div className="-mt-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                      <p className="font-semibold text-slate-700">Password requirements</p>
+                      {[
+                        [checks.length, "Use 8 or more characters"],
+                        [checks.mixedCase, "Use upper and lower case letters"],
+                        [checks.number, "Use a number"],
+                        [checks.symbol, "Use a symbol"],
+                      ].map(([valid, label]) => (
+                        <div key={label as string} className="flex items-center gap-2">
+                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${valid ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-400"}`}>{valid ? "✓" : ""}</span>
+                          <span className={valid ? "text-slate-700" : "text-slate-500"}>{label as string}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {!signup && (
                     <div className="-mt-2 text-right">
@@ -177,7 +210,7 @@ export default function LoginPage() {
                   {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
                   {message && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</p>}
 
-                  <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                  <button type="submit" disabled={busy || (signup && !passwordReady)} className="w-full rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
                     {signup ? "Continue" : busy ? "Please wait…" : "Log In"}
                   </button>
                 </form>
