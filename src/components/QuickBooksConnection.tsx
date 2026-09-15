@@ -9,13 +9,20 @@ type Connection = {
   connectedAt: string;
 };
 
-export default function QuickBooksConnection() {
+type Props = {
+  setupComplete?: boolean;
+};
+
+const SETUP_PROGRESS_KEY = "clearcfo_setup_progress_visible";
+
+export default function QuickBooksConnection({ setupComplete = false }: Props) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showSetupProgress, setShowSetupProgress] = useState(true);
 
   async function loadStatus() {
     try {
@@ -31,7 +38,16 @@ export default function QuickBooksConnection() {
   }
 
   useEffect(() => {
+    const savedPreference = window.localStorage.getItem(SETUP_PROGRESS_KEY);
+    if (savedPreference === "hidden") setShowSetupProgress(false);
+
+    const handlePreferenceChange = () => {
+      setShowSetupProgress(window.localStorage.getItem(SETUP_PROGRESS_KEY) !== "hidden");
+    };
+
+    window.addEventListener("clearcfo:setup-progress-changed", handlePreferenceChange);
     loadStatus();
+
     const params = new URLSearchParams(window.location.search);
     const result = params.get("quickbooks");
     const queryMessage = params.get("message");
@@ -39,6 +55,8 @@ export default function QuickBooksConnection() {
     if (result === "cancelled") setMessage(queryMessage || "QuickBooks connection was cancelled. No financial data was imported.");
     if (result === "error") setError(queryMessage || "QuickBooks connection failed. Please try again.");
     if (result) window.history.replaceState({}, "", "/customer");
+
+    return () => window.removeEventListener("clearcfo:setup-progress-changed", handlePreferenceChange);
   }, []);
 
   async function testSync() {
@@ -79,6 +97,7 @@ export default function QuickBooksConnection() {
   }
 
   const setupStep = loading ? 2 : connection ? 3 : 2;
+  const progressVisible = showSetupProgress && !setupComplete;
 
   return (
     <section className="mx-auto w-full max-w-7xl px-5 pt-6 sm:px-8 lg:px-10">
@@ -94,36 +113,40 @@ export default function QuickBooksConnection() {
                 Connect QuickBooks Online for automatic updates, or upload an Excel file if you do not use QuickBooks. ClearCFO uses whichever source you choose to build your CFO Briefing.
               </p>
             </div>
-            <div className="shrink-0 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-sm shadow-sm">
-              <p className="font-semibold text-slate-800">Setup progress</p>
-              <p className="mt-1 text-slate-500">Step {setupStep} of 3</p>
-            </div>
+            {progressVisible && (
+              <div className="shrink-0 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-sm shadow-sm">
+                <p className="font-semibold text-slate-800">Setup progress</p>
+                <p className="mt-1 text-slate-500">Step {setupStep} of 3</p>
+              </div>
+            )}
           </div>
 
-          <ol className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="ClearCFO setup progress">
-            {[
-              [1, "Create account", "Your ClearCFO workspace is ready."],
-              [2, "Choose your data source", connection ? "QuickBooks is connected." : "Connect QuickBooks or upload Excel."],
-              [3, "Review your briefing", connection ? "Your live financial analysis is next." : "Your briefing starts after you provide data."],
-            ].map(([step, title, detail]) => {
-              const number = Number(step);
-              const complete = number < setupStep || (number === 2 && !!connection);
-              const current = number === setupStep;
-              return (
-                <li key={number} className={`rounded-2xl border px-4 py-3 ${complete ? "border-emerald-200 bg-emerald-50/70" : current ? "border-blue-200 bg-blue-50/80" : "border-slate-200 bg-white/70"}`}>
-                  <div className="flex items-center gap-3">
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${complete ? "bg-emerald-600 text-white" : current ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>
-                      {complete ? "✓" : number}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800">{title}</p>
-                      <p className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</p>
+          {progressVisible && (
+            <ol className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="ClearCFO setup progress">
+              {[
+                [1, "Create account", "Your ClearCFO workspace is ready."],
+                [2, "Choose your data source", connection ? "QuickBooks is connected." : "Connect QuickBooks or upload Excel."],
+                [3, "Review your briefing", connection ? "Your live financial analysis is next." : "Your briefing starts after you provide data."],
+              ].map(([step, title, detail]) => {
+                const number = Number(step);
+                const complete = number < setupStep || (number === 2 && !!connection);
+                const current = number === setupStep;
+                return (
+                  <li key={number} className={`rounded-2xl border px-4 py-3 ${complete ? "border-emerald-200 bg-emerald-50/70" : current ? "border-blue-200 bg-blue-50/80" : "border-slate-200 bg-white/70"}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${complete ? "bg-emerald-600 text-white" : current ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>
+                        {complete ? "✓" : number}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800">{title}</p>
+                        <p className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</p>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </div>
 
         <div className="p-5 sm:p-7">
