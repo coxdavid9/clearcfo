@@ -3,10 +3,23 @@ import { getAuthCookieNames, refreshSession } from "../../../../lib/supabase-aut
 
 export const runtime = "nodejs";
 
-function safeNextPath(value: string | null) {
+function safeNextPath(requestUrl: string, value: string | null) {
   if (!value) return "/customer";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/customer";
-  return value;
+  // Reject protocol-relative URLs ("//evil.com") and backslash tricks
+  // ("/\evil.com": WHATWG URL parsing treats "\" as "/" for http(s), which
+  // would otherwise resolve to an off-site origin).
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return "/customer";
+  }
+  let resolved: URL;
+  try {
+    resolved = new URL(value, requestUrl);
+  } catch {
+    return "/customer";
+  }
+  // Defense in depth: the target must resolve to our own origin.
+  if (resolved.origin !== new URL(requestUrl).origin) return "/customer";
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
 export async function GET(request: Request) {
@@ -26,7 +39,7 @@ export async function GET(request: Request) {
     return response;
   }
 
-  const next = safeNextPath(new URL(request.url).searchParams.get("next"));
+  const next = safeNextPath(request.url, new URL(request.url).searchParams.get("next"));
   const response = NextResponse.redirect(new URL(next, request.url));
   const secure = process.env.NODE_ENV === "production";
 
