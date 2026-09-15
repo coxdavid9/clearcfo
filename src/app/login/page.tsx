@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 type SignupProfile = {
   companyName: string;
@@ -29,6 +29,14 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signup") === "1") {
+      setMode("signup");
+      setSignupStep(1);
+    }
+  }, []);
 
   function switchMode(nextMode: "login" | "signup") {
     setMode(nextMode);
