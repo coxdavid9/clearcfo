@@ -35,25 +35,23 @@ function collectRows(node: any, output: ReportRow[] = []): ReportRow[] {
   }
   if (typeof node !== "object") return output;
 
+  // QuickBooks report totals are commonly stored at the report/group level in
+  // Summary.ColData rather than inside Row.ColData. These totals are the rows
+  // ClearCFO needs for Revenue, Gross Profit, Expenses and Net Income.
+  const summaryCells = node.Summary?.ColData || [];
+  const summaryLabel = String(summaryCells[0]?.value || "").trim();
+  if (summaryLabel) {
+    output.push({
+      label: summaryLabel,
+      values: summaryCells.slice(1).map((cell: any) => toNumber(cell?.value)),
+    });
+  }
+
   if (Array.isArray(node.Row)) {
     for (const row of node.Row) {
       const cells = row?.ColData || [];
       const label = String(cells[0]?.value || "").trim();
       if (label) output.push({ label, values: cells.slice(1).map((cell: any) => toNumber(cell?.value)) });
-
-      // QuickBooks puts important report totals in Summary.ColData rather than
-      // Row.ColData (for example Total Income, Total Expenses, Gross Profit,
-      // and Net Income). The old adapter ignored these rows, so the API was
-      // returning real financial data but ClearCFO was building zero KPIs.
-      const summaryCells = row?.Summary?.ColData || [];
-      const summaryLabel = String(summaryCells[0]?.value || "").trim();
-      if (summaryLabel) {
-        output.push({
-          label: summaryLabel,
-          values: summaryCells.slice(1).map((cell: any) => toNumber(cell?.value)),
-        });
-      }
-
       collectRows(row, output);
     }
   }
@@ -75,6 +73,31 @@ function findRow(rows: ReportRow[], patterns: RegExp[]): ReportRow | null {
     if (row.values.some((value) => Number.isFinite(value) && value !== 0)) return row;
   }
   return null;
+}
+
+function findAggregateRow(
+  rows: ReportRow[],
+  preferredPatterns: RegExp[],
+  componentPatterns: RegExp[]
+): ReportRow | null {
+  // Prefer an explicit total so component accounts are not double-counted.
+  const preferred = findRow(rows, preferredPatterns);
+  if (preferred) return preferred;
+
+  const components = rows.filter((row) => {
+    const normalized = clean(row.label);
+    return componentPatterns.some((pattern) => pattern.test(normalized));
+  });
+
+  if (!components.length) return null;
+
+  const length = Math.max(...components.map((row) => row.values.length));
+  return {
+    label: "Cash",
+    values: Array.from({ length }, (_, index) =>
+      components.reduce((sum, row) => sum + (row.values[index] || 0), 0)
+    ),
+  };
 }
 
 function align(values: number[], length: number): number[] {
@@ -106,7 +129,8 @@ function trimTrailingEmptyPeriods(
 
 function reportMatrix(report: any, mappings: { name: string; patterns: RegExp[] }[]): { periods: string[]; rows: (string | number)[][] } {
   const reportPeriods = periods(report);
-  const collected = collectRows(report?.Rows);
+  // Pass the whole report so report-level Summary.ColData totals are included.
+  const collected = collectRows(report);
   const rows = mappings.flatMap(({ name, patterns }) => {
     const row = findRow(collected, patterns);
     return row ? [[name, ...align(row.values, reportPeriods.length)]] : [];
@@ -136,10 +160,21 @@ export function buildQuickBooksBriefing(
     throw new Error("ClearCFO received a QuickBooks P&L report, but could not normalize its reporting periods or financial rows.");
   }
 
-  const balance = reportMatrix(balanceSheet, [
-    { name: "Cash", patterns: [/^total cash and cash equivalents$/, /^cash and cash equivalents$/, /^total cash$/, /^cash$/] },
-    { name: "Inventory", patterns: [/^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/] },
+  const balancePeriods = periods(balanceSheet);
+  const balanceCollected = collectRows(balanceSheet);
+  const cash = findAggregateRow(
+    balanceCollected,
+    [/^total cash and cash equivalents$/, /^cash and cash equivalents$/, /^total cash$/],
+    [/^checking$/, /^savings$/, /^cash$/, /^undeposited funds$/, /^cash on hand$/]
+  );
+  const inventory = findRow(balanceCollected, [
+    /^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/
   ]);
+  const balanceRows = [
+    cash ? ["Cash", ...align(cash.values, balancePeriods.length)] : null,
+    inventory ? ["Inventory", ...align(inventory.values, balancePeriods.length)] : null,
+  ].filter((row): row is (string | number)[] => row !== null);
+  const balance = trimTrailingEmptyPeriods(balancePeriods, balanceRows);
 
   const workbook = XLSX.utils.book_new();
   const pnlSheet = XLSX.utils.aoa_to_sheet([
