@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import CustomerProfile from "../../components/CustomerProfile";
+import QuickBooksProfileConnection from "../../components/QuickBooksProfileConnection";
 import SetupPreference from "../../components/SetupPreference";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
@@ -26,7 +27,7 @@ export default async function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" hideProfile sessionAware />
+      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware />
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Account settings</p>
@@ -47,6 +48,7 @@ export default async function ProfilePage() {
           }}
         />
 
+        <QuickBooksProfileConnection />
         <SetupPreference />
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
