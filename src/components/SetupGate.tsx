@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import QuickBooksConnection from "./QuickBooksConnection";
 
 const SETUP_STATE_KEY = "clearcfo_setup_state";
-type SetupState = "complete" | "minimized" | null;
+
+type SetupState = "complete" | null;
 
 export default function SetupGate() {
   const [state, setState] = useState<SetupState>(null);
@@ -12,9 +13,7 @@ export default function SetupGate() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(SETUP_STATE_KEY);
-    if (saved === "complete" || saved === "minimized") {
-      setState(saved);
-    }
+    if (saved === "complete") setState("complete");
     setReady(true);
 
     const handleSync = () => {
@@ -36,46 +35,7 @@ export default function SetupGate() {
     };
   }, []);
 
-  if (!ready || state === "complete") return null;
+  if (!ready) return null;
 
-  if (state === "minimized") {
-    return (
-      <section className="mx-auto w-full max-w-7xl px-5 pt-4 sm:px-8 lg:px-10">
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">ClearCFO setup</p>
-            <p className="text-xs text-slate-500">Your setup is not finished yet.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              window.localStorage.removeItem(SETUP_STATE_KEY);
-              setState(null);
-            }}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
-          >
-            Show setup
-          </button>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <div>
-      <div className="mx-auto flex w-full max-w-7xl justify-end px-5 pt-4 sm:px-8 lg:px-10">
-        <button
-          type="button"
-          onClick={() => {
-            window.localStorage.setItem(SETUP_STATE_KEY, "minimized");
-            setState("minimized");
-          }}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-slate-800"
-        >
-          Minimize setup
-        </button>
-      </div>
-      <QuickBooksConnection />
-    </div>
-  );
+  return <QuickBooksConnection setupComplete={state === "complete"} />;
 }
