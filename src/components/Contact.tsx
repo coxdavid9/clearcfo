@@ -7,18 +7,12 @@ export default function Contact() {
         <p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-600">
           Whether you’re exploring ClearCFO for your business or already a customer, we’re here to help.
         </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-8 flex justify-center">
           <a
             href="mailto:contact@theclearcfo.com"
             className="inline-flex min-h-11 items-center justify-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Email ClearCFO
-          </a>
-          <a
-            href="mailto:contact@theclearcfo.com"
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            contact@theclearcfo.com
           </a>
         </div>
       </div>
