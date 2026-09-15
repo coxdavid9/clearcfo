@@ -60,6 +60,20 @@ svg[role="img"][aria-label*="historical trend"] {
   cursor: pointer;
 }
 
+/* Keep the CFO Briefing actions together: Upload Excel, Sync QuickBooks,
+   then the business-health indicator. */
+.max-w-6xl > .border-b.bg-white > div.flex.flex-wrap.items-center.gap-2 > button:first-child {
+  order: 1;
+}
+
+.max-w-6xl > .border-b.bg-white > div.flex.flex-wrap.items-center.gap-2 > button:last-child {
+  order: 2;
+}
+
+.max-w-6xl > .border-b.bg-white > div.flex.flex-wrap.items-center.gap-2 > div {
+  order: 3;
+}
+
 /* Mobile dashboard polish: keep section headers readable instead of
    squeezing the heading beside a full-width control. */
 @media (max-width: 639px) {
