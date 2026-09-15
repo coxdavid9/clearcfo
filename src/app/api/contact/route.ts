@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
-import tls from "node:tls";
 import { checkRateLimit, authRateLimit } from "../../../lib/rate-limit";
 
 export const runtime = "nodejs";
-
-type SmtpClient = {
-  socket: ReturnType<typeof tls.connect>;
-  buffer: string;
-};
 
 function getEnv(name: string) {
   const value = process.env[name]?.trim();
@@ -15,39 +9,17 @@ function getEnv(name: string) {
   return value;
 }
 
-function readResponse(client: SmtpClient): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const onData = () => {
-      const lines = client.buffer.split(/\r?\n/);
-      const completeIndex = lines.findIndex((line) => /^\d{3} /.test(line));
-      if (completeIndex === -1) return;
-      const response = lines.slice(0, completeIndex + 1).join("\n");
-      client.buffer = lines.slice(completeIndex + 1).join("\n");
-      client.socket.off("data", onData);
-      resolve(response);
-    };
-    client.socket.on("data", (chunk) => {
-      client.buffer += chunk.toString("utf8");
-      onData();
-    });
-    client.socket.once("error", reject);
-  });
-}
-
-async function smtpCommand(client: SmtpClient, command: string, expected: number[]) {
-  client.socket.write(`${command}\r\n`);
-  const response = await readResponse(client);
-  const code = Number(response.slice(0, 3));
-  if (!expected.includes(code)) throw new Error(`SMTP command failed with ${code}.`);
-  return response;
-}
-
-function encodeBase64(value: string) {
-  return Buffer.from(value, "utf8").toString("base64");
-}
-
 function sanitizeHeader(value: string) {
   return value.replace(/[\r\n]/g, " ").trim();
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export async function POST(request: Request) {
@@ -63,41 +35,26 @@ export async function POST(request: Request) {
 
     if (website) return NextResponse.json({ ok: true });
     if (!topic || !email || !message) {
-      return NextResponse.json({ error: "Please choose a topic and provide your email and message." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Please choose a topic and provide your email and message." },
+        { status: 400 },
+      );
     }
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email.length > 254 || !/^([^\s@]+)@([^\s@]+)\.([^\s@]+)$/.test(email)) {
       return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
     if (message.length > 5000) {
       return NextResponse.json({ error: "Please keep your message under 5,000 characters." }, { status: 400 });
     }
 
-    const host = process.env.CONTACT_SMTP_HOST?.trim() || "mail.spacemail.com";
-    const port = Number(process.env.CONTACT_SMTP_PORT || 465);
-    const username = getEnv("CONTACT_SMTP_USERNAME");
-    const password = getEnv("CONTACT_SMTP_PASSWORD");
+    const apiKey = getEnv("RESEND_API_KEY");
     const from = process.env.CONTACT_FROM_EMAIL?.trim() || "contact@theclearcfo.com";
     const to = process.env.CONTACT_TO_EMAIL?.trim() || "contact@theclearcfo.com";
+    const safeTopic = sanitizeHeader(topic);
+    const safeEmail = sanitizeHeader(email);
+    const subject = `ClearCFO website inquiry: ${safeTopic}`;
 
-    const socket = tls.connect({ host, port, servername: host, timeout: 10000 });
-    const client: SmtpClient = { socket, buffer: "" };
-    await new Promise<void>((resolve, reject) => {
-      socket.once("secureConnect", resolve);
-      socket.once("error", reject);
-      socket.once("timeout", () => reject(new Error("SMTP connection timed out.")));
-    });
-
-    await readResponse(client);
-    await smtpCommand(client, `EHLO theclearcfo.com`, [220, 250]);
-    await smtpCommand(client, "AUTH LOGIN", [334]);
-    await smtpCommand(client, encodeBase64(username), [334]);
-    await smtpCommand(client, encodeBase64(password), [235]);
-    await smtpCommand(client, `MAIL FROM:<${sanitizeHeader(from)}>`, [250]);
-    await smtpCommand(client, `RCPT TO:<${sanitizeHeader(to)}>`, [250, 251]);
-    await smtpCommand(client, "DATA", [354]);
-
-    const subject = `ClearCFO website inquiry: ${sanitizeHeader(topic)}`;
-    const bodyText = [
+    const text = [
       `Topic: ${topic}`,
       `From: ${email}`,
       "",
@@ -106,24 +63,50 @@ export async function POST(request: Request) {
       `Reply directly to this email to respond to ${email}.`,
     ].join("\n");
 
-    const headers = [
-      `From: ClearCFO Website <${sanitizeHeader(from)}>`,
-      `To: ${sanitizeHeader(to)}`,
-      `Reply-To: ${sanitizeHeader(email)}`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "Content-Transfer-Encoding: 8bit",
-    ].join("\r\n");
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;color:#17213a;line-height:1.6">
+        <div style="padding:24px 0;border-bottom:1px solid #e5e7eb">
+          <div style="font-size:24px;font-weight:700;letter-spacing:-0.5px">Clear<span style="color:#2563eb">CFO</span></div>
+          <div style="font-size:13px;color:#6b7280;margin-top:2px">Financial clarity. Smarter decisions.</div>
+        </div>
+        <div style="padding:28px 0">
+          <h2 style="margin:0 0 20px;font-size:22px">New website inquiry</h2>
+          <p style="margin:8px 0"><strong>Topic:</strong> ${escapeHtml(topic)}</p>
+          <p style="margin:8px 0"><strong>From:</strong> ${escapeHtml(email)}</p>
+          <div style="margin-top:24px;padding:20px;background:#f8fafc;border-radius:12px;white-space:pre-wrap">${escapeHtml(message)}</div>
+          <p style="margin-top:24px;font-size:14px;color:#6b7280">Reply to this email to respond directly to ${escapeHtml(email)}.</p>
+        </div>
+      </div>
+    `;
 
-    const data = `${headers}\r\n\r\n${bodyText.replace(/^\./gm, "..")}\r\n.`;
-    await smtpCommand(client, data, [250]);
-    await smtpCommand(client, "QUIT", [221]);
-    socket.end();
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `ClearCFO <${sanitizeHeader(from)}>`,
+        to: [sanitizeHeader(to)],
+        reply_to: safeEmail,
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      console.error("[ClearCFO Contact] Resend API failed:", response.status, details.slice(0, 500));
+      throw new Error(`Resend API returned ${response.status}.`);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[ClearCFO Contact] Email failed:", error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ error: "We couldn't send your message right now. Please try again shortly." }, { status: 503 });
+    return NextResponse.json(
+      { error: "We couldn't send your message right now. Please try again shortly." },
+      { status: 503 },
+    );
   }
 }
