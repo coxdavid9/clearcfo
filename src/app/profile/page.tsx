@@ -26,7 +26,7 @@ export default async function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" />
+      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" hideProfile />
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Account settings</p>
@@ -53,7 +53,6 @@ export default async function ProfilePage() {
           <h2 className="text-base font-semibold text-slate-900">Account security</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">Your ClearCFO login email is managed by the authentication provider. Passwords are never stored by the ClearCFO application.</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <a href="/customer" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-700">Back to CFO briefing</a>
             <a href="/api/auth/logout" className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Log out</a>
           </div>
         </div>
