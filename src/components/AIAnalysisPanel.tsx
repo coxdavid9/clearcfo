@@ -71,41 +71,66 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
     setLoading(true);
     setError("");
     setExpanded(true);
+
+    const body = JSON.stringify({
+      companyName: briefing.companyName,
+      financialSnapshot: {
+        revenue: briefing.revenue,
+        revenueChange: briefing.revenueChange,
+        grossMargin: briefing.grossMargin,
+        marginChange: briefing.marginChange,
+        cash: briefing.cash,
+        cashChange: briefing.cashChange,
+        inventory: briefing.inventory,
+        inventoryChange: briefing.inventoryChange,
+      },
+      detectedIssues: briefing.alerts,
+      financialDrivers: briefing.drivers,
+      driverRelationships: briefing.relationships,
+      detailDrivers: briefing.detailDrivers,
+      currentRecommendation: briefing.recommendation,
+      businessHealth: briefing.health,
+      analysisConfidence: briefing.confidence,
+      recentRevenueTrend: briefing.trend.slice(-12),
+      periods: briefing.periods.slice(-12),
+      multiPeriodInsights: briefing.trendInsights,
+      knownUnknowns: briefing.unknowns,
+    });
+
     try {
-      const response = await fetch("/api/cfo-analysis-retry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName: briefing.companyName,
-          financialSnapshot: {
-            revenue: briefing.revenue,
-            revenueChange: briefing.revenueChange,
-            grossMargin: briefing.grossMargin,
-            marginChange: briefing.marginChange,
-            cash: briefing.cash,
-            cashChange: briefing.cashChange,
-            inventory: briefing.inventory,
-            inventoryChange: briefing.inventoryChange,
-          },
-          detectedIssues: briefing.alerts,
-          financialDrivers: briefing.drivers,
-          driverRelationships: briefing.relationships,
-          detailDrivers: briefing.detailDrivers,
-          currentRecommendation: briefing.recommendation,
-          businessHealth: briefing.health,
-          analysisConfidence: briefing.confidence,
-          recentRevenueTrend: briefing.trend.slice(-12),
-          periods: briefing.periods.slice(-12),
-          multiPeriodInsights: briefing.trendInsights,
-          knownUnknowns: briefing.unknowns,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "ClearCFO could not generate the AI analysis.");
-      if (!payload?.analysis) throw new Error("ClearCFO received an empty AI analysis.");
-      const nextAnalysis = normalizeAnalysis(payload.analysis as AIAnalysis);
-      setAnalysis(nextAnalysis);
-      window.localStorage.setItem(AI_CACHE_KEY, JSON.stringify(nextAnalysis));
+      let response: Response;
+      let lastError = "";
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await fetch("/api/cfo-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+            cache: "no-store",
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            lastError = payload?.error || "ClearCFO could not generate the AI analysis.";
+            if (attempt === 0 && [408, 429, 500, 502, 503, 504].includes(response.status)) {
+              await new Promise((resolve) => setTimeout(resolve, 1200));
+              continue;
+            }
+            throw new Error(lastError);
+          }
+          if (!payload?.analysis) throw new Error("ClearCFO received an empty AI analysis.");
+          const nextAnalysis = normalizeAnalysis(payload.analysis as AIAnalysis);
+          setAnalysis(nextAnalysis);
+          window.localStorage.setItem(AI_CACHE_KEY, JSON.stringify(nextAnalysis));
+          return;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : "ClearCFO could not reach the AI analysis service.";
+          if (attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            continue;
+          }
+          throw new Error(lastError);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "ClearCFO could not generate the AI analysis.");
     } finally {
