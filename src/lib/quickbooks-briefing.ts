@@ -40,6 +40,20 @@ function collectRows(node: any, output: ReportRow[] = []): ReportRow[] {
       const cells = row?.ColData || [];
       const label = String(cells[0]?.value || "").trim();
       if (label) output.push({ label, values: cells.slice(1).map((cell: any) => toNumber(cell?.value)) });
+
+      // QuickBooks puts important report totals in Summary.ColData rather than
+      // Row.ColData (for example Total Income, Total Expenses, Gross Profit,
+      // and Net Income). The old adapter ignored these rows, so the API was
+      // returning real financial data but ClearCFO was building zero KPIs.
+      const summaryCells = row?.Summary?.ColData || [];
+      const summaryLabel = String(summaryCells[0]?.value || "").trim();
+      if (summaryLabel) {
+        output.push({
+          label: summaryLabel,
+          values: summaryCells.slice(1).map((cell: any) => toNumber(cell?.value)),
+        });
+      }
+
       collectRows(row, output);
     }
   }
@@ -92,8 +106,9 @@ function trimTrailingEmptyPeriods(
 
 function reportMatrix(report: any, mappings: { name: string; patterns: RegExp[] }[]): { periods: string[]; rows: (string | number)[][] } {
   const reportPeriods = periods(report);
+  const collected = collectRows(report?.Rows);
   const rows = mappings.flatMap(({ name, patterns }) => {
-    const row = findRow(collectRows(report?.Rows), patterns);
+    const row = findRow(collected, patterns);
     return row ? [[name, ...align(row.values, reportPeriods.length)]] : [];
   });
   return trimTrailingEmptyPeriods(reportPeriods, rows);
@@ -110,7 +125,6 @@ export function buildQuickBooksBriefing(
   companyName: string | null
 ): BriefingData {
   const pnl = reportMatrix(profitAndLoss, [
-    // Prefer explicit totals over the group/header row when QuickBooks returns both.
     { name: "Revenue", patterns: [/^total income$/, /^total revenue$/, /^net revenue$/, /^total sales$/, /^net sales$/, /^income$/, /^revenue$/, /^sales$/] },
     { name: "Gross Profit", patterns: [/^gross profit$/] },
     { name: "Cost of Goods Sold", patterns: [/^total cost of goods sold$/, /^cost of goods sold$/, /^cost of sales$/, /^cost of goods$/, /^cost of revenue$/] },
