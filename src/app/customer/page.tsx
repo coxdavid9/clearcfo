@@ -26,7 +26,7 @@ export default async function CustomerPage() {
 
   return (
     <main id="customer" className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" />
+      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware />
       <SetupGate />
       <QuickBooksSyncAction />
       <div id="cfo-briefing">
