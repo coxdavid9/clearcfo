@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 
 export default function QuickBooksSyncAction() {
   const [connected, setConnected] = useState(false);
@@ -50,6 +49,7 @@ export default function QuickBooksSyncAction() {
   async function syncNow() {
     setSyncing(true);
     setError("");
+    window.sessionStorage.setItem("clearcfo_manual_qb_sync", "true");
     try {
       const response = await fetch("/api/quickbooks/sync", {
         cache: "no-store",
@@ -59,31 +59,29 @@ export default function QuickBooksSyncAction() {
       if (!response.ok || !payload?.briefing) {
         throw new Error(payload?.error || "QuickBooks sync failed.");
       }
-      if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
       window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
+      window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(payload.briefing));
+      if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
       window.dispatchEvent(new CustomEvent("clearcfo:quickbooks-sync", { detail: payload }));
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "QuickBooks sync failed.");
     } finally {
+      window.sessionStorage.removeItem("clearcfo_manual_qb_sync");
       setSyncing(false);
     }
   }
 
   if (!connected || !target) return null;
 
-  return createPortal(
-    <>
-      <button
-        type="button"
-        onClick={syncNow}
-        disabled={syncing}
-        title={error || "Refresh your connected QuickBooks data"}
-        className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-sm disabled:cursor-wait disabled:opacity-60"
-      >
-        {syncing ? "Syncing…" : "Sync now"}
-      </button>
-      {error && <span className="basis-full text-xs font-medium text-red-600">{error}</span>}
-    </>,
-    target
+  return (
+    <button
+      type="button"
+      onClick={syncNow}
+      disabled={syncing}
+      title={error || "Refresh your connected QuickBooks data"}
+      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-sm disabled:cursor-wait disabled:opacity-60"
+    >
+      {syncing ? "Syncing…" : "Sync now"}
+    </button>
   );
 }
