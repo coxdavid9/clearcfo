@@ -1,84 +1,77 @@
 import { NextResponse } from "next/server";
-import { getAuthCookieNames, getSupabaseUser } from "../../../../lib/supabase-auth";
+import { checkRateLimit, authRateLimit } from "../../../../lib/rate-limit";
+import { getSupabaseUser } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";
 
-function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL;
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-
-  if (!url || !publishableKey) {
-    throw new Error("Supabase authentication is not configured.");
-  }
-
-  return { url: url.replace(/\/$/, ""), publishableKey };
-}
-
 export async function POST(request: Request) {
+  const limited = checkRateLimit(request, authRateLimit);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
-    let accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
-    let refreshToken = typeof body?.refreshToken === "string" ? body.refreshToken : "";
-
+    const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
+    const refreshToken = typeof body?.refreshToken === "string" ? body.refreshToken : "";
     const tokenHash = typeof body?.tokenHash === "string" ? body.tokenHash : "";
     const type = typeof body?.type === "string" ? body.type : "email";
 
-    if (!accessToken || !refreshToken) {
-      if (!tokenHash) {
-        return NextResponse.json({ error: "Confirmation link is incomplete." }, { status: 400 });
+    let sessionAccessToken = accessToken;
+    let sessionRefreshToken = refreshToken;
+
+    if (!sessionAccessToken && tokenHash) {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        return NextResponse.json({ error: "Authentication service is not configured." }, { status: 500 });
       }
 
-      const { url, publishableKey } = getSupabaseConfig();
-      const verifyResponse = await fetch(`${url}/auth/v1/verify`, {
+      const verifyResponse = await fetch(`${supabaseUrl}/auth/v1/verify`, {
         method: "POST",
         headers: {
-          apikey: publishableKey,
+          apikey: supabaseKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ type, token_hash: tokenHash }),
         cache: "no-store",
       });
 
-      const payload = await verifyResponse.json().catch(() => ({}));
-
-      if (!verifyResponse.ok || !payload?.access_token || !payload?.refresh_token) {
-        return NextResponse.json(
-          { error: payload?.msg || payload?.message || "The confirmation link is invalid or expired." },
-          { status: 401 },
-        );
+      if (!verifyResponse.ok) {
+        return NextResponse.json({ error: "Invalid or expired confirmation link." }, { status: 400 });
       }
 
-      accessToken = payload.access_token;
-      refreshToken = payload.refresh_token;
+      const session = await verifyResponse.json();
+      sessionAccessToken = typeof session?.access_token === "string" ? session.access_token : "";
+      sessionRefreshToken = typeof session?.refresh_token === "string" ? session.refresh_token : "";
     }
 
-    const user = await getSupabaseUser(accessToken);
+    if (!sessionAccessToken) {
+      return NextResponse.json({ error: "Missing confirmation token." }, { status: 400 });
+    }
+
+    const user = await getSupabaseUser(sessionAccessToken);
     if (!user) {
-      return NextResponse.json({ error: "The confirmation link is invalid or expired." }, { status: 401 });
+      return NextResponse.json({ error: "Unable to verify your account." }, { status: 401 });
     }
 
-    const response = NextResponse.json({ ok: true, user: { id: user.id, email: user.email } });
-    const { AUTH_COOKIE, REFRESH_COOKIE } = getAuthCookieNames();
-    const secure = process.env.NODE_ENV === "production";
+    const response = NextResponse.json({ ok: true, user });
+    response.cookies.set("clearcfo-auth", sessionAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
 
-    response.cookies.set(AUTH_COOKIE, accessToken, {
-      httpOnly: true,
-      secure,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 3600,
-    });
-    response.cookies.set(REFRESH_COOKIE, refreshToken, {
-      httpOnly: true,
-      secure,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    if (sessionRefreshToken) {
+      response.cookies.set("clearcfo-refresh", sessionRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
+    }
 
     return response;
-  } catch (error) {
-    console.error("[ClearCFO Auth] Email confirmation failed:", error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ error: "Unable to complete email confirmation." }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Invalid confirmation request." }, { status: 400 });
   }
 }
