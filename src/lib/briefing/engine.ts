@@ -222,7 +222,9 @@ function findDataRow(rows: unknown[][], patterns: RegExp[]): unknown[] | null {
 }
 
 function changePercent(current: number, previous: number): number {
-  if (previous === 0) return current === 0 ? 0 : 100;
+  // A percentage change is not meaningful when the prior period is zero.
+  // Returning 0 avoids presenting a fabricated +100% change for a new line item.
+  if (previous === 0) return 0;
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
@@ -267,12 +269,14 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
   const labels = periodLabels(rows, headerIndex);
   const revenueRow = findDataRow(rows, [/^revenue$/i, /total revenue/i, /sales/i]);
   const grossProfitRow = findDataRow(rows, [/gross profit/i]);
-  const cashRow = findDataRow(rows, [/cash/i]);
-  const inventoryRow = findDataRow(rows, [/inventory/i]);
+  const cashRow = findDataRow(rows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
+  const inventoryRow = findDataRow(rows, [/^inventory$/i, /total inventory/i, /inventory asset/i]);
+  const expenseRow = findDataRow(rows, [/^operating expenses$/i, /total operating expenses/i, /^total expenses$/i, /^expenses$/i]);
   const revenueValues = revenueRow ? rowValues(revenueRow, labels.length) : [];
   const grossProfitValues = grossProfitRow ? rowValues(grossProfitRow, labels.length) : [];
   const cashValues = cashRow ? rowValues(cashRow, labels.length) : [];
   const inventoryValues = inventoryRow ? rowValues(inventoryRow, labels.length) : [];
+  const expenseValues = expenseRow ? rowValues(expenseRow, labels.length) : [];
   const currentIndex = Math.max(0, labels.length - 1);
   const previousIndex = Math.max(0, currentIndex - 1);
   const revenue = revenueValues[currentIndex] ?? valueFromRow(revenueRow || [], ["Revenue", "Total Revenue", "Sales"]);
@@ -283,13 +287,15 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
   const previousCash = cashValues[previousIndex] ?? 0;
   const inventory = inventoryValues[currentIndex] ?? valueFromRow(inventoryRow || [], ["Inventory"]);
   const previousInventory = inventoryValues[previousIndex] ?? 0;
+  const expense = expenseValues[currentIndex] ?? valueFromRow(expenseRow || [], ["Operating Expenses", "Total Operating Expenses", "Expenses"]);
+  const previousExpense = expenseValues[previousIndex] ?? 0;
   const revenueChange = changePercent(revenue, previousRevenue);
   const margin = revenue !== 0 ? (grossProfit / revenue) * 100 : 0;
   const previousMargin = previousRevenue !== 0 ? (previousGrossProfit / previousRevenue) * 100 : margin;
   const marginChange = margin - previousMargin;
   const cashChange = changePercent(cash, previousCash);
   const inventoryChange = changePercent(inventory, previousInventory);
-  const expenseChange = 0;
+  const expenseChange = changePercent(expense, previousExpense);
   const drivers = buildDrivers(revenue, revenueChange, marginChange, cashChange, inventoryChange, expenseChange);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const trend = safeTrend(revenueValues, labels);
