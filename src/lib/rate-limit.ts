@@ -28,8 +28,15 @@ function prune(now: number) {
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    // Take the LAST entry: every trusted proxy appends the address it saw, so
+    // the final entry is the one added by our own edge (Render). The first
+    // entry is client-controlled and can be spoofed to dodge rate limits.
+    const entries = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const last = entries[entries.length - 1];
+    if (last) return last;
   }
   return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
