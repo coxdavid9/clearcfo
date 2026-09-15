@@ -49,22 +49,17 @@ function periods(report: any): string[] {
 }
 
 function findRow(rows: ReportRow[], patterns: RegExp[]): ReportRow | null {
-  let fallback: ReportRow | null = null;
-
+  // QuickBooks can return matching summary/group rows whose values are all zero.
+  // Only treat a row as normalized data when it contains an actual value.
   for (const row of rows) {
     const normalized = clean(row.label);
     if (!patterns.some((pattern) => pattern.test(normalized))) continue;
-
-    // QuickBooks reports can contain summary/group rows with the same label
-    // as a populated detail row. Prefer a matching row with an actual value
-    // so a zero-valued summary row does not hide the real account balance.
-    if (!fallback) fallback = row;
     if (row.values.some((value) => Number.isFinite(value) && value !== 0)) {
       return row;
     }
   }
 
-  return fallback;
+  return null;
 }
 
 function align(values: number[], length: number): number[] {
@@ -118,6 +113,9 @@ export function buildQuickBooksBriefing(
   ]);
   XLSX.utils.book_append_sheet(workbook, pnlSheet, "Monthly P&L");
 
+  // Balance-sheet data is optional. If QuickBooks does not expose a populated
+  // cash/inventory row, do not create a partial Balance Sheet that the Excel
+  // analyzer could misinterpret. The P&L can still produce a valid briefing.
   if (balance.periods.length && balance.rows.length) {
     const balanceSheet = XLSX.utils.aoa_to_sheet([
       ["Account", ...balance.periods],
