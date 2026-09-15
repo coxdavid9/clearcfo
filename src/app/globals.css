@@ -109,24 +109,8 @@ svg[role="img"][aria-label*="historical trend"] {
   }
 }
 
-/* AI analysis should read as part of the page, not as a modal overlay. */
-.fixed.inset-0.z-50.flex.items-center.justify-center.bg-slate-950\/45.p-4 {
-  position: static !important;
-  display: block !important;
-  background: transparent !important;
-  padding: 0 !important;
-}
-
-.fixed.inset-0.z-50.flex.items-center.justify-center.bg-slate-950\/45.p-4 > div {
-  width: 100% !important;
-  max-width: 72rem !important;
-  max-height: none !important;
-  margin: 1.25rem auto 0 !important;
-  border: 1px solid rgb(226 232 240);
-  border-radius: 1rem !important;
-  box-shadow: none !important;
-}
-
-.fixed.inset-0.z-50.flex.items-center.justify-center.bg-slate-950\/45.p-4 > div > div:first-child > button {
+/* The legacy CFOBriefing AI modal is replaced by the dedicated inline panel. */
+#cfo-briefing .mt-10.flex.flex-col.gap-5.rounded-2xl.border.border-slate-200.bg-white.p-6.sm\:p-7,
+#cfo-briefing .fixed.inset-0.z-50.flex.items-center.justify-center.bg-slate-950\/45.p-4 {
   display: none !important;
 }
