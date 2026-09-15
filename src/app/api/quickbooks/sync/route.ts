@@ -108,12 +108,9 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const end = new Date();
-    const isSandbox = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox";
-    const start = isSandbox ? new Date("2000-01-01T00:00:00Z") : new Date(end);
-    if (!isSandbox) {
-      start.setMonth(start.getMonth() - 12);
-      start.setDate(1);
-    }
+    const start = new Date(end);
+    start.setMonth(start.getMonth() - 12);
+    start.setDate(1);
 
     const reportParams = {
       start_date: isoDate(start),
@@ -140,9 +137,7 @@ export async function GET() {
 
     if (!reportHasFinancialValues(pnl)) {
       throw new Error(
-        isSandbox
-          ? "QuickBooks is connected, but the sandbox company returned no financial activity. Add a few sample transactions in the Intuit sandbox, then sync again."
-          : "QuickBooks is connected, but no financial activity was returned for the selected period."
+        "QuickBooks is connected, but no financial activity was returned for the selected period."
       );
     }
 
