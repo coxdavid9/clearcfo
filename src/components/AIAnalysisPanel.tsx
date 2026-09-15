@@ -35,7 +35,6 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
 
   useEffect(() => {
     if (!enabled) return;
-
     const loadCache = () => {
       try {
         const cachedBriefing = window.localStorage.getItem(CACHE_KEY);
@@ -49,7 +48,6 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         // Ignore malformed local cache and allow a fresh analysis.
       }
     };
-
     loadCache();
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
@@ -64,7 +62,6 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         loadCache();
       }
     };
-
     window.addEventListener("clearcfo:quickbooks-sync", handleSync);
     return () => window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
   }, [enabled]);
@@ -145,7 +142,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
             <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.recommendedAction}</p></div>
             {analysis.evidence?.length > 0 && <div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Evidence</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">{analysis.evidence.map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
             {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}
-            {analysis.unknowns?.length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-amber-700">Known unknowns</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">{analysis.unknowns.map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
+            {(analysis.unknowns ?? []).length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-amber-700">Known unknowns</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">{(analysis.unknowns ?? []).map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
           </div>
         )}
       </div>
