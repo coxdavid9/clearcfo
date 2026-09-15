@@ -18,7 +18,7 @@ function escapeHtml(value: string) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
 
@@ -65,17 +65,18 @@ export async function POST(request: Request) {
 
     const html = `
       <div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;color:#17213a;line-height:1.6">
-        <div style="padding:24px 0;border-bottom:1px solid #e5e7eb">
-          <div style="font-size:24px;font-weight:700;letter-spacing:-0.5px">Clear<span style="color:#2563eb">CFO</span></div>
-          <div style="font-size:13px;color:#6b7280;margin-top:2px">Financial clarity. Smarter decisions.</div>
+        <div style="padding:28px 0 22px;border-bottom:1px solid #e5e7eb">
+          <img src="https://theclearcfo.com/logo.png" alt="ClearCFO" width="224" style="display:block;width:224px;max-width:100%;height:auto;border:0" />
+          <div style="font-size:13px;color:#6b7280;margin-top:8px">Financial clarity. Smarter decisions.</div>
         </div>
-        <div style="padding:28px 0">
-          <h2 style="margin:0 0 20px;font-size:22px">New website inquiry</h2>
+        <div style="padding:30px 0">
+          <h2 style="margin:0 0 20px;font-size:22px;line-height:1.3">New website inquiry</h2>
           <p style="margin:8px 0"><strong>Topic:</strong> ${escapeHtml(topic)}</p>
           <p style="margin:8px 0"><strong>From:</strong> ${escapeHtml(email)}</p>
           <div style="margin-top:24px;padding:20px;background:#f8fafc;border-radius:12px;white-space:pre-wrap">${escapeHtml(message)}</div>
           <p style="margin-top:24px;font-size:14px;color:#6b7280">Reply to this email to respond directly to ${escapeHtml(email)}.</p>
         </div>
+        <div style="padding:18px 0 30px;border-top:1px solid #e5e7eb;font-size:12px;color:#94a3b8">ClearCFO · Financial clarity. Smarter decisions.</div>
       </div>
     `;
 
