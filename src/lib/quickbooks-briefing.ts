@@ -17,7 +17,13 @@ function clean(value: unknown): string {
 }
 
 function toNumber(value: unknown): number {
-  const parsed = Number(String(value ?? "").replace(/[$,%(),]/g, (match) => match === "(" ? "-" : ""));
+  const text = String(value ?? "")
+    .trim()
+    .replace(/\$/g, "")
+    .replace(/,/g, "")
+    .replace(/%/g, "")
+    .replace(/^\((.*)\)$/, "-$1");
+  const parsed = Number(text);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -113,13 +119,23 @@ export function buildQuickBooksBriefing(
   ]);
   XLSX.utils.book_append_sheet(workbook, pnlSheet, "Monthly P&L");
 
-  // Balance-sheet data is optional. If QuickBooks does not expose a populated
-  // cash/inventory row, do not create a partial Balance Sheet that the Excel
-  // analyzer could misinterpret. The P&L can still produce a valid briefing.
-  if (balance.periods.length && balance.rows.length) {
+  // QuickBooks Balance Sheet reports use reporting-period columns rather than
+  // the Current/Prior headers expected by the generic Excel analyzer. Normalize
+  // the latest two populated periods into Current/Prior so cash and inventory
+  // are recognized as real balance-sheet values instead of triggering a false
+  // "could not normalize" error.
+  if (balance.rows.length) {
+    const currentIndex = Math.max(0, balance.periods.length - 1);
+    const priorIndex = Math.max(0, currentIndex - 1);
+    const normalizedBalanceRows = balance.rows.map(([name, ...values]) => [
+      name,
+      toNumber(values[currentIndex]),
+      toNumber(values[priorIndex]),
+    ]);
+
     const balanceSheet = XLSX.utils.aoa_to_sheet([
-      ["Account", ...balance.periods],
-      ...balance.rows,
+      ["Account", "Current", "Prior"],
+      ...normalizedBalanceRows,
     ]);
     XLSX.utils.book_append_sheet(workbook, balanceSheet, "Balance Sheet");
   }
