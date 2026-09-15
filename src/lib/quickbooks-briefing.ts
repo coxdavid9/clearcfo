@@ -55,16 +55,11 @@ function periods(report: any): string[] {
 }
 
 function findRow(rows: ReportRow[], patterns: RegExp[]): ReportRow | null {
-  // QuickBooks can return matching summary/group rows whose values are all zero.
-  // Only treat a row as normalized data when it contains an actual value.
   for (const row of rows) {
     const normalized = clean(row.label);
     if (!patterns.some((pattern) => pattern.test(normalized))) continue;
-    if (row.values.some((value) => Number.isFinite(value) && value !== 0)) {
-      return row;
-    }
+    if (row.values.some((value) => Number.isFinite(value) && value !== 0)) return row;
   }
-
   return null;
 }
 
@@ -74,16 +69,34 @@ function align(values: number[], length: number): number[] {
   return Array.from({ length }, (_, index) => values[index] ?? 0);
 }
 
+function trimTrailingEmptyPeriods(
+  reportPeriods: string[],
+  rows: (string | number)[][]
+): { periods: string[]; rows: (string | number)[][] } {
+  let end = reportPeriods.length;
+
+  while (end > 1) {
+    const hasValue = rows.some((row) => {
+      const value = row[end];
+      return typeof value === "number" && Number.isFinite(value) && value !== 0;
+    });
+    if (hasValue) break;
+    end -= 1;
+  }
+
+  return {
+    periods: reportPeriods.slice(0, end),
+    rows: rows.map((row) => row.slice(0, end + 1)),
+  };
+}
+
 function reportMatrix(report: any, mappings: { name: string; patterns: RegExp[] }[]): { periods: string[]; rows: (string | number)[][] } {
   const reportPeriods = periods(report);
-  const rows = collectRows(report?.Rows);
-  return {
-    periods: reportPeriods,
-    rows: mappings.flatMap(({ name, patterns }) => {
-      const row = findRow(rows, patterns);
-      return row ? [[name, ...align(row.values, reportPeriods.length)]] : [];
-    }),
-  };
+  const rows = mappings.flatMap(({ name, patterns }) => {
+    const row = findRow(collectRows(report?.Rows), patterns);
+    return row ? [[name, ...align(row.values, reportPeriods.length)]] : [];
+  });
+  return trimTrailingEmptyPeriods(reportPeriods, rows);
 }
 
 /**
@@ -97,10 +110,12 @@ export function buildQuickBooksBriefing(
   companyName: string | null
 ): BriefingData {
   const pnl = reportMatrix(profitAndLoss, [
-    { name: "Revenue", patterns: [/^income$/, /^total income$/, /^revenue$/, /^sales$/] },
+    // Prefer explicit totals over the group/header row when QuickBooks returns both.
+    { name: "Revenue", patterns: [/^total income$/, /^total revenue$/, /^net revenue$/, /^total sales$/, /^net sales$/, /^income$/, /^revenue$/, /^sales$/] },
     { name: "Gross Profit", patterns: [/^gross profit$/] },
-    { name: "Cost of Goods Sold", patterns: [/^cost of goods sold$/, /^cost of sales$/, /^cost of goods$/] },
-    { name: "Operating Expenses", patterns: [/^expenses$/, /^total expenses$/, /^operating expenses$/] },
+    { name: "Cost of Goods Sold", patterns: [/^total cost of goods sold$/, /^cost of goods sold$/, /^cost of sales$/, /^cost of goods$/, /^cost of revenue$/] },
+    { name: "Operating Expenses", patterns: [/^total operating expenses$/, /^operating expenses$/, /^total expenses$/, /^expenses$/] },
+    { name: "Net Income", patterns: [/^net income$/, /^net operating income$/] },
   ]);
 
   if (!pnl.periods.length || !pnl.rows.length) {
@@ -119,11 +134,6 @@ export function buildQuickBooksBriefing(
   ]);
   XLSX.utils.book_append_sheet(workbook, pnlSheet, "Monthly P&L");
 
-  // QuickBooks Balance Sheet reports use reporting-period columns rather than
-  // the Current/Prior headers expected by the generic Excel analyzer. Normalize
-  // the latest two populated periods into Current/Prior so cash and inventory
-  // are recognized as real balance-sheet values instead of triggering a false
-  // "could not normalize" error.
   if (balance.rows.length) {
     const currentIndex = Math.max(0, balance.periods.length - 1);
     const priorIndex = Math.max(0, currentIndex - 1);
