@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function QuickBooksSyncAction() {
   const [connected, setConnected] = useState(false);
@@ -10,9 +11,26 @@ export default function QuickBooksSyncAction() {
 
   useEffect(() => {
     let active = true;
+
     const findTarget = () => {
-      const nextTarget = document.getElementById("quickbooks-sync-target");
-      if (active) setTarget(nextTarget);
+      const existing = document.getElementById("quickbooks-sync-target");
+      if (existing) {
+        if (active) setTarget(existing);
+        return;
+      }
+
+      const uploadButton = Array.from(document.querySelectorAll("button")).find(
+        (button) => button.textContent?.trim() === "Upload Excel"
+      );
+      const parent = uploadButton?.parentElement;
+      if (!parent) return;
+
+      const targetElement = document.createElement("span");
+      targetElement.id = "quickbooks-sync-target";
+      targetElement.className = "inline-flex";
+      targetElement.setAttribute("aria-label", "QuickBooks sync action");
+      parent.insertBefore(targetElement, parent.children[1] || null);
+      if (active) setTarget(targetElement);
     };
 
     const checkConnection = async () => {
@@ -73,15 +91,19 @@ export default function QuickBooksSyncAction() {
 
   if (!connected || !target) return null;
 
-  return (
-    <button
-      type="button"
-      onClick={syncNow}
-      disabled={syncing}
-      title={error || "Refresh your connected QuickBooks data"}
-      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-sm disabled:cursor-wait disabled:opacity-60"
-    >
-      {syncing ? "Syncing…" : "Sync now"}
-    </button>
+  return createPortal(
+    <>
+      <button
+        type="button"
+        onClick={syncNow}
+        disabled={syncing}
+        title={error || "Refresh your connected QuickBooks data"}
+        className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-sm disabled:cursor-wait disabled:opacity-60"
+      >
+        {syncing ? "Syncing…" : "Sync now"}
+      </button>
+      {error && <span className="basis-full text-xs font-medium text-red-600">{error}</span>}
+    </>,
+    target
   );
 }
