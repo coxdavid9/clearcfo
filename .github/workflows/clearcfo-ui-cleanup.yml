@@ -1,0 +1,202 @@
+name: ClearCFO UI cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.head_commit.message != 'Remove ClearCFO UI cleanup workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Update CFO briefing behavior
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("src/components/CFOBriefing.tsx")
+          text = path.read_text()
+
+          text = text.replace(
+              'const [hasValidAnalysis, setHasValidAnalysis] =\n    useState(true);',
+              'const [hasValidAnalysis, setHasValidAnalysis] =\n    useState(false);\n\n  const [lastSyncedAt, setLastSyncedAt] =\n    useState("");'
+          )
+
+          old_loader = '''  async function loadQuickBooksBriefing() {
+    try {
+      const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+      const statusPayload = await statusResponse.json();
+      if (!statusResponse.ok || !statusPayload?.connection?.connected) return;
+
+      const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok || !payload?.briefing) {
+        throw new Error(payload?.error || "ClearCFO could not load your QuickBooks financial data.");
+      }
+
+      setData(payload.briefing as BriefingData);
+      setLiveSource("quickbooks");
+      setHasValidAnalysis(true);
+      setError("");
+      setAiError("");
+      setAiAnalysis(null);
+      await generateAIAnalysis(payload.briefing as BriefingData);
+    } catch (err) {
+      setHasValidAnalysis(false);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "ClearCFO could not load your QuickBooks financial data."
+      );
+    }
+  }
+
+  useEffect(() => {
+    loadQuickBooksBriefing();
+
+    const handleSync = () => {
+      loadQuickBooksBriefing();
+    };
+    const handleDisconnect = () => {
+      setLiveSource("demo");
+      setHasValidAnalysis(false);
+      setError("");
+    };
+
+    window.addEventListener("clearcfo:quickbooks-sync", handleSync);
+    window.addEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+
+    return () => {
+      window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
+      window.removeEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+    };
+  }, []);'''
+
+          new_loader = '''  function applyQuickBooksBriefing(payload: any) {
+    const briefing = payload?.briefing as BriefingData | undefined;
+    if (!briefing) return false;
+
+    setData(briefing);
+    setLiveSource("quickbooks");
+    setHasValidAnalysis(true);
+    setError("");
+    setAiError("");
+    setAiAnalysis(null);
+
+    const syncedAt = payload?.syncedAt || new Date().toISOString();
+    setLastSyncedAt(syncedAt);
+    window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
+    window.localStorage.setItem("clearcfo_qb_last_synced_at", syncedAt);
+    window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
+
+    void generateAIAnalysis(briefing);
+    return true;
+  }
+
+  async function loadQuickBooksBriefing(forceSync = false) {
+    try {
+      const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+      const statusPayload = await statusResponse.json();
+      if (!statusResponse.ok || !statusPayload?.connection?.connected) return;
+
+      if (!forceSync) {
+        const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
+        const cachedSyncedAt = window.localStorage.getItem("clearcfo_qb_last_synced_at");
+        if (cachedBriefing) {
+          try {
+            const briefing = JSON.parse(cachedBriefing) as BriefingData;
+            applyQuickBooksBriefing({ briefing, syncedAt: cachedSyncedAt });
+            return;
+          } catch {
+            window.localStorage.removeItem("clearcfo_qb_briefing_cache");
+          }
+        }
+      }
+
+      const response = await fetch("/api/quickbooks/sync", {
+        cache: "no-store",
+        headers: { "x-clearcfo-manual-sync": "true" },
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.briefing) {
+        throw new Error(payload?.error || "ClearCFO could not load your QuickBooks financial data.");
+      }
+
+      applyQuickBooksBriefing(payload);
+    } catch (err) {
+      setHasValidAnalysis(false);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "ClearCFO could not load your QuickBooks financial data."
+      );
+    }
+  }
+
+  useEffect(() => {
+    void loadQuickBooksBriefing(false);
+
+    const handleSync = (event: Event) => {
+      const payload = (event as CustomEvent).detail;
+      if (!applyQuickBooksBriefing(payload)) void loadQuickBooksBriefing(true);
+    };
+    const handleDisconnect = () => {
+      window.localStorage.removeItem("clearcfo_qb_initial_sync");
+      window.localStorage.removeItem("clearcfo_qb_last_synced_at");
+      window.localStorage.removeItem("clearcfo_qb_briefing_cache");
+      setLiveSource("demo");
+      setHasValidAnalysis(false);
+      setError("");
+      setLastSyncedAt("");
+    };
+
+    window.addEventListener("clearcfo:quickbooks-sync", handleSync);
+    window.addEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+
+    return () => {
+      window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
+      window.removeEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+    };
+  }, []);'''
+
+          if old_loader not in text:
+              raise SystemExit("Expected QuickBooks loader block was not found")
+          text = text.replace(old_loader, new_loader)
+
+          old_actions = '''            <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading || aiLoading ? "Analyzing…" : "Upload Excel"}</button>
+            <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${data.health === "strong" ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : data.health === "watch" ? "border border-amber-100 bg-amber-50 text-amber-700" : "border border-red-100 bg-red-50 text-red-700"}`}>
+              <span className={`h-2 w-2 rounded-full ${data.health === "strong" ? "bg-emerald-500" : data.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} />Business health: {data.health}
+            </div>'''
+          new_actions = '''            <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading || aiLoading ? "Analyzing…" : "Upload Excel"}</button>
+            <span id="quickbooks-sync-target" className="inline-flex" aria-label="QuickBooks sync action" />
+            <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${data.health === "strong" ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : data.health === "watch" ? "border border-amber-100 bg-amber-50 text-amber-700" : "border border-red-100 bg-red-50 text-red-700"}`}>
+              <span className={`h-2 w-2 rounded-full ${data.health === "strong" ? "bg-emerald-500" : data.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} />Business health: {data.health}
+            </div>'''
+          if old_actions not in text:
+              raise SystemExit("Expected briefing action block was not found")
+          text = text.replace(old_actions, new_actions)
+
+          old_source = '''              <p className="mt-0.5 text-xs text-slate-500">{liveSource === "quickbooks" ? "QuickBooks financial data" : liveSource === "upload" ? `Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo financial data"}</p>'''
+          new_source = '''              <p className="mt-0.5 text-xs text-slate-500">{liveSource === "quickbooks" ? `QuickBooks financial data${lastSyncedAt ? ` · Last synced ${new Date(lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}` : liveSource === "upload" ? `Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo financial data"}</p>'''
+          if old_source not in text:
+              raise SystemExit("Expected source status line was not found")
+          text = text.replace(old_source, new_source)
+
+          path.write_text(text)
+
+      - name: Commit and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CFOBriefing.tsx .github/workflows/clearcfo-ui-cleanup.yml
+          git commit -m "Remove automatic QuickBooks refresh on page visits"
+          git rm .github/workflows/clearcfo-ui-cleanup.yml
+          git commit -m "Remove ClearCFO UI cleanup workflow"
+          git push
