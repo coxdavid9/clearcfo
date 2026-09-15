@@ -25,6 +25,14 @@ function readProfile(body: Record<string, unknown>) {
   return { profile };
 }
 
+function isStrongPassword(password: string) {
+  return password.length >= 8
+    && /[a-z]/.test(password)
+    && /[A-Z]/.test(password)
+    && /\d/.test(password)
+    && /[^A-Za-z0-9]/.test(password);
+}
+
 export async function POST(request: Request) {
   // Rate limit: slows fake-account floods.
   const limited = checkRateLimit(request, authRateLimit);
@@ -39,8 +47,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
     }
 
-    if (password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+    if (!isStrongPassword(password)) {
+      return NextResponse.json({ error: "Password must be at least 8 characters and include upper and lower case letters, a number, and a symbol." }, { status: 400 });
     }
 
     const profileResult = readProfile(body);
