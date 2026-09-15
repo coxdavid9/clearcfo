@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QuickBooksConnection from "./QuickBooksConnection";
 
 const ONBOARDING_SEEN_KEY = "clearcfo_setup_onboarding_seen";
 
@@ -24,8 +23,6 @@ export default function SetupGate() {
 
   return (
     <>
-      <QuickBooksConnection setupComplete />
-
       {showOnboarding && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-5 py-6 backdrop-blur-sm">
           <section role="dialog" aria-modal="true" aria-labelledby="setup-onboarding-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
