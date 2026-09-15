@@ -10,8 +10,11 @@ const QB_API_BASE = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox"
   : "https://quickbooks.api.intuit.com";
 const STATE_COOKIE = "clearcfo_qb_oauth_state";
 const STATE_MAX_AGE = 10 * 60;
+const APP_URL = process.env.NODE_ENV === "production"
+  ? "https://theclearcfo.com"
+  : (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000");
 
-type StoredConnection = {
+ type StoredConnection = {
   id: string;
   user_id: string;
   realm_id: string;
@@ -26,7 +29,10 @@ type StoredConnection = {
 function config() {
   const clientId = process.env.QUICKBOOKS_CLIENT_ID;
   const clientSecret = process.env.QUICKBOOKS_CLIENT_SECRET;
-  const redirectUri = process.env.QUICKBOOKS_REDIRECT_URI;
+  const configuredRedirectUri = process.env.QUICKBOOKS_REDIRECT_URI;
+  const redirectUri = process.env.NODE_ENV === "production"
+    ? `${APP_URL}/api/quickbooks/callback`
+    : configuredRedirectUri;
   const encryptionKey = process.env.QUICKBOOKS_TOKEN_ENCRYPTION_KEY;
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
