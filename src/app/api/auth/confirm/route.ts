@@ -3,14 +3,53 @@ import { getAuthCookieNames, getSupabaseUser } from "../../../../lib/supabase-au
 
 export const runtime = "nodejs";
 
+function getSupabaseConfig() {
+  const url = process.env.SUPABASE_URL;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !publishableKey) {
+    throw new Error("Supabase authentication is not configured.");
+  }
+
+  return { url: url.replace(/\/$/, ""), publishableKey };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
-    const refreshToken = typeof body?.refreshToken === "string" ? body.refreshToken : "";
+    let accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
+    let refreshToken = typeof body?.refreshToken === "string" ? body.refreshToken : "";
+
+    const tokenHash = typeof body?.tokenHash === "string" ? body.tokenHash : "";
+    const type = typeof body?.type === "string" ? body.type : "email";
 
     if (!accessToken || !refreshToken) {
-      return NextResponse.json({ error: "Confirmation session is incomplete." }, { status: 400 });
+      if (!tokenHash) {
+        return NextResponse.json({ error: "Confirmation link is incomplete." }, { status: 400 });
+      }
+
+      const { url, publishableKey } = getSupabaseConfig();
+      const verifyResponse = await fetch(`${url}/auth/v1/verify`, {
+        method: "POST",
+        headers: {
+          apikey: publishableKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ type, token_hash: tokenHash }),
+        cache: "no-store",
+      });
+
+      const payload = await verifyResponse.json().catch(() => ({}));
+
+      if (!verifyResponse.ok || !payload?.access_token || !payload?.refresh_token) {
+        return NextResponse.json(
+          { error: payload?.msg || payload?.message || "The confirmation link is invalid or expired." },
+          { status: 401 },
+        );
+      }
+
+      accessToken = payload.access_token;
+      refreshToken = payload.refresh_token;
     }
 
     const user = await getSupabaseUser(accessToken);
