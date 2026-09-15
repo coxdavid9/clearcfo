@@ -60,13 +60,13 @@ export async function GET() {
 
     const end = new Date();
     const isSandbox = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox";
-    // Intuit sandbox companies can contain sample transactions that pre-date
-    // the current calendar year. Production customers should see a focused
-    // recent history; sandbox testing gets a wider window so the sample data
-    // can actually exercise the financial engine.
-    const start = new Date(end);
-    start.setMonth(start.getMonth() - (isSandbox ? 60 : 12));
-    start.setDate(1);
+    // Sandbox data is for testing, so use the full available report history.
+    // Production stays focused on the most recent twelve months.
+    const start = isSandbox ? new Date("2000-01-01T00:00:00Z") : new Date(end);
+    if (!isSandbox) {
+      start.setMonth(start.getMonth() - 12);
+      start.setDate(1);
+    }
 
     const reportParams = {
       start_date: isoDate(start),
@@ -83,7 +83,7 @@ export async function GET() {
     if (!reportHasFinancialValues(pnl)) {
       throw new Error(
         isSandbox
-          ? "QuickBooks is connected, but the sandbox company has no financial activity in the last five years. Add a few sample transactions in the Intuit sandbox, then sync again."
+          ? "QuickBooks is connected, but the sandbox company returned no financial activity. Add a few sample transactions in the Intuit sandbox, then sync again."
           : "QuickBooks is connected, but no financial activity was returned for the selected period."
       );
     }
