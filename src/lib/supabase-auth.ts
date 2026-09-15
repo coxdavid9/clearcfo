@@ -79,8 +79,6 @@ export async function signUpWithPassword(email: string, password: string, profil
   const { url, publishableKey } = getSupabaseConfig();
   const redirectTo = `${getAppUrl()}/auth/callback`;
 
-  // Pass redirect_to on the signup request URL so Supabase Auth reliably carries
-  // the intended callback into the confirmation email's ConfirmationURL.
   const response = await fetch(`${url}/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: "POST",
     headers: {
