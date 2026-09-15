@@ -12,6 +12,10 @@ function getSupabaseConfig() {
   return { url: url.replace(/\/$/, ""), publishableKey };
 }
 
+function getAppUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || "https://theclearcfo.com").replace(/\/$/, "");
+}
+
 export function getAuthCookieNames() {
   return { AUTH_COOKIE, REFRESH_COOKIE };
 }
@@ -84,6 +88,7 @@ export async function signUpWithPassword(email: string, password: string, profil
       email,
       password,
       ...(profile ? { data: profile } : {}),
+      email_redirect_to: `${getAppUrl()}/login`,
     }),
     cache: "no-store",
   });
