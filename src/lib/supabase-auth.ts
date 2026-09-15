@@ -88,7 +88,7 @@ export async function signUpWithPassword(email: string, password: string, profil
       email,
       password,
       ...(profile ? { data: profile } : {}),
-      email_redirect_to: `${getAppUrl()}/login`,
+      email_redirect_to: `${getAppUrl()}/auth/callback`,
     }),
     cache: "no-store",
   });
