@@ -62,17 +62,17 @@ export default function SetupGate() {
   }
 
   return (
-    <div className="relative">
-      <div className="absolute right-5 top-8 z-10 sm:right-8 lg:right-10">
+    <div>
+      <div className="mx-auto flex w-full max-w-7xl justify-end px-5 pt-4 sm:px-8 lg:px-10">
         <button
           type="button"
           onClick={() => {
             window.localStorage.setItem(SETUP_STATE_KEY, "minimized");
             setState("minimized");
           }}
-          className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 text-xs font-semibold text-slate-500 shadow-sm backdrop-blur transition hover:text-slate-800"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-slate-800"
         >
-          Minimize
+          Minimize setup
         </button>
       </div>
       <QuickBooksConnection />
