@@ -25,6 +25,7 @@ type NavbarProps = {
 
 export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false, hideProfile = false }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
 
   const navigate = (href: string) => {
     setMenuOpen(false);
+    setAccountOpen(false);
     if (onNavigate) onNavigate(href);
     else window.location.href = `/${href}`;
   };
@@ -74,20 +76,48 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
   );
 
   const authenticatedAuthControl = (
-    <>
-      {!hideProfile && <a href={profileHref ?? "/profile"} className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 sm:inline-flex">Profile</a>}
-      <a href="/financial-data" className="hidden text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600 sm:inline-flex">Financial Data</a>
-      <a href="/customer" className="hidden rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-600 hover:shadow-md sm:inline-flex sm:px-5">CFO Briefing</a>
-      <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="hidden rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:inline-flex sm:px-5">Log Out</a>
-    </>
+    <div className="hidden items-center gap-3 sm:flex">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setAccountOpen((open) => !open)}
+          aria-expanded={accountOpen}
+          aria-haspopup="menu"
+          className="inline-flex items-center gap-1.5 px-1 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4"
+        >
+          Account
+          <span className={`text-[10px] transition-transform ${accountOpen ? "rotate-180" : ""}`}>▼</span>
+        </button>
+        {accountOpen && (
+          <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl" role="menu">
+            {!hideProfile && (
+              <a href={profileHref ?? "/profile"} onClick={() => setAccountOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-blue-600" role="menuitem">Profile</a>
+            )}
+            <a href="/financial-data" onClick={() => setAccountOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-blue-600" role="menuitem">Financial Data</a>
+          </div>
+        )}
+      </div>
+      <a href="/customer" className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-600 hover:shadow-md sm:px-5">CFO Briefing</a>
+      <a href="/api/auth/logout" onClick={() => { setMenuOpen(false); setAccountOpen(false); }} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:px-5">Log Out</a>
+    </div>
   );
 
   const authControl = sessionAware && authenticated ? authenticatedAuthControl : unauthenticatedAuthControl;
 
   const mobileAuthControl = sessionAware && authenticated ? (
     <>
-      {!hideProfile && <a href={profileHref ?? "/profile"} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Profile</a>}
-      <a href="/financial-data" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">Financial Data</a>
+      <div className="border-b border-slate-100 px-1 py-3">
+        <button type="button" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen} className="flex w-full items-center justify-between py-1 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">
+          <span>Account</span>
+          <span className={`text-xs transition-transform ${accountOpen ? "rotate-180" : ""}`}>▼</span>
+        </button>
+        {accountOpen && (
+          <div className="mt-2 flex flex-col gap-1 pl-3">
+            {!hideProfile && <a href={profileHref ?? "/profile"} onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600">Profile</a>}
+            <a href="/financial-data" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600">Financial Data</a>
+          </div>
+        )}
+      </div>
       <a href="/customer" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">CFO Briefing</a>
       <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">Log Out</a>
     </>
