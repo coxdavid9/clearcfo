@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit, authRateLimit } from "../../../../lib/rate-limit";
-import { getSupabaseUser } from "../../../../lib/supabase-auth";
+import { getAuthCookieNames, getSupabaseUser } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";
 
@@ -54,19 +54,24 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({ ok: true, user });
-    response.cookies.set("clearcfo-auth", sessionAccessToken, {
+    const { AUTH_COOKIE, REFRESH_COOKIE } = getAuthCookieNames();
+    const secure = process.env.NODE_ENV === "production";
+
+    response.cookies.set(AUTH_COOKIE, sessionAccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure,
       sameSite: "lax",
       path: "/",
+      maxAge: 60 * 60,
     });
 
     if (sessionRefreshToken) {
-      response.cookies.set("clearcfo-refresh", sessionRefreshToken, {
+      response.cookies.set(REFRESH_COOKIE, sessionRefreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure,
         sameSite: "lax",
         path: "/",
+        maxAge: 60 * 60 * 24 * 30,
       });
     }
 
