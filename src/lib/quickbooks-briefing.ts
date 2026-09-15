@@ -56,11 +56,23 @@ function collectRows(node: any, output: ReportRow[] = []): ReportRow[] {
   return output;
 }
 
-function periods(report: any): string[] {
+function reportColumns(report: any): { title: string; index: number }[] {
   return (report?.Columns?.Column || [])
     .slice(1)
-    .map((column: any) => String(column?.ColTitle || "").trim())
-    .filter(Boolean);
+    .map((column: any, index: number) => ({
+      title: String(column?.ColTitle || "").trim(),
+      index: index + 1,
+    }))
+    .filter((column: { title: string }) => column.title && !/^total$/i.test(column.title));
+}
+
+function periods(report: any): string[] {
+  return reportColumns(report).map((column) => column.title);
+}
+
+function valuesWithoutTotal(row: ReportRow, report: any): number[] {
+  const columns = reportColumns(report);
+  return columns.map((column) => row.values[column.index - 1] ?? 0);
 }
 
 function findRow(rows: ReportRow[], patterns: RegExp[]): ReportRow | null {
@@ -128,7 +140,8 @@ function reportMatrix(report: any, mappings: { name: string; patterns: RegExp[] 
   const collected = collectRows(report);
   const rows = mappings.flatMap(({ name, patterns }) => {
     const row = findRow(collected, patterns);
-    return row ? [[name, ...align(row.values, reportPeriods.length)]] : [];
+    if (!row) return [];
+    return [[name, ...align(valuesWithoutTotal(row, report), reportPeriods.length)]];
   });
   return trimTrailingEmptyPeriods(reportPeriods, rows);
 }
@@ -156,6 +169,9 @@ export function buildQuickBooksBriefing(
     throw new Error("ClearCFO received a QuickBooks P&L report, but could not normalize its reporting periods or financial rows.");
   }
 
+  // QuickBooks includes a final Total column in P&L reports. It is not a
+  // reporting period and must never be used as the current month for KPI
+  // comparisons. reportMatrix already removes it from P&L rows.
   const balancePeriods = periods(balanceSheet);
   const balanceCollected = collectRows(balanceSheet);
   const cash = findAggregateRow(
@@ -167,8 +183,8 @@ export function buildQuickBooksBriefing(
     /^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/
   ]);
 
-  const cashValues = cash ? align(cash.values, pnl.periods.length) : null;
-  const inventoryValues = inventory ? align(inventory.values, pnl.periods.length) : null;
+  const cashValues = cash ? align(valuesWithoutTotal(cash, balanceSheet), pnl.periods.length) : null;
+  const inventoryValues = inventory ? align(valuesWithoutTotal(inventory, balanceSheet), pnl.periods.length) : null;
 
   const mergedRows: (string | number)[][] = [...pnl.rows];
   if (cashValues) mergedRows.push(["Cash", ...cashValues]);
