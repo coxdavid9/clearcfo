@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import CustomerProfile from "../../components/CustomerProfile";
 import QuickBooksProfileConnection from "../../components/QuickBooksProfileConnection";
-import SetupPreference from "../../components/SetupPreference";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
 export const dynamic = "force-dynamic";
@@ -49,15 +48,30 @@ export default async function ProfilePage() {
         />
 
         <QuickBooksProfileConnection />
-        <SetupPreference />
 
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-base font-semibold text-slate-900">Account security</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">Your ClearCFO login email is managed by the authentication provider. Passwords are never stored by the ClearCFO application.</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <a href="/api/auth/logout" className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Log out</a>
+        <section className="mb-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Password</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Change your password anytime. We will email you a secure reset link.</p>
+            </div>
+            <a href="/forgot-password" className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-400 hover:text-blue-700">
+              Change password
+            </a>
           </div>
-        </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Session</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">End your session on this device. You will need to log in again next visit.</p>
+            </div>
+            <a href="/api/auth/logout" className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-400 hover:text-blue-700">
+              Log out
+            </a>
+          </div>
+        </section>
       </div>
     </main>
   );
