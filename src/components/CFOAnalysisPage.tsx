@@ -107,11 +107,10 @@ export default function CFOAnalysisPage() {
   }, []);
 
   const recommendedActions = analysis ? splitRecommendedActions(analysis.recommendedAction) : [];
-  const displayRecommendedActions = recommendedActions.length >= 2
-    ? recommendedActions
-    : (analysis?.actions?.length >= 3
-      ? analysis.actions.slice(0, 3).map((action) => `${action.title}: ${action.rationale}`)
-      : recommendedActions);
+  const fallbackActions = analysis?.actions && analysis.actions.length >= 3
+    ? analysis.actions.slice(0, 3).map((action) => `${action.title}: ${action.rationale}`)
+    : recommendedActions;
+  const displayRecommendedActions = recommendedActions.length >= 2 ? recommendedActions : fallbackActions;
 
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16"><div className="mx-auto w-full max-w-5xl">
