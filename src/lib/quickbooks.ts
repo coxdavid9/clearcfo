@@ -199,6 +199,23 @@ async function getCompanyInfo(realmId: string, accessToken: string) {
   return payload?.CompanyInfo?.CompanyName || null;
 }
 
+export async function getQuickBooksCompanyStartDate(userId: string): Promise<string | null> {
+  const connection = await getConnection(userId);
+  if (!connection) return null;
+  const { accessToken } = await accessTokenForConnection(connection);
+  const response = await fetch(
+    `${QB_API_BASE}/v3/company/${encodeURIComponent(connection.realm_id)}/companyinfo/${encodeURIComponent(connection.realm_id)}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      cache: "no-store",
+    }
+  );
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => null);
+  // CompanyStartDate looks like "2020-01-01".
+  return payload?.CompanyInfo?.CompanyStartDate || null;
+}
+
 export async function saveQuickBooksConnection(userId: string, realmId: string, tokens: Awaited<ReturnType<typeof exchangeCode>>) {
   const companyName = await getCompanyInfo(realmId, tokens.access_token);
   const now = Date.now();
