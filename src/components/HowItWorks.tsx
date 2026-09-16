@@ -4,50 +4,22 @@ const steps = [
   {
     title: "CONNECT",
     description: "Connect your financial data.",
-    icon: (
-      <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
-        <path d="M24 68h48c9 0 16-7 16-16 0-8-6-15-14-16-2-12-12-20-24-20-11 0-20 7-23 17-10 1-17 8-17 18 0 10 8 17 18 17Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M38 64V48m0 0-6 6m6-6 6 6M50 64V40m0 0-6 6m6-6 6 6M62 64V45m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: "/icons/step-connect.svg",
   },
   {
     title: "UNDERSTAND",
     description: "Get CFO-level insights.",
-    icon: (
-      <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
-        <path d="M48 12c-17 0-30 13-30 30 0 11 5 20 14 26 4 3 6 7 6 12h20c0-5 2-9 6-12 9-6 14-15 14-26 0-17-13-30-30-30Z" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M36 80h24M39 86h18" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-        <rect x="38" y="45" width="6" height="12" rx="1" fill="#1687C7" />
-        <rect x="47" y="35" width="6" height="22" rx="1" fill="#4DBD36" />
-        <rect x="56" y="42" width="6" height="15" rx="1" fill="#1687C7" />
-      </svg>
-    ),
+    icon: "/icons/step-understand.svg",
   },
   {
     title: "IDENTIFY",
     description: "See what's driving profit and performance.",
-    icon: (
-      <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
-        <circle cx="48" cy="43" r="25" fill="none" stroke="currentColor" strokeWidth="4" />
-        <path d="m66 61 15 15" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
-        <rect x="34" y="43" width="6" height="13" rx="1" fill="currentColor" />
-        <rect x="45" y="35" width="6" height="21" rx="1" fill="#1687C7" />
-        <rect x="56" y="39" width="6" height="17" rx="1" fill="#4DBD36" />
-      </svg>
-    ),
+    icon: "/icons/step-identify.svg",
   },
   {
     title: "IMPROVE",
     description: "Make better decisions.",
-    icon: (
-      <svg viewBox="0 0 96 96" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
-        <circle cx="45" cy="49" r="28" fill="none" stroke="currentColor" strokeWidth="4" />
-        <circle cx="45" cy="49" r="17" fill="none" stroke="currentColor" strokeWidth="4" />
-        <circle cx="45" cy="49" r="7" fill="#4DBD36" />
-        <path d="m45 49 31-31m0 0-1 11m1-11-11 1" fill="none" stroke="#4DBD36" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: "/icons/step-improve.svg",
   },
 ] as const;
 
@@ -75,8 +47,8 @@ export default function HowItWorks() {
                 index > 0 ? "border-slate-200 md:border-l" : ""
               }`}
             >
-              <div className="mx-auto flex h-24 items-center justify-center text-blue-600 transition-transform duration-300 group-hover:scale-105 sm:h-28">
-                {step.icon}
+              <div className="mx-auto flex h-24 items-center justify-center transition-transform duration-300 group-hover:scale-105 sm:h-28">
+                <img src={step.icon} alt="" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24" />
               </div>
               <h3 className="mt-4 text-xl font-extrabold tracking-wide text-[#0B2F8A]">
                 {step.title}
