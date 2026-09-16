@@ -23,7 +23,7 @@ function cacheAnalysisInput(briefing: BriefingData) {
 
 function displayChange(value: number, metricKey?: string, currentValue?: number): string {
   if (!Number.isFinite(value)) {
-    if (metricKey === "inventory" && Number.isFinite(currentValue) && currentValue !== 0) {
+    if (metricKey === "inventory" && typeof currentValue === "number" && Number.isFinite(currentValue) && currentValue !== 0) {
       return `${currentValue > 0 ? "+" : "−"}${currency.format(Math.abs(currentValue))}`;
     }
     return "—";
