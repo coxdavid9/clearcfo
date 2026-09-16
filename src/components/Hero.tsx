@@ -21,8 +21,10 @@ export default function Hero() {
         <p className="mx-auto mt-7 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
           ClearCFO turns financial data into clear insights, prioritized actions, and better decisions — without hiring a full-time CFO.
         </p>
+        <p className="mt-4 font-semibold text-blue-700">7-day free trial · No credit card required</p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <a href="#how-it-works" className="rounded-xl bg-blue-600 px-7 py-3.5 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See How It Works →</a>
+          <a href="/signup" className="rounded-xl bg-blue-600 px-7 py-3.5 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">Start free trial</a>
+          <a href="#how-it-works" className="rounded-xl border border-slate-300 bg-white px-7 py-3.5 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See How It Works →</a>
         </div>
       </ScrollReveal>
 
@@ -31,7 +33,6 @@ export default function Hero() {
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 sm:p-7">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO intelligence</p>
                 <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">What ClearCFO finds.</h2>
                 <p className="mt-1 text-sm text-slate-500">A quick read on the financial signals that deserve attention.</p>
               </div>
