@@ -21,6 +21,11 @@ function cacheAnalysisInput(briefing: BriefingData) {
   }
 }
 
+function displayChange(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value > 0 ? "+" : ""}${formatPercentValue(value)}`;
+}
+
 export default function CFOBriefing() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<BriefingData>(demoData);
@@ -30,9 +35,9 @@ export default function CFOBriefing() {
   const [error, setError] = useState("");
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
-  const trendChange = data.trend.length >= 2 && data.trend[0] !== 0
-    ? ((data.trend[data.trend.length - 1] - data.trend[0]) / Math.abs(data.trend[0])) * 100
-    : 0;
+  // The headline trend should describe the latest comparable period, not an
+  // empty/zero first month in a newly connected QuickBooks history.
+  const trendChange = Number.isFinite(data.revenueChange) ? data.revenueChange : Number.NaN;
 
   const trendPoints = useMemo(() => {
     const values = data.trend.map((value) => Number(value)).filter((value) => Number.isFinite(value));
@@ -187,7 +192,7 @@ export default function CFOBriefing() {
     { key: "revenue" as const, label: "Revenue", value: currency.format(data.revenue), change: data.revenueChange, tone: data.revenueChange > 0 ? "text-emerald-600" : data.revenueChange < 0 ? "text-red-600" : "text-amber-600", signal: data.revenueChange > 0 ? "bg-emerald-500" : data.revenueChange < 0 ? "bg-red-500" : "bg-amber-400" },
     { key: "margin" as const, label: "Gross Margin", value: formatPercentValue(data.grossMargin), change: data.marginChange, tone: data.marginChange > 0 ? "text-emerald-600" : data.marginChange < 0 ? "text-red-600" : "text-amber-600", signal: data.marginChange > 0 ? "bg-emerald-500" : data.marginChange < 0 ? "bg-red-500" : "bg-amber-400" },
     { key: "cash" as const, label: "Cash Position", value: currency.format(data.cash), change: data.cashChange, tone: data.cashChange > 0 ? "text-emerald-600" : data.cashChange < 0 ? "text-red-600" : "text-amber-600", signal: data.cashChange > 0 ? "bg-emerald-500" : data.cashChange < 0 ? "bg-red-500" : "bg-amber-400" },
-    { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
+    { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: !Number.isFinite(data.inventoryChange) ? "text-slate-500" : data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
   ];
   const selectedMetric = expandedMetric ? metrics.find((metric) => metric.key === expandedMetric) : null;
 
@@ -246,7 +251,7 @@ export default function CFOBriefing() {
                     <span className="text-sm font-semibold text-slate-400">{isExpanded ? "Selected" : "View detail"}</span>
                   </div>
                   <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{metric.change >= 0 ? "+" : ""}{formatPercentValue(metric.change)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{displayChange(metric.change)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
                 </button>
               );
             })}
@@ -256,7 +261,7 @@ export default function CFOBriefing() {
             <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">KPI detail</p><h3 className="mt-1 text-lg font-bold text-slate-900">{selectedMetric.label}</h3></div><button type="button" onClick={() => setExpandedMetric(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-white hover:text-blue-600">Close</button></div>
               <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">What changed</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.label} is {selectedMetric.value} and has changed {formatPercentValue(Math.abs(selectedMetric.change))} versus the prior period.</p></div>
+                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">What changed</p><p className="mt-2 text-sm leading-6 text-slate-700">{Number.isFinite(selectedMetric.change) ? `${selectedMetric.label} is ${selectedMetric.value} and has changed ${formatPercentValue(Math.abs(selectedMetric.change))} versus the prior period.` : `${selectedMetric.label} is ${selectedMetric.value}; a percentage comparison is not meaningful because the prior period was zero or unavailable.`}</p></div>
                 <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Context</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Revenue trend is the clearest measure of top-line momentum." : selectedMetric.key === "margin" ? "Gross margin shows how much revenue remains after direct costs." : selectedMetric.key === "cash" ? "Cash should be read alongside operating performance and working capital." : "Inventory should be read alongside sales, purchasing, and cash movement."}</p></div>
                 <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Growth needs to translate into sustainable gross profit and cash generation." : selectedMetric.key === "margin" ? "Small margin changes can materially affect profit as revenue scales." : selectedMetric.key === "cash" ? "Cash availability affects the company's ability to absorb surprises and fund operations." : "Inventory tied up in the business can affect liquidity and working capital efficiency."}</p></div>
               </div>
@@ -265,7 +270,7 @@ export default function CFOBriefing() {
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p><p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${trendChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>{percent(trendChange)}</p><p className="text-xs text-slate-400">trend</p></div></div>
+              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p><p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
               <div className="relative mt-5 h-56 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
                 <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label="Revenue trend over available periods" preserveAspectRatio="none">
                   <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
