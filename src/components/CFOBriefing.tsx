@@ -4,7 +4,6 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   type BriefingData,
-  type AIAnalysis,
   type ExpandedMetric,
   demoData,
   currency,
@@ -14,6 +13,14 @@ import {
   buildDeterministicExecutiveSummary,
 } from "../lib/briefing/engine";
 
+function cacheAnalysisInput(briefing: BriefingData) {
+  try {
+    window.localStorage.setItem("clearcfo_analysis_input", JSON.stringify(briefing));
+  } catch {
+    // Keep the briefing usable if browser storage is unavailable.
+  }
+}
+
 export default function CFOBriefing() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<BriefingData>(demoData);
@@ -21,10 +28,6 @@ export default function CFOBriefing() {
   const [hasValidAnalysis, setHasValidAnalysis] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState("");
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
   const trendChange = data.trend.length >= 2 && data.trend[0] !== 0
@@ -44,9 +47,7 @@ export default function CFOBriefing() {
     const max = Math.max(...values);
     const range = max - min;
     return data.trend.map((value, index) => {
-      const x = data.trend.length === 1
-        ? width / 2
-        : left + (index / (data.trend.length - 1)) * (width - left - right);
+      const x = data.trend.length === 1 ? width / 2 : left + (index / (data.trend.length - 1)) * (width - left - right);
       const normalized = range === 0 ? 0.5 : (value - min) / range;
       const y = top + (1 - normalized) * (height - top - bottom);
       return { x, y, value };
@@ -54,13 +55,11 @@ export default function CFOBriefing() {
   }, [data.trend]);
 
   const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
-
   const trendLabelIndices = useMemo(() => {
     const last = Math.max(0, data.periods.length - 1);
     if (last === 0) return [0];
     return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
   }, [data.periods.length]);
-
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
 
   async function loadQuickBooksBriefing() {
@@ -73,8 +72,7 @@ export default function CFOBriefing() {
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           setError("");
-          setAiError("");
-          setAiAnalysis(null);
+          cacheAnalysisInput(cached);
           return;
         }
       }
@@ -94,12 +92,10 @@ export default function CFOBriefing() {
       setLiveSource("quickbooks");
       setHasValidAnalysis(true);
       setError("");
-      setAiError("");
-      setAiAnalysis(null);
       window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
       window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
       if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
-      await generateAIAnalysis(briefing);
+      cacheAnalysisInput(briefing);
     } catch (err) {
       setHasValidAnalysis(false);
       setError(err instanceof Error ? err.message : "ClearCFO could not load your QuickBooks financial data.");
@@ -117,9 +113,7 @@ export default function CFOBriefing() {
         setLiveSource("quickbooks");
         setHasValidAnalysis(true);
         setError("");
-        setAiError("");
-        setAiAnalysis(null);
-        void generateAIAnalysis(briefing);
+        cacheAnalysisInput(briefing);
         return;
       }
       void loadQuickBooksBriefing();
@@ -129,6 +123,7 @@ export default function CFOBriefing() {
       window.localStorage.removeItem("clearcfo_qb_briefing_cache");
       window.localStorage.removeItem("clearcfo_qb_last_synced_at");
       window.localStorage.removeItem("clearcfo_qb_initial_sync");
+      window.localStorage.removeItem("clearcfo_analysis_input");
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setError("");
@@ -142,9 +137,7 @@ export default function CFOBriefing() {
     };
   }, []);
 
-  const toggleMetric = (metric: ExpandedMetric) => {
-    setExpandedMetric((current) => current === metric ? null : metric);
-  };
+  const toggleMetric = (metric: ExpandedMetric) => setExpandedMetric((current) => current === metric ? null : metric);
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -152,9 +145,6 @@ export default function CFOBriefing() {
     setUploading(true);
     setHasValidAnalysis(false);
     setError("");
-    setAiError("");
-    setAiAnalysis(null);
-    setShowAnalysis(false);
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { cellDates: true });
@@ -162,67 +152,13 @@ export default function CFOBriefing() {
       setData(analyzed);
       setLiveSource("upload");
       setHasValidAnalysis(true);
-      await generateAIAnalysis(analyzed);
+      cacheAnalysisInput(analyzed);
     } catch (err) {
       setHasValidAnalysis(false);
       setError(err instanceof Error ? err.message : "We couldn't read that workbook. Please check the file format and sheet names.");
     } finally {
       setUploading(false);
       event.target.value = "";
-    }
-  }
-
-  async function generateAIAnalysis(inputData: BriefingData = data) {
-    setAiLoading(true);
-    setAiError("");
-    try {
-      const response = await fetch("/api/cfo-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName: inputData.companyName,
-          financialSnapshot: {
-            revenue: inputData.revenue,
-            revenueChange: inputData.revenueChange,
-            grossMargin: inputData.grossMargin,
-            marginChange: inputData.marginChange,
-            cash: inputData.cash,
-            cashChange: inputData.cashChange,
-            inventory: inputData.inventory,
-            inventoryChange: inputData.inventoryChange,
-          },
-          detectedIssues: inputData.alerts,
-          financialDrivers: inputData.drivers,
-          driverRelationships: inputData.relationships,
-          detailDrivers: inputData.detailDrivers,
-          currentRecommendation: inputData.recommendation,
-          businessHealth: inputData.health,
-          analysisConfidence: inputData.confidence,
-          recentRevenueTrend: inputData.trend.slice(-12),
-          periods: inputData.periods.slice(-12),
-          multiPeriodInsights: inputData.trendInsights,
-          knownUnknowns: inputData.unknowns,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "ClearCFO could not generate the AI analysis.");
-      const normalizePercentageText = (value: string): string => value.replace(/(-?\d+)\.0%\b/g, "$1%");
-      const analysis = payload.analysis as AIAnalysis;
-      setAiAnalysis({
-        ...analysis,
-        executiveSummary: normalizePercentageText(analysis.executiveSummary),
-        primaryDriver: normalizePercentageText(analysis.primaryDriver),
-        whyItMatters: normalizePercentageText(analysis.whyItMatters),
-        managementQuestion: normalizePercentageText(analysis.managementQuestion),
-        recommendedAction: normalizePercentageText(analysis.recommendedAction),
-        evidence: analysis.evidence.map(normalizePercentageText),
-        unknowns: analysis.unknowns?.map(normalizePercentageText),
-        actions: analysis.actions.map((action) => ({ ...action, title: normalizePercentageText(action.title), rationale: normalizePercentageText(action.rationale) })),
-      });
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : "ClearCFO could not generate the AI analysis.");
-    } finally {
-      setAiLoading(false);
     }
   }
 
@@ -253,7 +189,6 @@ export default function CFOBriefing() {
     { key: "cash" as const, label: "Cash Position", value: currency.format(data.cash), change: data.cashChange, tone: data.cashChange > 0 ? "text-emerald-600" : data.cashChange < 0 ? "text-red-600" : "text-amber-600", signal: data.cashChange > 0 ? "bg-emerald-500" : data.cashChange < 0 ? "bg-red-500" : "bg-amber-400" },
     { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
   ];
-
   const selectedMetric = expandedMetric ? metrics.find((metric) => metric.key === expandedMetric) : null;
 
   return (
@@ -273,7 +208,7 @@ export default function CFOBriefing() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading || aiLoading ? "Analyzing…" : "Upload Excel"}</button>
+              <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Excel"}</button>
               <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${data.health === "strong" ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : data.health === "watch" ? "border border-amber-100 bg-amber-50 text-amber-700" : "border border-red-100 bg-red-50 text-red-700"}`}>
                 <span className={`h-2 w-2 rounded-full ${data.health === "strong" ? "bg-emerald-500" : data.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} />Business health: {data.health}
               </div>
@@ -305,25 +240,13 @@ export default function CFOBriefing() {
             {metrics.map((metric) => {
               const isExpanded = expandedMetric === metric.key;
               return (
-                <button
-                  type="button"
-                  key={metric.key}
-                  onClick={() => toggleMetric(metric.key)}
-                  aria-expanded={isExpanded}
-                  className={`relative min-h-[132px] rounded-2xl border p-5 text-left shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 ${isExpanded ? "z-10 border-blue-300 bg-blue-50/70 shadow-lg shadow-blue-900/10 md:-translate-y-1 md:scale-[1.02]" : expandedMetric ? "border-slate-200 bg-white opacity-65 hover:opacity-100" : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-200 hover:shadow-md hover:shadow-blue-900/5"}`}
-                >
+                <button type="button" key={metric.key} onClick={() => toggleMetric(metric.key)} aria-expanded={isExpanded} className={`relative min-h-[132px] rounded-2xl border p-5 text-left shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 ${isExpanded ? "z-10 border-blue-300 bg-blue-50/70 shadow-lg shadow-blue-900/10 md:-translate-y-1 md:scale-[1.02]" : expandedMetric ? "border-slate-200 bg-white opacity-65 hover:opacity-100" : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-200 hover:shadow-md hover:shadow-blue-900/5"}`}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${metric.signal}`} aria-hidden="true" />
-                      <p className="text-xs font-medium text-slate-500 sm:text-sm">{metric.label}</p>
-                    </div>
+                    <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${metric.signal}`} aria-hidden="true" /><p className="text-xs font-medium text-slate-500 sm:text-sm">{metric.label}</p></div>
                     <span className="text-sm font-semibold text-slate-400">{isExpanded ? "Selected" : "View detail"}</span>
                   </div>
                   <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm">
-                    <span className={metric.tone}>{metric.change >= 0 ? "+" : ""}{formatPercentValue(metric.change)}</span>
-                    <span className="font-normal text-slate-400">vs. prior period</span>
-                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{metric.change >= 0 ? "+" : ""}{formatPercentValue(metric.change)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
                 </button>
               );
             })}
@@ -331,75 +254,31 @@ export default function CFOBriefing() {
 
           {selectedMetric && (
             <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">KPI detail</p>
-                  <h3 className="mt-1 text-lg font-bold text-slate-900">{selectedMetric.label}</h3>
-                </div>
-                <button type="button" onClick={() => setExpandedMetric(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-white hover:text-blue-600">Close</button>
-              </div>
+              <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">KPI detail</p><h3 className="mt-1 text-lg font-bold text-slate-900">{selectedMetric.label}</h3></div><button type="button" onClick={() => setExpandedMetric(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-white hover:text-blue-600">Close</button></div>
               <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-white bg-white/80 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">What changed</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.label} is {selectedMetric.value} and has changed {formatPercentValue(Math.abs(selectedMetric.change))}% versus the prior period.</p>
-                </div>
-                <div className="rounded-xl border border-white bg-white/80 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Context</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Revenue trend is the clearest measure of top-line momentum." : selectedMetric.key === "margin" ? "Gross margin shows how much revenue remains after direct costs." : selectedMetric.key === "cash" ? "Cash should be read alongside operating performance and working capital." : "Inventory should be read alongside sales, purchasing, and cash movement."}</p>
-                </div>
-                <div className="rounded-xl border border-white bg-white/80 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Why it matters</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Growth needs to translate into sustainable gross profit and cash generation." : selectedMetric.key === "margin" ? "Small margin changes can materially affect profit as revenue scales." : selectedMetric.key === "cash" ? "Cash availability affects the company&apos;s ability to absorb surprises and fund operations." : "Inventory tied up in the business can affect liquidity and working capital efficiency."}</p>
-                </div>
+                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">What changed</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.label} is {selectedMetric.value} and has changed {formatPercentValue(Math.abs(selectedMetric.change))} versus the prior period.</p></div>
+                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Context</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Revenue trend is the clearest measure of top-line momentum." : selectedMetric.key === "margin" ? "Gross margin shows how much revenue remains after direct costs." : selectedMetric.key === "cash" ? "Cash should be read alongside operating performance and working capital." : "Inventory should be read alongside sales, purchasing, and cash movement."}</p></div>
+                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Growth needs to translate into sustainable gross profit and cash generation." : selectedMetric.key === "margin" ? "Small margin changes can materially affect profit as revenue scales." : selectedMetric.key === "cash" ? "Cash availability affects the company's ability to absorb surprises and fund operations." : "Inventory tied up in the business can affect liquidity and working capital efficiency."}</p></div>
               </div>
             </div>
           )}
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p>
-                  <p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p>
-                </div>
-                <div className="text-right">
-                  <p className={`text-sm font-bold ${trendChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>{percent(trendChange)}</p>
-                  <p className="text-xs text-slate-400">trend</p>
-                </div>
-              </div>
-
+              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p><p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${trendChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>{percent(trendChange)}</p><p className="text-xs text-slate-400">trend</p></div></div>
               <div className="relative mt-5 h-56 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
                 <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label="Revenue trend over available periods" preserveAspectRatio="none">
-                  <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
-                  <line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
-                  <line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
+                  <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
                   {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className="text-blue-600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-                  {trendPoints.map((point, index) => (
-                    <circle key={`${data.periods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className="text-blue-600">
-                      <title>{`${data.periods[index] || "Period"}: ${currency.format(point.value)}`}</title>
-                    </circle>
-                  ))}
+                  {trendPoints.map((point, index) => <circle key={`${data.periods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className="text-blue-600"><title>{`${data.periods[index] || "Period"}: ${currency.format(point.value)}`}</title></circle>)}
                 </svg>
               </div>
-              <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">
-                {trendLabelIndices.map((index) => <span key={`${data.periods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{data.periods[index] || (index === 0 ? "Prior" : "Current")}</span>)}
-              </div>
+              <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${data.periods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{data.periods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
             </div>
 
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-900">What needs attention</p>
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {data.alerts.slice(0, 3).map((alert, index) => (
-                  <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left">
-                    <p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p>
-                  </div>
-                ))}
-                {!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}
-              </div>
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span></div>
+              <div className="mt-4 space-y-3">{data.alerts.slice(0, 3).map((alert, index) => <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left"><p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p><p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p></div>)}{!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div>
             </div>
           </div>
 
@@ -410,10 +289,12 @@ export default function CFOBriefing() {
 
           <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><div className="mt-4 space-y-3">{data.drivers.map((driver) => <div key={`q-${driver.id}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{driver.category}:</span> {driver.managementQuestion}</div>)}</div></div>
 
-          <div className="mt-10 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p></div><button type="button" onClick={() => setShowAnalysis(true)} className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">View AI Analysis</button></div>
+          <div className="mt-10 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p></div>
+            <a href="/customer/analysis" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">View AI Analysis →</a>
+          </div>
         </div>
       </div>
-      {showAnalysis && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" onClick={() => setShowAnalysis(false)}><div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-2xl font-bold text-slate-900">What should management do next?</h3></div><button type="button" onClick={() => setShowAnalysis(false)} className="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">×</button></div>{aiLoading && <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">Analyzing financial signals…</div>}{aiError && <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{aiError}</div>}{aiAnalysis && <div className="mt-6 space-y-5"><div className="rounded-2xl bg-slate-50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Executive summary</p><p className="mt-2 text-sm leading-6 text-slate-700">{aiAnalysis.executiveSummary}</p></div><div className="grid gap-4 sm:grid-cols-2"><div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Primary driver</p><p className="mt-2 text-sm leading-6 text-slate-700">{aiAnalysis.primaryDriver}</p></div><div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{aiAnalysis.whyItMatters}</p></div></div><div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Management question</p><p className="mt-2 text-sm leading-6 text-slate-700">{aiAnalysis.managementQuestion}</p></div><div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><p className="mt-2 text-sm leading-6 text-slate-700">{aiAnalysis.recommendedAction}</p></div>{aiAnalysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{aiAnalysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}</div>}</div></div>}
     </div>
   );
 }

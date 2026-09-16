@@ -8,6 +8,7 @@ type TrendCardProps = {
   title: string;
   series: TrendSeries | undefined;
   tone: "positive" | "watch";
+  chartColor: string;
 };
 
 function money(value: number) {
@@ -23,7 +24,7 @@ function changePercent(values: number[]) {
   return ((values[values.length - 1] - values[0]) / Math.abs(values[0])) * 100;
 }
 
-function TrendCard({ title, series, tone }: TrendCardProps) {
+function TrendCard({ title, series, tone, chartColor }: TrendCardProps) {
   const values = series?.values?.slice(-6) || [];
   const labels = series?.periods?.slice(-6) || [];
   const points = useMemo(() => {
@@ -62,7 +63,7 @@ function TrendCard({ title, series, tone }: TrendCardProps) {
             <div className="absolute inset-x-0 top-3 border-t border-slate-200" />
             <div className="absolute inset-x-0 top-1/2 border-t border-slate-200" />
             <div className="absolute inset-x-0 bottom-5 border-t border-slate-200" />
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-x-1 top-1 h-28 w-[calc(100%-0.5rem)] overflow-visible text-blue-500" aria-label={`${title} trend`}>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`absolute inset-x-1 top-1 h-28 w-[calc(100%-0.5rem)] overflow-visible ${chartColor}`} aria-label={`${title} trend`}>
               <polyline points={line} fill="none" stroke="currentColor" strokeWidth="2.4" vectorEffect="non-scaling-stroke" />
               {points.map((point, index) => (
                 <circle key={`${index}-${point.value}`} cx={point.x} cy={point.y} r="1.6" fill="currentColor" vectorEffect="non-scaling-stroke" />
@@ -135,10 +136,10 @@ export default function FinancialTrends() {
 
   const byName = new Map(series.map((item) => [item.name, item]));
   const cards = [
-    { title: "Revenue", tone: "positive" as const },
-    { title: "Inventory", tone: "watch" as const },
-    { title: "Operating Expenses", tone: "watch" as const },
-    { title: "Cash Position", tone: "positive" as const },
+    { title: "Revenue", tone: "positive" as const, chartColor: "text-blue-600" },
+    { title: "Inventory", tone: "watch" as const, chartColor: "text-violet-600" },
+    { title: "Operating Expenses", tone: "watch" as const, chartColor: "text-orange-500" },
+    { title: "Cash Position", tone: "positive" as const, chartColor: "text-emerald-600" },
   ];
 
   return (
@@ -154,7 +155,7 @@ export default function FinancialTrends() {
         </div>
       </div>
       <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
-        {cards.map((card) => <div key={card.title} className="bg-white p-3 sm:p-4"><TrendCard title={card.title} series={byName.get(card.title)} tone={card.tone} /></div>)}
+        {cards.map((card) => <div key={card.title} className="bg-white p-3 sm:p-4"><TrendCard title={card.title} series={byName.get(card.title)} tone={card.tone} chartColor={card.chartColor} /></div>)}
       </div>
       <div className="mx-5 my-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-slate-600 sm:mx-8">
         <strong className="text-blue-700">The bigger picture:</strong> These charts use the QuickBooks periods actually returned by the connected company. ClearCFO will not fill missing periods with made-up financial values.
