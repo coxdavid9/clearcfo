@@ -21,8 +21,13 @@ function cacheAnalysisInput(briefing: BriefingData) {
   }
 }
 
-function displayChange(value: number): string {
-  if (!Number.isFinite(value)) return "—";
+function displayChange(value: number, metricKey?: string, currentValue?: number): string {
+  if (!Number.isFinite(value)) {
+    if (metricKey === "inventory" && Number.isFinite(currentValue) && currentValue !== 0) {
+      return `${currentValue > 0 ? "+" : "−"}${currency.format(Math.abs(currentValue))}`;
+    }
+    return "—";
+  }
   return `${value > 0 ? "+" : ""}${formatPercentValue(value)}`;
 }
 
@@ -196,6 +201,17 @@ export default function CFOBriefing() {
   ];
   const selectedMetric = expandedMetric ? metrics.find((metric) => metric.key === expandedMetric) : null;
 
+  const renderMetricDetail = (metric: (typeof metrics)[number]) => (
+    <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">KPI detail</p><h3 className="mt-1 text-lg font-bold text-slate-900">{metric.label}</h3></div><button type="button" onClick={() => setExpandedMetric(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-white hover:text-blue-600">Close</button></div>
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">What changed</p><p className="mt-2 text-sm leading-6 text-slate-700">{Number.isFinite(metric.change) ? `${metric.label} is ${metric.value} and has changed ${formatPercentValue(Math.abs(metric.change))} versus the prior period.` : metric.key === "inventory" && data.inventory !== 0 ? `${metric.label} is ${metric.value}; it increased by ${currency.format(Math.abs(data.inventory))} from the prior period. A percentage comparison is not meaningful because the prior period was zero or unavailable.` : `${metric.label} is ${metric.value}; a percentage comparison is not meaningful because the prior period was zero or unavailable.`}</p></div>
+        <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Context</p><p className="mt-2 text-sm leading-6 text-slate-700">{metric.key === "revenue" ? "Revenue trend is the clearest measure of top-line momentum." : metric.key === "margin" ? "Gross margin shows how much revenue remains after direct costs." : metric.key === "cash" ? "Cash should be read alongside operating performance and working capital." : "Inventory should be read alongside sales, purchasing, and cash movement."}</p></div>
+        <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{metric.key === "revenue" ? "Growth needs to translate into sustainable gross profit and cash generation." : metric.key === "margin" ? "Small margin changes can materially affect profit as revenue scales." : metric.key === "cash" ? "Cash availability affects the company's ability to absorb surprises and fund operations." : "Inventory tied up in the business can affect liquidity and working capital efficiency."}</p></div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
@@ -245,28 +261,22 @@ export default function CFOBriefing() {
             {metrics.map((metric) => {
               const isExpanded = expandedMetric === metric.key;
               return (
-                <button type="button" key={metric.key} onClick={() => toggleMetric(metric.key)} aria-expanded={isExpanded} className={`relative min-h-[132px] rounded-2xl border p-5 text-left shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 ${isExpanded ? "z-10 border-blue-300 bg-blue-50/70 shadow-lg shadow-blue-900/10 md:-translate-y-1 md:scale-[1.02]" : expandedMetric ? "border-slate-200 bg-white opacity-65 hover:opacity-100" : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-200 hover:shadow-md hover:shadow-blue-900/5"}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${metric.signal}`} aria-hidden="true" /><p className="text-xs font-medium text-slate-500 sm:text-sm">{metric.label}</p></div>
-                    <span className="text-sm font-semibold text-slate-400">{isExpanded ? "Selected" : "View detail"}</span>
-                  </div>
-                  <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{displayChange(metric.change)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
-                </button>
+                <div key={metric.key} className="min-w-0">
+                  <button type="button" onClick={() => toggleMetric(metric.key)} aria-expanded={isExpanded} className={`relative min-h-[132px] w-full rounded-2xl border p-5 text-left shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 ${isExpanded ? "z-10 border-blue-300 bg-blue-50/70 shadow-lg shadow-blue-900/10 md:-translate-y-1 md:scale-[1.02]" : expandedMetric ? "border-slate-200 bg-white opacity-65 hover:opacity-100" : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-200 hover:shadow-md hover:shadow-blue-900/5"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${metric.signal}`} aria-hidden="true" /><p className="text-xs font-medium text-slate-500 sm:text-sm">{metric.label}</p></div>
+                      <span className="text-sm font-semibold text-slate-400">{isExpanded ? "Selected" : "View detail"}</span>
+                    </div>
+                    <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{displayChange(metric.change, metric.key, metric.key === "inventory" ? data.inventory : undefined)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
+                  </button>
+                  {isExpanded && <div className="mt-4 md:hidden">{renderMetricDetail(metric)}</div>}
+                </div>
               );
             })}
           </div>
 
-          {selectedMetric && (
-            <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">KPI detail</p><h3 className="mt-1 text-lg font-bold text-slate-900">{selectedMetric.label}</h3></div><button type="button" onClick={() => setExpandedMetric(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-white hover:text-blue-600">Close</button></div>
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">What changed</p><p className="mt-2 text-sm leading-6 text-slate-700">{Number.isFinite(selectedMetric.change) ? `${selectedMetric.label} is ${selectedMetric.value} and has changed ${formatPercentValue(Math.abs(selectedMetric.change))} versus the prior period.` : `${selectedMetric.label} is ${selectedMetric.value}; a percentage comparison is not meaningful because the prior period was zero or unavailable.`}</p></div>
-                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Context</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Revenue trend is the clearest measure of top-line momentum." : selectedMetric.key === "margin" ? "Gross margin shows how much revenue remains after direct costs." : selectedMetric.key === "cash" ? "Cash should be read alongside operating performance and working capital." : "Inventory should be read alongside sales, purchasing, and cash movement."}</p></div>
-                <div className="rounded-xl border border-white bg-white/80 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{selectedMetric.key === "revenue" ? "Growth needs to translate into sustainable gross profit and cash generation." : selectedMetric.key === "margin" ? "Small margin changes can materially affect profit as revenue scales." : selectedMetric.key === "cash" ? "Cash availability affects the company's ability to absorb surprises and fund operations." : "Inventory tied up in the business can affect liquidity and working capital efficiency."}</p></div>
-              </div>
-            </div>
-          )}
+          {selectedMetric && <div className="mt-6 hidden md:block">{renderMetricDetail(selectedMetric)}</div>}
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
