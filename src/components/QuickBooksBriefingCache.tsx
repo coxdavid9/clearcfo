@@ -42,19 +42,20 @@ export default function QuickBooksBriefingCache() {
       const cachedSyncedAt = window.localStorage.getItem(SYNC_KEY);
       if (!cachedBriefing) {
         const response = await originalFetch(input, init);
-        if (response.ok) {
-          try {
-            const payload = await response.clone().json();
-            if (payload?.briefing) {
-              const briefing = normalizeBriefing(payload.briefing);
-              window.localStorage.setItem(CACHE_KEY, JSON.stringify(briefing));
-              if (payload.syncedAt) window.localStorage.setItem(SYNC_KEY, payload.syncedAt);
-            }
-          } catch {
-            // Let the original response continue to the caller.
-          }
+        if (!response.ok) return response;
+        try {
+          const payload = await response.clone().json();
+          if (!payload?.briefing) return response;
+          const briefing = normalizeBriefing(payload.briefing);
+          window.localStorage.setItem(CACHE_KEY, JSON.stringify(briefing));
+          if (payload.syncedAt) window.localStorage.setItem(SYNC_KEY, payload.syncedAt);
+          return new Response(JSON.stringify({ ...payload, briefing }), {
+            status: response.status,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch {
+          return response;
         }
-        return response;
       }
 
       const briefing = normalizeBriefing(JSON.parse(cachedBriefing));
