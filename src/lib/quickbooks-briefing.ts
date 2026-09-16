@@ -53,6 +53,18 @@ function reportPeriods(report: any): string[] {
     .filter((title: string) => title && !/^total$/i.test(title));
 }
 
+function isPartialCurrentMonth(label: string): boolean {
+  const cleaned = label.trim().toLowerCase();
+  const monthStarts = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  const monthIndex = monthStarts.findIndex((m) => cleaned.startsWith(m));
+  if (monthIndex < 0) return false;
+  const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
+  if (!yearMatch) return false;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return monthIndex === now.getMonth() && Number(yearMatch[0]) === now.getFullYear() && now.getDate() < daysInMonth;
+}
+
 function findSectionByGroup(rows: ReportNode[], patterns: RegExp[]): ReportNode | null {
   return rows.find((row) => row.type === "Section" && row.group && patterns.some((pattern) => pattern.test(clean(row.group))) && row.values.some((value) => value !== 0)) || null;
 }
@@ -128,14 +140,19 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const netIncome = pickSeries(pnlRows, [/^netincome$/, /^netoperatingincome$/], [/^net income$/, /^net operating income$/], pnlPeriods.length);
   const grossProfit = pnlPeriods.map((_, index) => (revenue[index] || 0) - (cogs[index] || 0));
 
-  const dataIndex = latestPopulatedIndex([revenue, cogs, expenses, netIncome || []]);
-  if (dataIndex < 0) throw new Error("QuickBooks is connected, but ClearCFO could not identify a non-zero income, expense, or net-income period in the returned P&L.");
+  const dataIndex = latestPopulatedIndex([revenue, cogs, expenses]);
+  if (dataIndex < 0) throw new Error("QuickBooks is connected, but ClearCFO could not identify a non-zero income or expense period in the returned P&L.");
 
-  const activePeriods = pnlPeriods.slice(0, dataIndex + 1);
-  const activeRevenue = revenue.slice(0, dataIndex + 1);
-  const activeCogs = cogs.slice(0, dataIndex + 1);
-  const activeExpenses = expenses.slice(0, dataIndex + 1);
-  const activeGrossProfit = grossProfit.slice(0, dataIndex + 1);
+  let endIndex = dataIndex;
+  // The current calendar month is almost always a partial period.
+  // Comparing it to a full prior month creates fake -100% alerts, so exclude it
+  // from current-period KPIs (keep it only if it's the sole populated period).
+  if (endIndex > 0 && isPartialCurrentMonth(pnlPeriods[endIndex])) endIndex -= 1;
+  const activePeriods = pnlPeriods.slice(0, endIndex + 1);
+  const activeRevenue = revenue.slice(0, endIndex + 1);
+  const activeCogs = cogs.slice(0, endIndex + 1);
+  const activeExpenses = expenses.slice(0, endIndex + 1);
+  const activeGrossProfit = grossProfit.slice(0, endIndex + 1);
 
   const balancePeriods = reportPeriods(balanceSheet);
   const balanceRows = collectRows(balanceSheet?.Rows, balancePeriods.length);
