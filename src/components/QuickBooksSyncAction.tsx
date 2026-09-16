@@ -79,8 +79,10 @@ export default function QuickBooksSyncAction() {
       }
       window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
       window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(payload.briefing));
+      if (payload.diagnostics) window.localStorage.setItem("clearcfo_qb_diagnostics", JSON.stringify(payload.diagnostics));
       if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
       window.dispatchEvent(new CustomEvent("clearcfo:quickbooks-sync", { detail: payload }));
+      window.dispatchEvent(new CustomEvent("clearcfo:quickbooks-diagnostics", { detail: payload.diagnostics || null }));
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "QuickBooks sync failed.");
     } finally {
