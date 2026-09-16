@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Navbar from "../../../components/Navbar";
 import CFOBriefing from "../../../components/CFOBriefing";
+import FinancialTrends from "../../../components/FinancialTrends";
 import SetupGate from "../../../components/SetupGate";
 import QuickBooksSyncAction from "../../../components/QuickBooksSyncAction";
 import QuickBooksBriefingCache from "../../../components/QuickBooksBriefingCache";
@@ -27,6 +28,7 @@ export default async function CFOBriefingPage() {
       <QuickBooksBriefingCache />
       <QuickBooksSyncAction />
       <CFOBriefing />
+      <FinancialTrends />
       <Footer />
     </main>
   );
