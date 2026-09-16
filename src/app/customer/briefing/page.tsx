@@ -6,6 +6,7 @@ import FinancialTrends from "../../../components/FinancialTrends";
 import SetupGate from "../../../components/SetupGate";
 import QuickBooksSyncAction from "../../../components/QuickBooksSyncAction";
 import QuickBooksBriefingCache from "../../../components/QuickBooksBriefingCache";
+import QuickBooksDiagnostics from "../../../components/QuickBooksDiagnostics";
 import Footer from "../../../components/Footer";
 import { getAuthCookieNames, getSupabaseUser } from "../../../lib/supabase-auth";
 
@@ -29,6 +30,7 @@ export default async function CFOBriefingPage() {
       <QuickBooksSyncAction />
       <CFOBriefing />
       <FinancialTrends />
+      <QuickBooksDiagnostics />
       <Footer />
     </main>
   );
