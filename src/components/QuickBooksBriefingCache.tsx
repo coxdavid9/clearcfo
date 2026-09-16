@@ -5,13 +5,24 @@ import { useInsertionEffect } from "react";
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
 const SYNC_KEY = "clearcfo_qb_last_synced_at";
 const MANUAL_KEY = "clearcfo_manual_qb_sync";
-const TREND_VERSION_KEY = "clearcfo_qb_trend_series_v2";
+const TREND_VERSION_KEY = "clearcfo_qb_trend_series_v3";
+
+function normalizeBriefing(briefing: any) {
+  const revenueSeries = Array.isArray(briefing?.trendSeries)
+    ? briefing.trendSeries.find((series: any) => series?.name === "Revenue")
+    : null;
+  if (revenueSeries?.values?.length) {
+    return {
+      ...briefing,
+      trend: Array.isArray(briefing.trend) && briefing.trend.length ? briefing.trend : revenueSeries.values,
+      periods: Array.isArray(briefing.periods) && briefing.periods.length ? briefing.periods : revenueSeries.periods,
+    };
+  }
+  return briefing;
+}
 
 export default function QuickBooksBriefingCache() {
   useInsertionEffect(() => {
-    // Existing caches were created before the dashboard stored all four KPI
-    // trend series. Clear that snapshot once so the next sync hydrates the
-    // dashboard with the new monthly history.
     if (window.localStorage.getItem(TREND_VERSION_KEY) !== "1") {
       window.localStorage.removeItem(CACHE_KEY);
       window.localStorage.removeItem(SYNC_KEY);
@@ -35,7 +46,8 @@ export default function QuickBooksBriefingCache() {
           try {
             const payload = await response.clone().json();
             if (payload?.briefing) {
-              window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload.briefing));
+              const briefing = normalizeBriefing(payload.briefing);
+              window.localStorage.setItem(CACHE_KEY, JSON.stringify(briefing));
               if (payload.syncedAt) window.localStorage.setItem(SYNC_KEY, payload.syncedAt);
             }
           } catch {
@@ -45,12 +57,13 @@ export default function QuickBooksBriefingCache() {
         return response;
       }
 
+      const briefing = normalizeBriefing(JSON.parse(cachedBriefing));
       return new Response(JSON.stringify({
         ok: true,
         source: "quickbooks",
         cached: true,
         syncedAt: cachedSyncedAt || new Date().toISOString(),
-        briefing: JSON.parse(cachedBriefing),
+        briefing,
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
