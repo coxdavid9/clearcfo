@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { type AIAnalysis, type BriefingData, demoData } from "../lib/briefing/engine";
 
-const ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v1";
+const ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v2";
 
 function normalizePercentageText(value: string) {
   return value.replace(/(-?\d+(?:\.\d+)?)%%/g, "$1%").replace(/(-?\d+)\.0%\b/g, "$1%");
@@ -15,8 +15,8 @@ function normalizeAnalysis(analysis: AIAnalysis): AIAnalysis {
 }
 
 function splitRecommendedActions(value: string) {
-  const normalized = normalizePercentageText(value).trim();
-  const matches = [...normalized.matchAll(/(?:^|\s)(\d+)[.)]\s*/g)];
+  const normalized = normalizePercentageText(value).replace(/\r/g, "").trim();
+  const matches = [...normalized.matchAll(/(?:^|\n|\s)(\d+)[.)]\s*/g)];
   if (matches.length < 2) return [normalized];
   return matches.map((match, index) => {
     const start = (match.index ?? 0) + match[0].length;
@@ -34,7 +34,19 @@ function priorityBadge(priority: string) {
 }
 
 function analysisFingerprint(input: BriefingData) {
-  return JSON.stringify({ companyName: input.companyName, revenue: input.revenue, revenueChange: input.revenueChange, grossMargin: input.grossMargin, marginChange: input.marginChange, cash: input.cash, cashChange: input.cashChange, inventory: input.inventory, inventoryChange: input.inventoryChange, alerts: input.alerts, drivers: input.drivers, relationships: input.relationships, detailDrivers: input.detailDrivers, recommendation: input.recommendation, health: input.health, confidence: input.confidence, trend: input.trend.slice(-12), periods: input.periods.slice(-12), trendInsights: input.trendInsights, unknowns: input.unknowns });
+  return JSON.stringify({
+    companyName: input.companyName,
+    revenue: input.revenue,
+    revenueChange: input.revenueChange,
+    grossMargin: input.grossMargin,
+    marginChange: input.marginChange,
+    cash: input.cash,
+    cashChange: input.cashChange,
+    inventory: input.inventory,
+    inventoryChange: input.inventoryChange,
+    trend: input.trend.slice(-12),
+    periods: input.periods.slice(-12),
+  });
 }
 
 export default function CFOAnalysisPage() {
@@ -94,6 +106,13 @@ export default function CFOAnalysisPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const recommendedActions = analysis ? splitRecommendedActions(analysis.recommendedAction) : [];
+  const displayRecommendedActions = recommendedActions.length >= 2
+    ? recommendedActions
+    : (analysis?.actions?.length >= 3
+      ? analysis.actions.slice(0, 3).map((action) => `${action.title}: ${action.rationale}`)
+      : recommendedActions);
+
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16"><div className="mx-auto w-full max-w-5xl">
       <div className="mb-6 flex items-center justify-between gap-4"><a href="/customer/briefing" className="text-sm font-semibold text-blue-600 hover:text-blue-700">← Back to CFO Briefing</a><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">AI Analysis</span></div>
@@ -104,7 +123,7 @@ export default function CFOAnalysisPage() {
           <div className="rounded-2xl bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Executive summary</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.executiveSummary}</p></div>
           <div className="grid gap-5 sm:grid-cols-2"><div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Primary driver</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.primaryDriver}</p></div><div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.whyItMatters}</p></div></div>
           <div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Management question</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.managementQuestion}</p></div>
-          <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-6"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><div className="mt-3 space-y-3">{splitRecommendedActions(analysis.recommendedAction).map((action, index) => <div key={`${action}-${index}`} className="flex gap-3 text-sm leading-6 text-slate-700"><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{index + 1}</span><p>{action.replace(/^\d+\.\s*/, "")}</p></div>)}</div></div>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-6"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><div className="mt-3 space-y-3">{displayRecommendedActions.map((action, index) => <div key={`${action}-${index}`} className="flex gap-3 text-sm leading-6 text-slate-700"><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{index + 1}</span><p>{action.replace(/^\d+[.)]\s*/, "")}</p></div>)}</div></div>
           {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${priorityBadge(action.priority)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}
         </div>}
       </section>
