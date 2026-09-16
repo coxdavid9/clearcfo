@@ -28,6 +28,31 @@ function normalizeAnalysis(analysis: AIAnalysis): AIAnalysis {
   };
 }
 
+function splitRecommendedActions(value: string) {
+  const normalized = normalizePercentageText(value).trim();
+  const matches = [...normalized.matchAll(/(?:^|\s)(\d+)\)\s*/g)];
+
+  if (matches.length < 2) return [normalized];
+
+  return matches.map((match, index) => {
+    const start = (match.index ?? 0) + match[0].length;
+    const end = index + 1 < matches.length ? matches[index + 1].index ?? normalized.length : normalized.length;
+    const text = normalized.slice(start, end).trim();
+    return text ? `${match[1]}. ${text}` : "";
+  }).filter(Boolean);
+}
+
+function priorityBadge(priority: string) {
+  const normalized = priority.toLowerCase();
+  if (normalized === "high") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (normalized === "medium") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
 export default function CFOAnalysisPage() {
   const [data, setData] = useState<BriefingData>(demoData);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
@@ -142,7 +167,16 @@ export default function CFOAnalysisPage() {
 
               <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-6">
                 <p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.recommendedAction}</p>
+                <div className="mt-3 space-y-3">
+                  {splitRecommendedActions(analysis.recommendedAction).map((action, index) => (
+                    <div key={`${action}-${index}`} className="flex gap-3 text-sm leading-6 text-slate-700">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                        {index + 1}
+                      </span>
+                      <p>{action.replace(/^\d+\.\s*/, "")}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {analysis.actions?.length > 0 && (
@@ -153,7 +187,10 @@ export default function CFOAnalysisPage() {
                       <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-6">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-semibold text-slate-900">{action.title}</p>
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span>
+                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${priorityBadge(action.priority)}`}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {action.priority}
+                          </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p>
                       </div>
