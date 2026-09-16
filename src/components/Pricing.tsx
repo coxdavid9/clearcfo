@@ -25,7 +25,7 @@ export default function Pricing() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-600">Pricing</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Simple pricing. Serious financial clarity.</h2>
             <p className="mt-4 leading-7 text-slate-600">Two straightforward levels. Start with the visibility you need and move up when you need deeper decision support.</p>
-            <p className="mt-4 font-semibold text-blue-700">7-day free trial · No credit card required</p>
+            <p className="mt-4 font-semibold text-blue-700">7-day free trial · Credit card required</p>
           </div>
         </ScrollReveal>
 
