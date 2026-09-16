@@ -5,7 +5,7 @@ import { useInsertionEffect } from "react";
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
 const SYNC_KEY = "clearcfo_qb_last_synced_at";
 const MANUAL_KEY = "clearcfo_manual_qb_sync";
-const TREND_VERSION_KEY = "clearcfo_qb_trend_series_v3";
+const TREND_VERSION_KEY = "clearcfo_qb_trend_series_v4";
 
 function normalizeBriefing(briefing: any) {
   const revenueSeries = Array.isArray(briefing?.trendSeries)
