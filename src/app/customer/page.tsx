@@ -1,12 +1,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Navbar from "../../components/Navbar";
-import CFOBriefing from "../../components/CFOBriefing";
-import AIAnalysisPanel from "../../components/AIAnalysisPanel";
+import FinancialDashboard from "../../components/FinancialDashboard";
 import SetupGate from "../../components/SetupGate";
 import QuickBooksSyncAction from "../../components/QuickBooksSyncAction";
 import QuickBooksBriefingCache from "../../components/QuickBooksBriefingCache";
-import TrendDetailOverlay from "../../components/TrendDetailOverlay";
 import Footer from "../../components/Footer";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
@@ -33,11 +31,7 @@ export default async function CustomerPage() {
       <SetupGate />
       <QuickBooksBriefingCache />
       <QuickBooksSyncAction />
-      <div id="cfo-briefing">
-        <CFOBriefing />
-      </div>
-      <AIAnalysisPanel />
-      <TrendDetailOverlay enabled />
+      <FinancialDashboard />
       <Footer />
     </main>
   );
