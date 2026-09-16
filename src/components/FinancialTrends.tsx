@@ -20,8 +20,11 @@ function formatValue(title: string, value: number) {
 }
 
 function changePercent(values: number[]) {
-  if (values.length < 2 || values[0] === 0) return 0;
-  return ((values[values.length - 1] - values[0]) / Math.abs(values[0])) * 100;
+  if (values.length < 2) return 0;
+  const previous = values[values.length - 2];
+  const latest = values[values.length - 1];
+  if (previous === 0) return 0;
+  return ((latest - previous) / Math.abs(previous)) * 100;
 }
 
 function TrendCard({ title, series, tone, chartColor }: TrendCardProps) {
@@ -42,16 +45,19 @@ function TrendCard({ title, series, tone, chartColor }: TrendCardProps) {
   const change = changePercent(values);
   const labelIndices = Array.from(new Set([0, Math.round(Math.max(0, labels.length - 1) / 2), Math.max(0, labels.length - 1)]));
   const latest = values[values.length - 1] ?? 0;
+  const previous = values.length > 1 ? values[values.length - 2] : 0;
+  const hasPercentComparison = values.length > 1 && previous !== 0;
+  const absoluteChange = latest - previous;
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          <p className={`mt-1 text-sm font-semibold ${change >= 0 ? "text-emerald-600" : "text-amber-600"}`}>
-            {change > 0 ? "+" : ""}{change.toFixed(1)}%
+          <p className={`mt-1 text-sm font-semibold ${hasPercentComparison ? (change >= 0 ? "text-emerald-600" : "text-amber-600") : "text-slate-500"}`}>
+            {hasPercentComparison ? `${change > 0 ? "+" : ""}${change.toFixed(1)}%` : values.length > 1 ? `${absoluteChange >= 0 ? "+" : "-"}${money(Math.abs(absoluteChange))}` : "—"}
           </p>
-          <p className="mt-1 text-[11px] text-slate-400">{change >= 0 ? (tone === "positive" ? "Growing" : "Building") : "Declining"}</p>
+          <p className="mt-1 text-[11px] text-slate-400">{hasPercentComparison ? (change >= 0 ? (tone === "positive" ? "Growing" : "Building") : "Declining") : "Prior period was $0"}</p>
         </div>
         <span className="text-[10px] font-semibold text-slate-400">{values.length}-period</span>
       </div>
@@ -80,7 +86,7 @@ function TrendCard({ title, series, tone, chartColor }: TrendCardProps) {
 
       <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
         <span>Latest {formatValue(title, latest)}</span>
-        <span>{values.length > 1 ? `Prior ${formatValue(title, values[values.length - 2])}` : "Current period"}</span>
+        <span>{values.length > 1 ? `Prior ${formatValue(title, previous)}` : "Current period"}</span>
       </div>
     </article>
   );
