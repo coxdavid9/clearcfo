@@ -70,16 +70,24 @@ export default function QuickBooksProfileConnection() {
           )}
         </div>
 
-        {connection?.connected && (
-          <button
-            type="button"
-            onClick={disconnect}
-            disabled={disconnecting}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            {disconnecting ? "Disconnecting…" : "Disconnect QuickBooks"}
-          </button>
-        )}
+        {!loading &&
+          (connection?.connected ? (
+            <button
+              type="button"
+              onClick={disconnect}
+              disabled={disconnecting}
+              className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              {disconnecting ? "Disconnecting…" : "Disconnect QuickBooks"}
+            </button>
+          ) : (
+            <a
+              href="/api/quickbooks/connect"
+              className="shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            >
+              Connect QuickBooks
+            </a>
+          ))}
       </div>
 
       {message && <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">{message}</p>}
