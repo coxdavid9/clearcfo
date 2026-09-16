@@ -103,7 +103,7 @@ function latestPopulatedIndex(series: number[][]): number {
   return -1;
 }
 
-function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number): FinancialDriver[] {
+function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
   if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2) {
     drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
@@ -115,7 +115,11 @@ function buildDrivers(revenueChange: number, marginChange: number, cashChange: n
     drivers.push({ id: "inventory-growth", category: "Inventory", title: "Inventory is outpacing revenue", observation: `Inventory changed ${formatPercent(inventoryChange)}, ahead of revenue at ${formatPercent(revenueChange)}.`, evidence: [`Inventory change: ${formatPercent(inventoryChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: "Medium", impact: 3, confidence: 0.9, managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?" });
   }
   if (Number.isFinite(marginChange) && marginChange < -2) {
-    drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercent(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercent(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
+    if ((previousCogs || 0) === 0 && (currentCogs || 0) > 0) {
+      drivers.push({ id: "margin-baseline", category: "Margin", title: "COGS appeared this period after none in the prior period", observation: `COGS of $${Math.round(currentCogs).toLocaleString()} was recorded this period versus $0 in the prior period, which accounts for the margin change.`, evidence: [`Current COGS: $${Math.round(currentCogs).toLocaleString()}`, `Prior COGS: $0`], direction: "down", severity: "Medium", impact: 2, confidence: 0.88, managementQuestion: "Is all prior-period COGS now recorded, or is more still to come?" });
+    } else {
+      drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercent(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercent(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
+    }
   }
   return drivers;
 }
@@ -144,9 +148,6 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   if (dataIndex < 0) throw new Error("QuickBooks is connected, but ClearCFO could not identify a non-zero income or expense period in the returned P&L.");
 
   let endIndex = dataIndex;
-  // The current calendar month is almost always a partial period.
-  // Comparing it to a full prior month creates fake -100% alerts, so exclude it
-  // from current-period KPIs (keep it only if it's the sole populated period).
   if (endIndex > 0 && isPartialCurrentMonth(pnlPeriods[endIndex])) endIndex -= 1;
   const activePeriods = pnlPeriods.slice(0, endIndex + 1);
   const activeRevenue = revenue.slice(0, endIndex + 1);
@@ -184,7 +185,9 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const cashChange = previous >= 0 ? changePercent(currentCash, previousCash) : Number.NaN;
   const inventoryChange = previous >= 0 ? changePercent(currentInventory, previousInventory) : Number.NaN;
   const expenseChange = previous >= 0 ? changePercent(currentExpense, previousExpense) : Number.NaN;
-  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange);
+  const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
+  const currentCogsValue = activeCogs[current] || 0;
+  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
 
   const trendSeries: Series[] = [
