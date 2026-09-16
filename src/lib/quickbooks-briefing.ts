@@ -128,8 +128,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const netIncome = pickSeries(pnlRows, [/^netincome$/, /^netoperatingincome$/], [/^net income$/, /^net operating income$/], pnlPeriods.length);
   const grossProfit = pnlPeriods.map((_, index) => (revenue[index] || 0) - (cogs[index] || 0));
 
-  const dataIndex = latestPopulatedIndex([revenue, cogs, expenses, netIncome || []]);
-  if (dataIndex < 0) throw new Error("QuickBooks is connected, but ClearCFO could not identify a non-zero income, expense, or net-income period in the returned P&L.");
+  const dataIndex = latestPopulatedIndex([revenue, cogs, expenses]);
+  if (dataIndex < 0) throw new Error("QuickBooks is connected, but ClearCFO could not identify a non-zero income or expense period in the returned P&L.");
 
   const activePeriods = pnlPeriods.slice(0, dataIndex + 1);
   const activeRevenue = revenue.slice(0, dataIndex + 1);
