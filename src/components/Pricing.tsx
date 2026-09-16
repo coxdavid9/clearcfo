@@ -11,7 +11,7 @@ const plans = [
     name: "Pro",
     price: "$79",
     description: "For businesses that want deeper decision support and more financial planning tools.",
-    features: ["Forecasting", "Everything in Core", "Deeper financial analysis", "Expanded historical insights", "Priority decision support"],
+    features: ["Deeper financial analysis", "Everything in Core", "Expanded historical insights", "Priority decision support", "Weekly CFO report"],
     popular: true,
   },
 ];
@@ -45,7 +45,7 @@ export default function Pricing() {
                   {plan.features.map((feature, featureIndex) => (
                     <li key={feature} className="flex gap-2">
                       <span className="font-bold text-emerald-600">✓</span>
-                      <span className={plan.name === "Pro" && featureIndex === 0 ? "font-semibold text-slate-900" : ""}>{feature}</span>
+                      <span>{feature}</span>
                     </li>
                   ))}
                 </ul>
