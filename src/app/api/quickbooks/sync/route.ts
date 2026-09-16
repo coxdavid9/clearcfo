@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { quickBooksReport, requireCurrentUser, getQuickBooksConnection } from "../../../../lib/quickbooks";
+import { getQuickBooksCompanyStartDate, quickBooksReport, requireCurrentUser, getQuickBooksConnection } from "../../../../lib/quickbooks";
 import { buildQuickBooksBriefing } from "../../../../lib/quickbooks-briefing";
 
 export const runtime = "nodejs";
@@ -67,10 +67,12 @@ function parseProfitAndLoss(report: any) {
   const metrics: Record<string, number[]> = {};
 
   for (const row of rows) {
-    const cells = row?.ColData || [];
+    // Section totals (Income, Expenses, Net Income, ...) live in Summary.ColData;
+    // account-level lines use ColData.
+    const cells = row?.ColData || row?.Summary?.ColData || [];
     const label = String(cells[0]?.value || "").trim();
     if (!wanted.has(label)) continue;
-    metrics[label] = cells.slice(1).map((cell: any) => Number(cell?.value || 0) || 0);
+    metrics[label] = cells.slice(1).map((cell: any) => Number(String(cell?.value ?? "").replace(/,/g, "")) || 0);
   }
 
   // QuickBooks can include the current partial month as the last column.
@@ -108,8 +110,11 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const end = new Date();
-    const start = new Date(end);
-    start.setMonth(start.getMonth() - 12);
+    // No artificial month limit: sync the full history starting from the
+    // company's own start date (per QuickBooks CompanyInfo).
+    const companyStartDate = await getQuickBooksCompanyStartDate(user.id);
+    const start = companyStartDate ? new Date(`${companyStartDate}T00:00:00`) : new Date("2000-01-01T00:00:00");
+    if (Number.isNaN(start.getTime())) start.setTime(new Date("2000-01-01T00:00:00").getTime());
     start.setDate(1);
 
     const reportParams = {
