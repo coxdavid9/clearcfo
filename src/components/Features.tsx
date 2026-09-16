@@ -47,7 +47,7 @@ export default function Features() {
           {features.map((feature, index) => (
             <ScrollReveal key={feature.title} delay={index * 90} y={18}>
               <div className="group h-full rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg">
-                <div className="flex h-24 items-center justify-start transition-transform duration-300 group-hover:scale-105 sm:h-28">
+                <div className="flex h-24 items-center justify-center transition-transform duration-300 group-hover:scale-105 sm:h-28">
                   <img src={feature.icon} alt="" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24" />
                 </div>
                 <h3 className="mt-2 text-lg font-bold text-slate-900">{feature.title}</h3>
