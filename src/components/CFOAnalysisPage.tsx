@@ -107,12 +107,10 @@ export default function CFOAnalysisPage() {
   }, []);
 
   const recommendedActions = analysis ? splitRecommendedActions(analysis.recommendedAction) : [];
-  const actions = analysis?.actions ?? [];
-  const displayRecommendedActions = recommendedActions.length >= 2
-    ? recommendedActions
-    : (actions.length >= 3
-      ? actions.slice(0, 3).map((action) => `${action.title}: ${action.rationale}`)
-      : recommendedActions);
+  const fallbackActions = analysis?.actions && analysis.actions.length >= 3
+    ? analysis.actions.slice(0, 3).map((action) => `${action.title}: ${action.rationale}`)
+    : recommendedActions;
+  const displayRecommendedActions = recommendedActions.length >= 2 ? recommendedActions : fallbackActions;
 
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16"><div className="mx-auto w-full max-w-5xl">
@@ -125,7 +123,7 @@ export default function CFOAnalysisPage() {
           <div className="grid gap-5 sm:grid-cols-2"><div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Primary driver</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.primaryDriver}</p></div><div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.whyItMatters}</p></div></div>
           <div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Management question</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.managementQuestion}</p></div>
           <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-6"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><div className="mt-3 space-y-3">{displayRecommendedActions.map((action, index) => <div key={`${action}-${index}`} className="flex gap-3 text-sm leading-6 text-slate-700"><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{index + 1}</span><p>{action.replace(/^\d+[.)]\s*/, "")}</p></div>)}</div></div>
-          {actions.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${priorityBadge(action.priority)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}
+          {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${priorityBadge(action.priority)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}
         </div>}
       </section>
     </div></div>
