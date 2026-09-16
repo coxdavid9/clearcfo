@@ -74,6 +74,19 @@ export default function LoginPage() {
     setSignupStep(2);
   }
 
+  async function startCheckoutAfterAuth(tier: "core" | "pro") {
+    const response = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.url !== "string") {
+      throw new Error(data.error || "Unable to start Stripe Checkout.");
+    }
+    window.location.href = data.url;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -82,6 +95,8 @@ export default function LoginPage() {
 
     const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
     const body = mode === "login" ? { email, password } : { email, password, ...profile };
+    const checkout = new URLSearchParams(window.location.search).get("checkout");
+    const checkoutTier = checkout === "core" || checkout === "pro" ? checkout : null;
 
     try {
       const response = await fetch(endpoint, {
@@ -107,9 +122,15 @@ export default function LoginPage() {
       if (mode === "signup") {
         window.localStorage.removeItem("clearcfo_setup_onboarding_seen");
       }
+
+      if (checkoutTier) {
+        await startCheckoutAfterAuth(checkoutTier);
+        return;
+      }
+
       window.location.href = "/customer";
-    } catch {
-      setError("We could not reach ClearCFO. Please try again.");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "We could not reach ClearCFO. Please try again.");
     } finally {
       setBusy(false);
     }

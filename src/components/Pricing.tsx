@@ -1,14 +1,17 @@
 import ScrollReveal from "./ScrollReveal";
+import StripeCheckoutButton from "./StripeCheckoutButton";
 
 const plans = [
   {
     name: "Core",
+    tier: "core" as const,
     price: "$39",
     description: "For owners who want a clear view of performance and the issues that deserve attention.",
     features: ["KPI dashboard", "Financial drivers", "Financial trends", "ClearCFO recommendations", "Priority insights"],
   },
   {
     name: "Pro",
+    tier: "pro" as const,
     price: "$79",
     description: "For businesses that want deeper decision support and more financial planning tools.",
     features: ["Everything in Core", "Deeper financial analysis", "Expanded historical insights", "Priority decision support", "Forecasting", "Priority insights"],
@@ -41,9 +44,7 @@ export default function Pricing() {
                 <ul className="mt-7 space-y-3 text-sm text-slate-600">
                   {plan.features.map((feature) => <li key={feature} className="flex gap-2"><span className="font-bold text-emerald-600">✓</span>{feature}</li>)}
                 </ul>
-                <a href="#contact" className={`mt-8 rounded-xl py-3 text-center text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 ${plan.popular ? "bg-blue-600 text-white hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md" : "border border-slate-300 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm"}`}>
-                  Get Started
-                </a>
+                <StripeCheckoutButton tier={plan.tier} popular={plan.popular} />
               </div>
             </ScrollReveal>
           ))}
