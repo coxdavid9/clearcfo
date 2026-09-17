@@ -44,3 +44,5 @@ jobs:
           git add src/components/CFOBriefing.tsx
           git commit -m "Fix What Needs Attention panel"
           git push
+
+# trigger
