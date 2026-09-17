@@ -66,6 +66,27 @@ export async function GET() {
       getQuickBooksConnection(user.id),
     ]);
 
+    const detailReportRequests = {
+      profitAndLossDetail: quickBooksReport(user.id, "ProfitAndLossDetail", reportParams),
+      incomeByCustomer: quickBooksReport(user.id, "IncomeByCustomerSummary", reportParams),
+      expenseByVendor: quickBooksReport(user.id, "ExpenseByVendorSummary", reportParams),
+      agedReceivables: quickBooksReport(user.id, "AgedReceivableDetail", { end_date: reportParams.end_date }),
+      agedPayables: quickBooksReport(user.id, "AgedPayableDetail", { end_date: reportParams.end_date }),
+      inventoryValuation: quickBooksReport(user.id, "InventoryValuationSummary", { end_date: reportParams.end_date }),
+    } as const;
+
+    const detailEntries = await Promise.all(
+      Object.entries(detailReportRequests).map(async ([name, request]) => {
+        try {
+          return [name, await request] as const;
+        } catch (error) {
+          console.warn(`[ClearCFO QuickBooks] Optional detail report skipped: ${name}`, error instanceof Error ? error.message : error);
+          return [name, null] as const;
+        }
+      })
+    );
+    const detailReports = Object.fromEntries(detailEntries);
+
     const diagnostics = {
       generatedAt: new Date().toISOString(),
       environment: process.env.QUICKBOOKS_ENVIRONMENT || "unknown",
@@ -80,8 +101,8 @@ export async function GET() {
 
     if (!reportHasFinancialValues(pnl)) throw new Error("QuickBooks is connected, but no financial activity was returned for the selected period.");
 
-    const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection?.companyName || null);
-    return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), source: "quickbooks", periods: briefing.periods, trendSeries: briefing.trendSeries, briefing, diagnostics, reports: { profitAndLoss: pnl, balanceSheet } }, { headers: { "Cache-Control": "no-store" } });
+    const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection?.companyName || null, detailReports);
+    return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), source: "quickbooks", periods: briefing.periods, trendSeries: briefing.trendSeries, briefing, diagnostics, reports: { profitAndLoss: pnl, balanceSheet, detail: detailReports } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[ClearCFO QuickBooks] Sync failed:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "QuickBooks sync failed." }, { status: 500 });
