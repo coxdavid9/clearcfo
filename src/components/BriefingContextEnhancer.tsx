@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+// The selected KPI is the lens for every briefing section below it.
 type MetricKey = "revenue" | "margin" | "cash" | "inventory";
 
 type Driver = {
