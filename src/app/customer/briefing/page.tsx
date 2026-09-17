@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Navbar from "../../../components/Navbar";
 import CFOBriefing from "../../../components/CFOBriefing";
 import FinancialTrends from "../../../components/FinancialTrends";
+import BriefingContextEnhancer from "../../../components/BriefingContextEnhancer";
 import SetupGate from "../../../components/SetupGate";
 import QuickBooksSyncAction from "../../../components/QuickBooksSyncAction";
 import QuickBooksBriefingCache from "../../../components/QuickBooksBriefingCache";
@@ -29,6 +30,7 @@ export default async function CFOBriefingPage() {
       <QuickBooksBriefingCache />
       <QuickBooksSyncAction />
       <CFOBriefing />
+      <BriefingContextEnhancer />
       <FinancialTrends />
       <QuickBooksDiagnostics />
       <Footer />
