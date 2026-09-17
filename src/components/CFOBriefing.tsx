@@ -248,34 +248,55 @@ export default function CFOBriefing() {
     return matches.slice(0, 3);
   }, [activeMetricKey, data.drivers]);
   const whatChangedItems = useMemo(() => {
-    const keywordMap: Record<string, string[]> = {
-      revenue: ["revenue", "sales", "top-line"],
-      margin: ["margin", "gross profit", "cogs", "direct cost", "pricing", "product mix"],
-      cash: ["cash", "liquidity", "working capital", "cash flow"],
-      inventory: ["inventory", "stock", "working capital"],
-    };
-    const keywords = keywordMap[activeMetricKey] || keywordMap.revenue;
-    const matchingAlerts = data.alerts.filter((alert) => {
-      const text = alert.toLowerCase();
-      return keywords.some((keyword) => text.includes(keyword));
-    }).slice(0, 3);
-
-    if (matchingAlerts.length) return matchingAlerts;
-
     const current = activeMetricDefinition.current;
     const change = activeMetricDefinition.change;
-    if (Number.isFinite(change)) {
-      const direction = change >= 0 ? "increased" : "decreased";
-      const amount = activeMetricKey === "margin"
-        ? `${Number(Math.abs(change).toFixed(1))} percentage points`
-        : `${formatPercentValue(Math.abs(change))}`;
-      const valueText = activeMetricKey === "margin" ? formatPercentValue(current) : currency.format(current);
-      return [`${activeMetric.name} is ${valueText} and ${direction} ${amount} versus the prior period.`];
+    const valueText = activeMetricKey === "margin" ? formatPercentValue(current) : currency.format(current);
+
+    if (activeMetricKey === "revenue") {
+      const items = [
+        Number.isFinite(change)
+          ? `Revenue is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(change))} versus the prior period.`
+          : `Revenue is ${valueText}; the prior-period comparison is unavailable.`,
+      ];
+      if (Number.isFinite(data.marginChange) && data.marginChange !== 0) {
+        items.push(`Gross margin changed ${Math.abs(data.marginChange).toFixed(1)} percentage points during the same period, so review whether the revenue movement is translating into gross profit.`);
+      }
+      if (Number.isFinite(data.cashChange) && data.cashChange !== 0) {
+        items.push(`Cash ${data.cashChange < 0 ? "decreased" : "increased"} ${formatPercentValue(Math.abs(data.cashChange))} during the same period; compare collections and other cash uses with the revenue growth.`);
+      }
+      return items.slice(0, 3);
     }
 
-    const valueText = activeMetricKey === "margin" ? formatPercentValue(current) : currency.format(current);
-    return [`${activeMetric.name} is ${valueText}; the prior-period comparison is unavailable, so ClearCFO is not estimating the direction or size of the change.`];
-  }, [activeMetricKey, activeMetric.name, activeMetricDefinition.current, activeMetricDefinition.change, data.alerts]);
+    if (activeMetricKey === "margin") {
+      const marginDriver = data.drivers.find((driver) => driver.category === "Margin");
+      if (marginDriver) return [marginDriver.observation, ...marginDriver.evidence.slice(0, 2)].slice(0, 3);
+      if (Number.isFinite(change)) {
+        return [`Gross margin is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${Math.abs(change).toFixed(1)} percentage points versus the prior period.`];
+      }
+      return [`Gross margin is ${valueText}; the prior-period comparison is unavailable.`];
+    }
+
+    if (activeMetricKey === "cash") {
+      const cashDriver = data.drivers.find((driver) => driver.category === "Cash");
+      const items = [
+        Number.isFinite(change)
+          ? `Cash Position is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(change))} versus the prior period.`
+          : `Cash Position is ${valueText}; the prior-period comparison is unavailable.`,
+      ];
+      if (cashDriver) items.push(cashDriver.observation);
+      if (Number.isFinite(data.inventoryChange) && data.inventoryChange !== 0) {
+        items.push(`Inventory ${data.inventoryChange > 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.inventoryChange))}; review the movement alongside cash because inventory can absorb or release working capital.`);
+      }
+      return items.slice(0, 3);
+    }
+
+    const inventoryDriver = data.drivers.find((driver) => driver.category === "Inventory");
+    if (inventoryDriver) return [inventoryDriver.observation, ...inventoryDriver.evidence.slice(0, 2)].slice(0, 3);
+    if (Number.isFinite(change)) {
+      return [`Inventory is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(change))} versus the prior period.`];
+    }
+    return [`Inventory is ${valueText}; the prior-period comparison is unavailable, so ClearCFO is not estimating the direction or size of the change.`];
+  }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.drivers, data.marginChange, data.cashChange, data.inventoryChange]);
 
   const financialDrivers = useMemo(() => {
     const current = activeMetricDefinition.current;
