@@ -4,7 +4,8 @@ import Navbar from "../../../components/Navbar";
 import CFOBriefing from "../../../components/CFOBriefing";
 import FinancialTrends from "../../../components/FinancialTrends";
 import SetupGate from "../../../components/SetupGate";
-import QuickBooksBriefingGate from "../../../components/QuickBooksBriefingGate";
+import QuickBooksSyncAction from "../../../components/QuickBooksSyncAction";
+import QuickBooksBriefingCache from "../../../components/QuickBooksBriefingCache";
 import QuickBooksDiagnostics from "../../../components/QuickBooksDiagnostics";
 import Footer from "../../../components/Footer";
 import { getAuthCookieNames, getSupabaseUser } from "../../../lib/supabase-auth";
@@ -25,10 +26,10 @@ export default async function CFOBriefingPage() {
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware />
       <SetupGate />
-      <QuickBooksBriefingGate>
-        <CFOBriefing />
-        <FinancialTrends />
-      </QuickBooksBriefingGate>
+      <QuickBooksBriefingCache />
+      <QuickBooksSyncAction />
+      <CFOBriefing />
+      <FinancialTrends />
       <QuickBooksDiagnostics />
       <Footer />
     </main>
