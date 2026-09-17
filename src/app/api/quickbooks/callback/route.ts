@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { completeQuickBooksCallback } from "../../../../lib/quickbooks";
+import { completeQuickBooksCallback } from "../../../../lib/quickbooks-company";
 
 export const runtime = "nodejs";
 
-const APP_URL = process.env.NODE_ENV === "production"
-  ? "https://theclearcfo.com"
-  : null;
+const APP_URL = process.env.NODE_ENV === "production" ? "https://theclearcfo.com" : null;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -16,13 +14,8 @@ export async function GET(request: Request) {
   const realmId = url.searchParams.get("realmId");
   const state = url.searchParams.get("state");
 
-  if (error) {
-    return NextResponse.redirect(new URL(`/customer?quickbooks=cancelled&message=${encodeURIComponent(errorDescription || error)}`, origin));
-  }
-
-  if (!code || !realmId || !state) {
-    return NextResponse.redirect(new URL("/customer?quickbooks=error&message=Missing%20QuickBooks%20authorization%20response", origin));
-  }
+  if (error) return NextResponse.redirect(new URL(`/customer?quickbooks=cancelled&message=${encodeURIComponent(errorDescription || error)}`, origin));
+  if (!code || !realmId || !state) return NextResponse.redirect(new URL("/customer?quickbooks=error&message=Missing%20QuickBooks%20authorization%20response", origin));
 
   try {
     const result = await completeQuickBooksCallback(code, realmId, state);

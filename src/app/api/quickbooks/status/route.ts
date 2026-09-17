@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getQuickBooksConnection, requireCurrentUser } from "../../../../lib/quickbooks";
+import { getQuickBooksConnection, requireCurrentUser } from "../../../../lib/quickbooks-company";
 
 export const runtime = "nodejs";
 

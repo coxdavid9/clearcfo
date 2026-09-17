@@ -7,6 +7,7 @@ export const PLANS = {
     monthlyPrice: 39,
     annualPrice: 390,
     annualSavingsPercent: 17,
+    maxBusinesses: 1,
   },
   pro: {
     key: "pro",
@@ -14,6 +15,7 @@ export const PLANS = {
     monthlyPrice: 79,
     annualPrice: 790,
     annualSavingsPercent: 17,
+    maxBusinesses: null,
   },
 } as const;
 
@@ -22,6 +24,10 @@ export type BillingInterval = "month" | "year";
 
 export function getPlanPrice(plan: PlanKey, interval: BillingInterval) {
   return interval === "year" ? PLANS[plan].annualPrice : PLANS[plan].monthlyPrice;
+}
+
+export function getMaxBusinesses(plan: PlanKey) {
+  return PLANS[plan].maxBusinesses;
 }
 
 export function getTrialDisclosure(plan: PlanKey, interval: BillingInterval) {
