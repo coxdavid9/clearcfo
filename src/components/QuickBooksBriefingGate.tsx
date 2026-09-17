@@ -2,33 +2,39 @@
 
 import { ReactNode, useEffect, useState } from "react";
 
-const SYNC_KEY = "clearcfo_qb_last_synced_at";
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
+const SYNC_KEY = "clearcfo_qb_last_synced_at";
+const DIAGNOSTICS_KEY = "clearcfo_qb_diagnostics";
 
 export default function QuickBooksBriefingGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const initialSync = window.localStorage.getItem(SYNC_KEY);
-    const startedAt = Date.now();
 
-    const check = () => {
-      if (cancelled) return;
-      const currentSync = window.localStorage.getItem(SYNC_KEY);
-      const currentCache = window.localStorage.getItem(CACHE_KEY);
-      const hasFreshSync = Boolean(currentSync && currentSync !== initialSync);
-      const timedOut = Date.now() - startedAt >= 15000;
+    const refreshBeforeReveal = async () => {
+      try {
+        const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+        const statusPayload = await statusResponse.json();
 
-      if (hasFreshSync || (!initialSync && currentCache) || timedOut) {
-        setReady(true);
-        return;
+        if (statusResponse.ok && statusPayload?.connection?.connected) {
+          const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
+          const payload = await response.json();
+
+          if (response.ok && payload?.briefing) {
+            window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload.briefing));
+            if (payload.diagnostics) window.localStorage.setItem(DIAGNOSTICS_KEY, JSON.stringify(payload.diagnostics));
+            if (payload.syncedAt) window.localStorage.setItem(SYNC_KEY, payload.syncedAt);
+          }
+        }
+      } catch {
+        // CFOBriefing will use its normal cached fallback if the live refresh fails.
+      } finally {
+        if (!cancelled) setReady(true);
       }
-
-      window.setTimeout(check, 150);
     };
 
-    check();
+    void refreshBeforeReveal();
     return () => {
       cancelled = true;
     };
