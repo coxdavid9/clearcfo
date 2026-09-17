@@ -11,7 +11,6 @@ export default function QuickBooksBriefingGate({ children }: { children: ReactNo
   useEffect(() => {
     let cancelled = false;
     const initialSync = window.localStorage.getItem(SYNC_KEY);
-    const initialCache = window.localStorage.getItem(CACHE_KEY);
     const startedAt = Date.now();
 
     const check = () => {
@@ -19,7 +18,6 @@ export default function QuickBooksBriefingGate({ children }: { children: ReactNo
       const currentSync = window.localStorage.getItem(SYNC_KEY);
       const currentCache = window.localStorage.getItem(CACHE_KEY);
       const hasFreshSync = Boolean(currentSync && currentSync !== initialSync);
-      const hasInitialData = Boolean(initialCache && currentCache);
       const timedOut = Date.now() - startedAt >= 15000;
 
       if (hasFreshSync || (!initialSync && currentCache) || timedOut) {
