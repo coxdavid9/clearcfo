@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   type BriefingData,
@@ -8,7 +8,6 @@ import {
   demoData,
   currency,
   formatPercentValue,
-  percent,
   analyzeWorkbook,
   buildDeterministicExecutiveSummary,
 } from "../lib/briefing/engine";
@@ -40,60 +39,19 @@ export default function CFOBriefing() {
   const [liveSource, setLiveSource] = useState<"demo" | "upload" | "quickbooks">("demo");
   const [hasValidAnalysis, setHasValidAnalysis] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
-  // The headline trend should describe the latest comparable period, not an
-  // empty/zero first month in a newly connected QuickBooks history.
-  const trendChange = Number.isFinite(data.revenueChange) ? data.revenueChange : Number.NaN;
   const marginBaseline = data.drivers.some((driver) => driver.id === "margin-baseline");
-
-  const trendPoints = useMemo(() => {
-    const values = data.trend.map((value) => Number(value)).filter((value) => Number.isFinite(value));
-    if (!values.length) return [];
-    const width = 720;
-    const height = 220;
-    const left = 18;
-    const right = 18;
-    const top = 22;
-    const bottom = 30;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min;
-    return data.trend.map((value, index) => {
-      const x = data.trend.length === 1 ? width / 2 : left + (index / (data.trend.length - 1)) * (width - left - right);
-      const normalized = range === 0 ? 0.5 : (value - min) / range;
-      const y = top + (1 - normalized) * (height - top - bottom);
-      return { x, y, value };
-    });
-  }, [data.trend]);
-
-  const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
-  const trendLabelIndices = useMemo(() => {
-    const last = Math.max(0, data.periods.length - 1);
-    if (last === 0) return [0];
-    return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
-  }, [data.periods.length]);
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
 
-  async function loadQuickBooksBriefing() {
+  async function loadQuickBooksBriefing(allowCachedFallback = true) {
     try {
-      const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
-      if (cachedBriefing) {
-        const cached = JSON.parse(cachedBriefing) as BriefingData;
-        if (cached?.companyName && Array.isArray(cached.alerts)) {
-          setData(cached);
-          setLiveSource("quickbooks");
-          setHasValidAnalysis(true);
-          setError("");
-          cacheAnalysisInput(cached);
-          return;
-        }
-      }
-
       const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
       const statusPayload = await statusResponse.json();
-      if (!statusResponse.ok || !statusPayload?.connection?.connected) return;
+      if (!statusResponse.ok || !statusPayload?.connection?.connected) return false;
 
       const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
       const payload = await response.json();
@@ -108,16 +66,51 @@ export default function CFOBriefing() {
       setError("");
       window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
       window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
-      if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
+      if (payload.syncedAt) {
+        window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
+        setLastSyncedAt(payload.syncedAt);
+      }
       cacheAnalysisInput(briefing);
+      return true;
     } catch (err) {
+      if (allowCachedFallback) {
+        try {
+          const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
+          if (cachedBriefing) {
+            const cached = JSON.parse(cachedBriefing) as BriefingData;
+            if (cached?.companyName && Array.isArray(cached.alerts)) {
+              setData(cached);
+              setLiveSource("quickbooks");
+              setHasValidAnalysis(true);
+              setLastSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at"));
+              setError("Live QuickBooks refresh failed, so the last saved briefing is being shown.");
+              cacheAnalysisInput(cached);
+              return false;
+            }
+          }
+        } catch {
+          // Fall through to the live error below.
+        }
+      }
       setHasValidAnalysis(false);
       setError(err instanceof Error ? err.message : "ClearCFO could not load your QuickBooks financial data.");
+      return false;
+    }
+  }
+
+  async function syncQuickBooks() {
+    if (syncing) return;
+    setSyncing(true);
+    setError("");
+    try {
+      await loadQuickBooksBriefing(false);
+    } finally {
+      setSyncing(false);
     }
   }
 
   useEffect(() => {
-    void loadQuickBooksBriefing();
+    void loadQuickBooksBriefing(true);
 
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
@@ -130,7 +123,7 @@ export default function CFOBriefing() {
         cacheAnalysisInput(briefing);
         return;
       }
-      void loadQuickBooksBriefing();
+      void loadQuickBooksBriefing(true);
     };
 
     const handleDisconnect = () => {
@@ -138,6 +131,7 @@ export default function CFOBriefing() {
       window.localStorage.removeItem("clearcfo_qb_last_synced_at");
       window.localStorage.removeItem("clearcfo_qb_initial_sync");
       window.localStorage.removeItem("clearcfo_analysis_input");
+      setLastSyncedAt(null);
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setError("");
@@ -233,6 +227,14 @@ export default function CFOBriefing() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {liveSource === "quickbooks" && (
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={syncQuickBooks} disabled={syncing} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    {syncing ? "Syncing…" : "Sync now"}
+                  </button>
+                  {lastSyncedAt && <span className="text-[10px] text-slate-400">Synced {new Date(lastSyncedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>}
+                </div>
+              )}
               <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Excel"}</button>
               <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${data.health === "strong" ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : data.health === "watch" ? "border border-amber-100 bg-amber-50 text-amber-700" : "border border-red-100 bg-red-50 text-red-700"}`}>
                 <span className={`h-2 w-2 rounded-full ${data.health === "strong" ? "bg-emerald-500" : data.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} />Business health: {data.health}
@@ -282,23 +284,9 @@ export default function CFOBriefing() {
 
           {selectedMetric && <div className="mt-6 hidden md:block">{renderMetricDetail(selectedMetric)}</div>}
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p><p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
-              <div className="relative mt-5 h-56 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
-                <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label="Revenue trend over available periods" preserveAspectRatio="none">
-                  <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
-                  {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className="text-blue-600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-                  {trendPoints.map((point, index) => <circle key={`${data.periods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className="text-blue-600"><title>{`${data.periods[index] || "Period"}: ${currency.format(point.value)}`}</title></circle>)}
-                </svg>
-              </div>
-              <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${data.periods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{data.periods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
-            </div>
-
-            <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span></div>
-              <div className="mt-4 space-y-3">{data.alerts.slice(0, 3).map((alert, index) => <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left"><p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p><p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p></div>)}{!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div>
-            </div>
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
+            <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span></div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">{data.alerts.slice(0, 3).map((alert, index) => <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left"><p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p><p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p></div>)}{!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div>
           </div>
 
           <div className="mt-10 grid gap-5 lg:grid-cols-2">
