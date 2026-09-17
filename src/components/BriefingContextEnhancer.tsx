@@ -114,7 +114,7 @@ function lensCopy(metric: MetricKey, data: BriefingData): LensCopy {
   const marginDriver = findDriver(data, ["margin-baseline", "margin-pressure"]);
 
   const sharedDrivers = {
-    opex: opexDriver?.observation || `Operating expenses changed ${revenue === "not available" ? "relative to the available period" : "versus the prior period"}.`,
+    opex: opexDriver?.observation || "The current analysis does not isolate an operating-expense driver; review expense movement alongside the selected KPI.",
     cash: cashDriver?.observation || `Cash changed ${cash} versus the prior period.`,
     inventory: inventoryDriver?.observation || inventoryChangeText(data),
     margin: marginDriver?.observation || `Gross margin changed ${margin} versus the prior period.`,
@@ -138,8 +138,8 @@ function lensCopy(metric: MetricKey, data: BriefingData): LensCopy {
         { title: "Cash conversion", text: sharedDrivers.cash, severity: cashDriver?.severity || "Watch" },
       ],
       questions: [
-        `Revenue: Is the latest sales change repeatable, and which customers or products explain it?`,
-        `Margin: What changed in direct costs or mix as revenue moved?`,
+        "Revenue: Is the latest sales change repeatable, and which customers or products explain it?",
+        "Margin: What changed in direct costs or mix as revenue moved?",
         `Cash: Why did cash move ${cash} while revenue changed ${revenue}?`,
       ],
       analysis: `Revenue is the selected lens: ${money.format(data.revenue)} (${revenue} versus the prior period). The next management question is whether the sales movement is translating into margin and cash.`,
@@ -169,8 +169,8 @@ function lensCopy(metric: MetricKey, data: BriefingData): LensCopy {
       ],
       questions: [
         `Margin: Is the ${margin} movement coming from direct costs, pricing, or product mix?`,
-        `Revenue: Which revenue changes occurred in the same period as the margin movement?`,
-        `Cash: Is the margin movement beginning to affect operating liquidity?`,
+        "Revenue: Which revenue changes occurred in the same period as the margin movement?",
+        "Cash: Is the margin movement beginning to affect operating liquidity?",
       ],
       analysis: `Gross Margin is the selected lens: ${data.grossMargin.toFixed(1)}% (${margin} versus the prior period). The focus is explaining the direct-cost movement and its effect on profit and cash.`,
     };
@@ -185,7 +185,7 @@ function lensCopy(metric: MetricKey, data: BriefingData): LensCopy {
       whatChanged: `Cash is ${money.format(data.cash)} and changed ${cash} versus the prior period. Revenue changed ${revenue}; inventory changed ${inventory}.`,
       attention: [
         { title: "Liquidity movement", text: Number.isFinite(data.cashChange) && data.cashChange < 0 ? `Cash declined ${Math.abs(data.cashChange).toFixed(1)}% versus the prior period. Determine whether the decline is temporary or recurring.` : `Cash changed ${cash} versus the prior period. Continue monitoring available liquidity against upcoming obligations.`, severity: Number.isFinite(data.cashChange) && data.cashChange < -5 ? "High" : "Watch" },
-        { title: "Operating cash pressure", text: opexDriver?.observation || "The current analysis does not isolate an operating-expense driver. Review expense movement alongside cash. ", severity: opexDriver?.severity || "Watch" },
+        { title: "Operating cash pressure", text: opexDriver?.observation || "The current analysis does not isolate an operating-expense driver. Review expense movement alongside cash.", severity: opexDriver?.severity || "Watch" },
         { title: "Working-capital pressure", text: inventoryDriver?.observation || `Inventory is ${money.format(data.inventory)} and changed ${inventory}. Review inventory and receivables before treating the cash movement as purely operating spend.`, severity: inventoryDriver?.severity || "Watch" },
       ],
       drivers: [
@@ -195,7 +195,7 @@ function lensCopy(metric: MetricKey, data: BriefingData): LensCopy {
       ],
       questions: [
         `Cash: What caused cash to change ${cash}, and which part is recurring?`,
-        `Expenses: Which operating costs are consuming the most cash right now?`,
+        "Expenses: Which operating costs are consuming the most cash right now?",
         `Working capital: Are inventory or receivables tying up cash as sales move ${revenue}?`,
       ],
       analysis: `Cash Position is the selected lens: ${money.format(data.cash)} (${cash} versus the prior period). The focus is identifying what is consuming or releasing liquidity and whether the movement is sustainable.`,
@@ -219,9 +219,9 @@ function lensCopy(metric: MetricKey, data: BriefingData): LensCopy {
       { title: "COGS and inventory conversion", text: marginDriver?.observation || "The current analysis does not isolate a separate COGS driver. Review COGS and recent purchasing against the inventory balance.", severity: marginDriver?.severity || "Watch" },
     ],
     questions: [
-      `Inventory: What caused the latest inventory movement, and is it tied to planned sales demand?`,
-      `Cash: How much liquidity is currently committed to inventory?`,
-      `COGS: Are COGS and inventory moving consistently with the sales level?`,
+      "Inventory: What caused the latest inventory movement, and is it tied to planned sales demand?",
+      "Cash: How much liquidity is currently committed to inventory?",
+      "COGS: Are COGS and inventory moving consistently with the sales level?",
     ],
     analysis: `Inventory is the selected lens: ${money.format(data.inventory)} (${Number.isFinite(data.inventoryChange) ? inventory : "no meaningful percentage comparison"}). The focus is whether inventory is supporting sales or tying up cash.`,
   };
@@ -239,11 +239,11 @@ function updateBriefing() {
   const copy = lensCopy(metric, data);
   const headings = Array.from(document.querySelectorAll<HTMLParagraphElement>("p"));
 
-  // The expanded KPI detail is rendered from the same lens as the lower briefing.
-  const detailCard = document.querySelector<HTMLElement>("div.rounded-2xl.border.border-blue-100.bg-blue-50\\/40");
+  // Find the expanded KPI detail by its unique label rather than a generated CSS class.
+  const detailLabel = headings.find((node) => node.textContent?.trim() === "KPI detail");
+  const detailCard = detailLabel?.parentElement?.parentElement;
   if (detailCard) {
     const detailColumns = Array.from(detailCard.querySelectorAll<HTMLElement>(".grid > div"));
-    const labels = ["What changed", "Context", "Why it matters"];
     const values = [copy.whatChanged, copy.context, copy.why];
     detailColumns.slice(0, 3).forEach((column, index) => {
       const paragraphs = column.querySelectorAll("p");
@@ -268,14 +268,22 @@ function updateBriefing() {
     setText(badge, `${copy.attention.length} ${copy.attention.length === 1 ? "alert" : "alerts"}`);
   }
 
-  // Lower What Changed: make each statement about the selected KPI and its closest relationships.
-  const changedHeading = headings.find((node) => node.textContent?.trim() === "What changed");
+  // Lower What Changed is the second occurrence of the heading; the first is KPI detail.
+  const changedHeadings = headings.filter((node) => node.textContent?.trim() === "What changed");
+  const changedHeading = changedHeadings[changedHeadings.length - 1];
   const changedCard = changedHeading?.parentElement?.parentElement;
-  if (changedCard) {
+  if (changedCard && changedCard !== detailCard) {
     const items = Array.from(changedCard.querySelectorAll<HTMLElement>("div.rounded-xl"));
     items.slice(0, 3).forEach((item, index) => {
-      setText(item.querySelector("p"), copy.attention[index]?.title || metricNames[metric]);
-      setText(item.querySelectorAll("p")[1], index === 0 ? copy.whatChanged : copy.attention[index]?.text || copy.whatChanged);
+      const lensItem = copy.attention[index];
+      if (!lensItem) return;
+      const paragraphs = item.querySelectorAll("p");
+      if (paragraphs.length > 1) {
+        setText(paragraphs[0], lensItem.title);
+        setText(paragraphs[1], index === 0 ? copy.whatChanged : lensItem.text);
+      } else {
+        setText(item, index === 0 ? copy.whatChanged : lensItem.text);
+      }
     });
   }
 
@@ -295,15 +303,14 @@ function updateBriefing() {
     });
   }
 
-  // Management questions should follow the same KPI lens so the page does not switch back to global drivers.
+  // Management questions follow the same KPI lens so the page does not switch back to global drivers.
   const questionsHeading = headings.find((node) => node.textContent?.trim() === "Management questions");
   const questionsCard = questionsHeading?.parentElement?.parentElement;
   if (questionsCard) {
     const items = Array.from(questionsCard.querySelectorAll<HTMLElement>("div.rounded-xl"));
     items.slice(0, 3).forEach((item, index) => {
       const question = copy.questions[index];
-      if (!question) return;
-      setText(item, question);
+      if (question) setText(item, question);
     });
   }
 
@@ -311,8 +318,7 @@ function updateBriefing() {
   const analysisLabel = headings.find((node) => node.textContent?.trim() === "AI Analysis");
   const analysisCard = analysisLabel?.parentElement?.parentElement;
   if (analysisCard) {
-    const paragraphs = analysisCard.querySelectorAll("p");
-    const summary = Array.from(paragraphs).find((paragraph) => paragraph.textContent?.includes("selected lens") || paragraph.className.includes("max-w-2xl"));
+    const summary = Array.from(analysisCard.querySelectorAll<HTMLParagraphElement>("p")).find((paragraph) => paragraph.className.includes("max-w-2xl"));
     if (summary) setText(summary, copy.analysis);
   }
 }
@@ -327,7 +333,7 @@ export default function BriefingContextEnhancer() {
     };
 
     // CFOBriefing loads QuickBooks asynchronously. Retry briefly so the lens is
-    // applied after the real data replaces the initial demo render.
+    // applied after the real data replaces the initial render.
     const retry = window.setInterval(() => {
       run();
       attempts += 1;
