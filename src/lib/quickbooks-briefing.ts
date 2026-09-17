@@ -133,7 +133,82 @@ function buildAlerts(revenueChange: number, cashChange: number, inventoryChange:
   return alerts;
 }
 
-export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null): BriefingData {
+type ManagementQuestion = { category: string; question: string };
+
+function latestNonZeroValue(values: number[]): number {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    if (Number.isFinite(values[index]) && values[index] !== 0) return values[index];
+  }
+  return 0;
+}
+
+function topReportRows(report: any, limit = 3): Array<{ label: string; value: number }> {
+  if (!report) return [];
+  const periods = reportPeriods(report);
+  if (!periods.length) return [];
+  return collectRows(report?.Rows, periods.length)
+    .filter((row) => row.type !== "Section")
+    .map((row) => ({ label: row.label, value: latestNonZeroValue(row.values) }))
+    .filter((row) => row.label && Number.isFinite(row.value) && row.value !== 0 && !/^total|^net income|^gross profit|^operating income/i.test(row.label))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+    .slice(0, limit);
+}
+
+function buildManagementQuestions(detailReports: Record<string, any>): ManagementQuestion[] {
+  const questions: ManagementQuestion[] = [];
+
+  const customers = topReportRows(detailReports.incomeByCustomer, 3);
+  const customerTotal = customers.reduce((sum, row) => sum + Math.abs(row.value), 0);
+  if (customers.length && customerTotal > 0) {
+    const top = customers[0];
+    const share = (Math.abs(top.value) / customerTotal) * 100;
+    questions.push({
+      category: "Revenue",
+      question: `Which customers are driving the current revenue mix? ${top.label} is the largest reported customer at ${currency.format(top.value)}, representing about ${share.toFixed(0)}% of the top customers returned by QuickBooks.`,
+    });
+  }
+
+  const vendors = topReportRows(detailReports.expenseByVendor, 3);
+  if (vendors.length) {
+    const top = vendors[0];
+    questions.push({
+      category: "Expenses",
+      question: `Which vendor relationships are driving spending? ${top.label} is the largest reported vendor at ${currency.format(Math.abs(top.value))}; review whether the spend is recurring, necessary, or unusually high versus prior periods.`,
+    });
+  }
+
+  const expenses = topReportRows(detailReports.profitAndLossDetail, 5)
+    .filter((row) => !/income|revenue|sales|cost of goods|gross profit/i.test(row.label));
+  if (expenses.length) {
+    const top = expenses[0];
+    questions.push({
+      category: "Profitability",
+      question: `What is driving the expense line ${top.label}? QuickBooks shows ${currency.format(Math.abs(top.value))} in the latest reported period; compare it with the prior period before deciding whether the movement is structural or temporary.`,
+    });
+  }
+
+  const receivables = topReportRows(detailReports.agedReceivables, 3);
+  if (receivables.length) {
+    const top = receivables[0];
+    questions.push({
+      category: "Cash",
+      question: `Which receivables need attention? ${top.label} is the largest customer balance returned in the aged-receivables detail at ${currency.format(Math.abs(top.value))}; review age and collection timing before relying on the balance as available cash.`,
+    });
+  }
+
+  const inventory = topReportRows(detailReports.inventoryValuation, 3);
+  if (inventory.length) {
+    const top = inventory[0];
+    questions.push({
+      category: "Inventory",
+      question: `What is tying up the most inventory cash? ${top.label} has the largest reported inventory value at ${currency.format(Math.abs(top.value))}; compare its value with recent sales velocity and aging.`,
+    });
+  }
+
+  return questions.slice(0, 5);
+}
+
+export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
   const pnlPeriods = reportPeriods(profitAndLoss);
   const pnlRows = collectRows(profitAndLoss?.Rows, pnlPeriods.length);
   if (!pnlPeriods.length) throw new Error("ClearCFO received a QuickBooks P&L report, but no reporting periods were returned.");
@@ -220,6 +295,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "upload",
     drivers,
+    managementQuestions: buildManagementQuestions(detailReports),
     relationships: drivers.map((driver) => driver.observation),
     detailDrivers: [],
     trendInsights: [],
