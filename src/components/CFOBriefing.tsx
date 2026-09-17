@@ -233,6 +233,20 @@ export default function CFOBriefing() {
     { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: !Number.isFinite(data.inventoryChange) ? "text-slate-500" : data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
   ];
   const selectedMetric = expandedMetric ? metrics.find((metric) => metric.key === expandedMetric) : null;
+  const attentionDrivers = useMemo(() => {
+    const keywordMap: Record<string, string[]> = {
+      revenue: ["revenue", "sales", "top-line"],
+      margin: ["margin", "cogs", "gross profit", "direct cost", "pricing", "product mix"],
+      cash: ["cash", "liquidity", "working capital", "cash flow"],
+      inventory: ["inventory", "stock", "working capital"]
+    };
+    const keywords = keywordMap[activeMetricKey] || keywordMap.revenue;
+    const matches = data.drivers.filter((driver) => {
+      const text = `${driver.category} ${driver.title} ${driver.observation} ${driver.evidence.join(" ")}`.toLowerCase();
+      return keywords.some((keyword) => text.includes(keyword));
+    });
+    return matches.slice(0, 3);
+  }, [activeMetricKey, data.drivers]);
 
   const renderMetricDetail = (metric: (typeof metrics)[number]) => (
     <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
@@ -325,12 +339,13 @@ export default function CFOBriefing() {
             </div>
 
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.drivers.length} {data.drivers.length === 1 ? "item" : "items"}</span></div>
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{attentionDrivers.length} {attentionDrivers.length === 1 ? "item" : "items"}</span></div>
+              <p className="mt-1 text-xs text-slate-500">Focused on {activeMetric.name}.</p>
               <div className="mt-4 space-y-3">
-                {data.drivers.length ? data.drivers.slice(0, 3).map((driver) => <div key={driver.id} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left">
+                {attentionDrivers.length ? attentionDrivers.map((driver) => <div key={driver.id} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left">
                   <div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold text-slate-900">{driver.title}</p><span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide ${driver.severity === "High" ? "text-red-600" : driver.severity === "Medium" ? "text-amber-600" : "text-slate-400"}`}>{driver.severity}</span></div>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{driver.observation}</p>
-                </div>) : <p className="text-sm text-slate-500">No major financial issues were detected.</p>}
+                </div>) : <p className="text-sm text-slate-500">No specific issues were detected for {activeMetric.name.toLowerCase()}.</p>}
               </div>
             </div>
           </div>
