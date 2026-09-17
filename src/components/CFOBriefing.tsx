@@ -255,48 +255,71 @@ export default function CFOBriefing() {
     if (activeMetricKey === "revenue") {
       const items = [
         Number.isFinite(change)
-          ? `Revenue is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(change))} versus the prior period.`
+          ? `Revenue moved from the prior period to ${valueText}, a ${change >= 0 ? "increase" : "decrease"} of ${formatPercentValue(Math.abs(change))}.`
           : `Revenue is ${valueText}; the prior-period comparison is unavailable.`,
       ];
       if (Number.isFinite(data.marginChange) && data.marginChange !== 0) {
-        items.push(`Gross margin changed ${Math.abs(data.marginChange).toFixed(1)} percentage points during the same period, so review whether the revenue movement is translating into gross profit.`);
+        items.push(`Gross margin moved ${data.marginChange >= 0 ? "up" : "down"} ${Math.abs(data.marginChange).toFixed(1)} percentage points.`);
       }
       if (Number.isFinite(data.cashChange) && data.cashChange !== 0) {
-        items.push(`Cash ${data.cashChange < 0 ? "decreased" : "increased"} ${formatPercentValue(Math.abs(data.cashChange))} during the same period; compare collections and other cash uses with the revenue growth.`);
+        items.push(`Cash moved ${data.cashChange >= 0 ? "up" : "down"} ${formatPercentValue(Math.abs(data.cashChange))}.`);
       }
       return items.slice(0, 3);
     }
 
     if (activeMetricKey === "margin") {
-      const marginDriver = data.drivers.find((driver) => driver.category === "Margin");
-      if (marginDriver) return [marginDriver.observation, ...marginDriver.evidence.slice(0, 2)].slice(0, 3);
-      if (Number.isFinite(change)) {
-        return [`Gross margin is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${Math.abs(change).toFixed(1)} percentage points versus the prior period.`];
-      }
-      return [`Gross margin is ${valueText}; the prior-period comparison is unavailable.`];
-    }
-
-    if (activeMetricKey === "cash") {
-      const cashDriver = data.drivers.find((driver) => driver.category === "Cash");
+      const grossProfit = data.revenue * data.grossMargin / 100;
+      const previousRevenue = Number.isFinite(data.revenueChange) && data.revenueChange !== -100
+        ? data.revenue / (1 + data.revenueChange / 100)
+        : NaN;
+      const previousMargin = Number.isFinite(data.marginChange) ? data.grossMargin - data.marginChange : NaN;
+      const previousGrossProfit = Number.isFinite(previousRevenue) && Number.isFinite(previousMargin)
+        ? previousRevenue * previousMargin / 100
+        : NaN;
+      const cogs = data.revenue - grossProfit;
+      const previousCogs = Number.isFinite(previousGrossProfit) ? previousRevenue - previousGrossProfit : NaN;
       const items = [
         Number.isFinite(change)
-          ? `Cash Position is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(change))} versus the prior period.`
-          : `Cash Position is ${valueText}; the prior-period comparison is unavailable.`,
+          ? `Gross margin is ${valueText}, down ${Math.abs(change).toFixed(1)} percentage points versus the prior period.`
+          : `Gross margin is ${valueText}; the prior-period comparison is unavailable.`,
       ];
-      if (cashDriver) items.push(cashDriver.observation);
-      if (Number.isFinite(data.inventoryChange) && data.inventoryChange !== 0) {
-        items.push(`Inventory ${data.inventoryChange > 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.inventoryChange))}; review the movement alongside cash because inventory can absorb or release working capital.`);
+      if (Number.isFinite(cogs) && Number.isFinite(previousCogs)) {
+        items.push(`COGS was ${currency.format(cogs)} this period versus ${currency.format(previousCogs)} in the prior period.`);
+      }
+      if (Number.isFinite(data.revenueChange) && data.revenueChange !== 0) {
+        items.push(`Revenue ${data.revenueChange >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.revenueChange))} during the same period.`);
       }
       return items.slice(0, 3);
     }
 
-    const inventoryDriver = data.drivers.find((driver) => driver.category === "Inventory");
-    if (inventoryDriver) return [inventoryDriver.observation, ...inventoryDriver.evidence.slice(0, 2)].slice(0, 3);
-    if (Number.isFinite(change)) {
-      return [`Inventory is ${valueText} and ${change >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(change))} versus the prior period.`];
+    if (activeMetricKey === "cash") {
+      const items = [
+        Number.isFinite(change)
+          ? `Cash Position is ${valueText}, ${change >= 0 ? "up" : "down"} ${formatPercentValue(Math.abs(change))} versus the prior period.`
+          : `Cash Position is ${valueText}; the prior-period comparison is unavailable.`,
+      ];
+      if (Number.isFinite(data.inventoryChange) && data.inventoryChange !== 0) {
+        items.push(`Inventory ${data.inventoryChange >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.inventoryChange))}.`);
+      }
+      if (Number.isFinite(data.revenueChange) && data.revenueChange !== 0) {
+        items.push(`Revenue ${data.revenueChange >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.revenueChange))}.`);
+      }
+      return items.slice(0, 3);
     }
-    return [`Inventory is ${valueText}; the prior-period comparison is unavailable, so ClearCFO is not estimating the direction or size of the change.`];
-  }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.drivers, data.marginChange, data.cashChange, data.inventoryChange]);
+
+    const items = [
+      Number.isFinite(change)
+        ? `Inventory is ${valueText}, ${change >= 0 ? "up" : "down"} ${formatPercentValue(Math.abs(change))} versus the prior period.`
+        : `Inventory is ${valueText}; the prior-period comparison is unavailable.`,
+    ];
+    if (Number.isFinite(data.revenueChange) && data.revenueChange !== 0) {
+      items.push(`Revenue ${data.revenueChange >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.revenueChange))}.`);
+    }
+    if (Number.isFinite(data.cashChange) && data.cashChange !== 0) {
+      items.push(`Cash ${data.cashChange >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(data.cashChange))}.`);
+    }
+    return items.slice(0, 3);
+  }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.revenue, data.grossMargin, data.revenueChange, data.marginChange, data.cashChange, data.inventoryChange]);
 
   const financialDrivers = useMemo(() => {
     const current = activeMetricDefinition.current;
