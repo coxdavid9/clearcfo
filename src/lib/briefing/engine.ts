@@ -22,6 +22,7 @@ export type BriefingData = {
   confidence: number;
   source: "demo" | "upload";
   drivers: FinancialDriver[];
+  managementQuestions?: Array<{ category: string; question: string }>;
   relationships: string[];
   detailDrivers: DetailDriver[];
   trendInsights: string[];
