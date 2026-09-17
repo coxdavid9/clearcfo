@@ -247,6 +247,19 @@ export default function CFOBriefing() {
     });
     return matches.slice(0, 3);
   }, [activeMetricKey, data.drivers]);
+  const financialDrivers = useMemo(() => {
+    const keywordMap: Record<string, string[]> = {
+      revenue: ["revenue", "sales", "top-line"],
+      margin: ["margin", "cogs", "gross profit", "direct cost", "pricing", "product mix"],
+      cash: ["cash", "liquidity", "working capital", "cash flow"],
+      inventory: ["inventory", "stock", "working capital", "purchasing"]
+    };
+    const keywords = keywordMap[activeMetricKey] || keywordMap.revenue;
+    return data.drivers.filter((driver) => {
+      const text = `${driver.category} ${driver.title} ${driver.observation} ${driver.evidence.join(" ")}`.toLowerCase();
+      return keywords.some((keyword) => text.includes(keyword));
+    });
+  }, [activeMetricKey, data.drivers]);
 
   const renderMetricDetail = (metric: (typeof metrics)[number]) => (
     <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
@@ -352,7 +365,7 @@ export default function CFOBriefing() {
 
           <div className="mt-10 grid gap-5 lg:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">What changed</p><div className="mt-4 space-y-3">{data.alerts.length ? data.alerts.map((alert, index) => <div key={`${alert}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">{alert}</div>) : <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><div className="mt-4 space-y-3">{data.drivers.length ? data.drivers.map((driver) => <div key={driver.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{driver.severity}</span></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>) : <p className="text-sm text-slate-500">No major financial drivers were detected.</p>}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Drivers affecting the selected KPI.</p><div className="mt-4 space-y-3">{financialDrivers.length ? financialDrivers.map((driver) => <div key={driver.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{driver.severity}</span></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>) : <p className="text-sm text-slate-500">No specific financial drivers were detected for {activeMetric.name.toLowerCase()}.</p>}</div></div>
           </div>
 
           <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><div className="mt-4 space-y-3">{data.drivers.map((driver) => <div key={`q-${driver.id}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{driver.category}:</span> {driver.managementQuestion}</div>)}</div></div>
