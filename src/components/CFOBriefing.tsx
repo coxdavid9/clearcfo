@@ -325,8 +325,13 @@ export default function CFOBriefing() {
             </div>
 
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span></div>
-              <div className="mt-4 space-y-3">{data.alerts.slice(0, 3).map((alert, index) => <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left"><p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p><p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p></div>)}{!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div>
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.drivers.length} {data.drivers.length === 1 ? "item" : "items"}</span></div>
+              <div className="mt-4 space-y-3">
+                {data.drivers.length ? data.drivers.slice(0, 3).map((driver) => <div key={driver.id} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left">
+                  <div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold text-slate-900">{driver.title}</p><span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide ${driver.severity === "High" ? "text-red-600" : driver.severity === "Medium" ? "text-amber-600" : "text-slate-400"}`}>{driver.severity}</span></div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{driver.observation}</p>
+                </div>) : <p className="text-sm text-slate-500">No major financial issues were detected.</p>}
+              </div>
             </div>
           </div>
 
