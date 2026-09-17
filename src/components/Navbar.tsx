@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import CompanySwitcher from "./CompanySwitcher";
 
 const navItems = [
   ["Product", "#product"],
@@ -67,6 +68,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
 
   const authenticatedAuthControl = (
     <div className="hidden items-center gap-3 sm:flex">
+      <CompanySwitcher />
       <a href="/customer/briefing" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md sm:px-5">CFO Briefing</a>
       <a href={profileHref ?? "/profile"} className="px-1 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">Account</a>
       <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:px-5">Log Out</a>
