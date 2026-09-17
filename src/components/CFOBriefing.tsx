@@ -34,6 +34,10 @@ function displayChange(value: number, metricKey?: string, currentValue?: number)
   return `${value > 0 ? "+" : ""}${formatPercentValue(value)}`;
 }
 
+function formatTrendValue(metricKey: string, value: number): string {
+  return metricKey === "margin" ? `${value.toFixed(1)}%` : currency.format(value);
+}
+
 export default function CFOBriefing() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<BriefingData>(demoData);
@@ -43,13 +47,38 @@ export default function CFOBriefing() {
   const [error, setError] = useState("");
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
-  // The headline trend should describe the latest comparable period, not an
-  // empty/zero first month in a newly connected QuickBooks history.
-  const trendChange = Number.isFinite(data.revenueChange) ? data.revenueChange : Number.NaN;
   const marginBaseline = data.drivers.some((driver) => driver.id === "margin-baseline");
+  const activeMetricKey = expandedMetric ?? "revenue";
+  const activeMetric = useMemo(() => {
+    const metricLabels: Record<string, string> = {
+      revenue: "Revenue",
+      margin: "Gross Margin",
+      cash: "Cash Position",
+      inventory: "Inventory",
+    };
+    const label = metricLabels[activeMetricKey] || "Revenue";
+    return data.trendSeries?.find((series) => series.name === label) || {
+      name: "Revenue",
+      values: data.trend,
+      periods: data.periods,
+    };
+  }, [activeMetricKey, data.trendSeries, data.trend, data.periods]);
+
+  const trendValues = activeMetric.values || [];
+  const trendPeriods = activeMetric.periods || [];
+  const activeMetricDefinition = useMemo(() => {
+    const metricsByKey = {
+      revenue: { change: data.revenueChange, current: data.revenue },
+      margin: { change: data.marginChange, current: data.grossMargin },
+      cash: { change: data.cashChange, current: data.cash },
+      inventory: { change: data.inventoryChange, current: data.inventory },
+    } as const;
+    return metricsByKey[activeMetricKey as keyof typeof metricsByKey] || metricsByKey.revenue;
+  }, [activeMetricKey, data.revenueChange, data.marginChange, data.cashChange, data.inventoryChange, data.revenue, data.grossMargin, data.cash, data.inventory]);
+  const trendChange = activeMetricDefinition.change;
 
   const trendPoints = useMemo(() => {
-    const values = data.trend.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+    const values = trendValues.map((value) => Number(value)).filter((value) => Number.isFinite(value));
     if (!values.length) return [];
     const width = 720;
     const height = 220;
@@ -60,20 +89,20 @@ export default function CFOBriefing() {
     const min = Math.min(...values);
     const max = Math.max(...values);
     const range = max - min;
-    return data.trend.map((value, index) => {
-      const x = data.trend.length === 1 ? width / 2 : left + (index / (data.trend.length - 1)) * (width - left - right);
+    return trendValues.map((value, index) => {
+      const x = trendValues.length === 1 ? width / 2 : left + (index / (trendValues.length - 1)) * (width - left - right);
       const normalized = range === 0 ? 0.5 : (value - min) / range;
       const y = top + (1 - normalized) * (height - top - bottom);
       return { x, y, value };
     });
-  }, [data.trend]);
+  }, [trendValues]);
 
   const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
   const trendLabelIndices = useMemo(() => {
-    const last = Math.max(0, data.periods.length - 1);
+    const last = Math.max(0, trendPeriods.length - 1);
     if (last === 0) return [0];
     return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
-  }, [data.periods.length]);
+  }, [trendPeriods.length]);
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
 
   async function loadQuickBooksBriefing() {
@@ -252,7 +281,7 @@ export default function CFOBriefing() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial signals</p>
-              <p className="mt-1 text-xs text-slate-500">A quick read on what is improving, changing, or needs attention.</p>
+              <p className="mt-1 text-xs text-slate-500">Click a KPI to make it the main trend.</p>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
               <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Positive</span>
@@ -284,15 +313,15 @@ export default function CFOBriefing() {
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p><p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
+              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — {activeMetric.name}</p><p className="mt-1 text-xs text-slate-500">Trailing {trendValues.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange, activeMetricKey, activeMetricDefinition.current)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
               <div className="relative mt-5 h-56 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
-                <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label="Revenue trend over available periods" preserveAspectRatio="none">
+                <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label={`${activeMetric.name} trend over available periods`} preserveAspectRatio="none">
                   <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
-                  {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className="text-blue-600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-                  {trendPoints.map((point, index) => <circle key={`${data.periods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className="text-blue-600"><title>{`${data.periods[index] || "Period"}: ${currency.format(point.value)}`}</title></circle>)}
+                  {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+                  {trendPoints.map((point, index) => <circle key={`${trendPeriods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"}><title>{`${trendPeriods[index] || "Period"}: ${formatTrendValue(activeMetricKey, point.value)}`}</title></circle>)}
                 </svg>
               </div>
-              <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${data.periods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{data.periods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
+              <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${trendPeriods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{trendPeriods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
             </div>
 
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">

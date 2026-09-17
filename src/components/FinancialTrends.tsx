@@ -142,11 +142,9 @@ export default function FinancialTrends() {
 
   const byName = new Map(series.map((item) => [item.name, item]));
   const cards = [
-    { title: "Revenue", tone: "positive" as const, chartColor: "text-blue-600" },
     { title: "Gross Margin", tone: "watch" as const, chartColor: "text-indigo-600" },
     { title: "Cash Position", tone: "positive" as const, chartColor: "text-emerald-600" },
     { title: "Inventory", tone: "watch" as const, chartColor: "text-violet-600" },
-    { title: "Operating Expenses", tone: "watch" as const, chartColor: "text-orange-500" },
   ];
 
   return (
@@ -155,13 +153,13 @@ export default function FinancialTrends() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Financial trends</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">What has changed over time?</h2>
-            <p className="mt-1 text-sm text-slate-500">See whether the latest result is part of a broader pattern across the available periods.</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">Supporting trend detail</h2>
+            <p className="mt-1 text-sm text-slate-500">The main chart above changes with the KPI you select; these supporting views keep the other trends visible.</p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Across periods</span>
         </div>
       </div>
-      <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
+      <div className="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => <div key={card.title} className="bg-white p-3 sm:p-4"><TrendCard title={card.title} series={byName.get(card.title)} tone={card.tone} chartColor={card.chartColor} /></div>)}
       </div>
       <div className="mx-5 my-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-slate-600 sm:mx-8">
