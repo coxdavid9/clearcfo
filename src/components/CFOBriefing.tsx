@@ -247,6 +247,36 @@ export default function CFOBriefing() {
     });
     return matches.slice(0, 3);
   }, [activeMetricKey, data.drivers]);
+  const whatChangedItems = useMemo(() => {
+    const keywordMap: Record<string, string[]> = {
+      revenue: ["revenue", "sales", "top-line"],
+      margin: ["margin", "gross profit", "cogs", "direct cost", "pricing", "product mix"],
+      cash: ["cash", "liquidity", "working capital", "cash flow"],
+      inventory: ["inventory", "stock", "working capital"],
+    };
+    const keywords = keywordMap[activeMetricKey] || keywordMap.revenue;
+    const matchingAlerts = data.alerts.filter((alert) => {
+      const text = alert.toLowerCase();
+      return keywords.some((keyword) => text.includes(keyword));
+    }).slice(0, 3);
+
+    if (matchingAlerts.length) return matchingAlerts;
+
+    const current = activeMetricDefinition.current;
+    const change = activeMetricDefinition.change;
+    if (Number.isFinite(change)) {
+      const direction = change >= 0 ? "increased" : "decreased";
+      const amount = activeMetricKey === "margin"
+        ? `${Number(Math.abs(change).toFixed(1))} percentage points`
+        : `${formatPercentValue(Math.abs(change))}`;
+      const valueText = activeMetricKey === "margin" ? formatPercentValue(current) : currency.format(current);
+      return [`${activeMetric.name} is ${valueText} and ${direction} ${amount} versus the prior period.`];
+    }
+
+    const valueText = activeMetricKey === "margin" ? formatPercentValue(current) : currency.format(current);
+    return [`${activeMetric.name} is ${valueText}; the prior-period comparison is unavailable, so ClearCFO is not estimating the direction or size of the change.`];
+  }, [activeMetricKey, activeMetric.name, activeMetricDefinition.current, activeMetricDefinition.change, data.alerts]);
+
   const financialDrivers = useMemo(() => {
     const current = activeMetricDefinition.current;
     const change = activeMetricDefinition.change;
@@ -381,7 +411,7 @@ export default function CFOBriefing() {
           </div>
 
           <div className="mt-10 grid gap-5 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">What changed</p><div className="mt-4 space-y-3">{data.alerts.length ? data.alerts.map((alert, index) => <div key={`${alert}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">{alert}</div>) : <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">What changed</p><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Changes specific to the selected KPI.</p><div className="mt-4 space-y-3">{whatChangedItems.map((item, index) => <div key={`${item}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">{item}</div>)}</div></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p><span className={`text-xs font-semibold uppercase tracking-wide ${driver.severity === "High" ? "text-red-600" : driver.severity === "Medium" ? "text-amber-600" : "text-slate-400"}`}>{driver.severity}</span></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
           </div>
 
