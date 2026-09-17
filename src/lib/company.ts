@@ -34,22 +34,21 @@ async function supabaseRequest(path: string, init: RequestInit = {}) {
   const { url, serviceRoleKey } = config();
   return fetch(`${url}/rest/v1/${path}`, {
     ...init,
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-      ...(init.headers || {}),
-    },
+    headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json", ...(init.headers || {}) },
     cache: "no-store",
   });
 }
 
-async function currentUserId() {
+async function currentUser() {
   const cookieStore = await cookies();
   const { AUTH_COOKIE } = getAuthCookieNames();
   const token = cookieStore.get(AUTH_COOKIE)?.value;
   if (!token) return null;
-  const user = await getSupabaseUser(token);
+  return getSupabaseUser(token);
+}
+
+async function currentUserId() {
+  const user = await currentUser();
   return user?.id || null;
 }
 
@@ -67,22 +66,48 @@ export async function listUserCompanies(userId: string): Promise<Membership[]> {
   return await response.json() as Membership[];
 }
 
+async function createInitialCompany(userId: string) {
+  const user = await currentUser();
+  const metadata = user?.user_metadata || {};
+  const response = await supabaseRequest("companies", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      name: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName.trim().slice(0, 200) : "My Business",
+      industry: typeof metadata.industry === "string" && metadata.industry.trim() ? metadata.industry.trim().slice(0, 200) : null,
+      company_size: typeof metadata.companySize === "string" && metadata.companySize.trim() ? metadata.companySize.trim().slice(0, 200) : null,
+      contact_phone: typeof metadata.contactPhone === "string" && metadata.contactPhone.trim() ? metadata.contactPhone.trim().slice(0, 200) : null,
+      created_by: userId,
+    }),
+  });
+  if (!response.ok) throw new Error(`Could not create initial business (${response.status}).`);
+  const companies = await response.json() as Company[];
+  const company = companies[0];
+  if (!company) throw new Error("Initial business was not created.");
+
+  const membershipResponse = await supabaseRequest("company_memberships", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ company_id: company.id, user_id: userId, role: "owner" }),
+  });
+  if (!membershipResponse.ok) throw new Error(`Could not create initial business membership (${membershipResponse.status}).`);
+  return company;
+}
+
 export async function getActiveCompany(userId: string): Promise<Company | null> {
-  const memberships = await listUserCompanies(userId);
-  if (!memberships.length) return null;
+  let memberships = await listUserCompanies(userId);
+  if (!memberships.length) {
+    const company = await createInitialCompany(userId);
+    memberships = await listUserCompanies(userId);
+    if (!memberships.length) return company;
+  }
 
   const cookieStore = await cookies();
   const requestedId = cookieStore.get(ACTIVE_COMPANY_COOKIE)?.value;
   const active = memberships.find((membership) => membership.company_id === requestedId) || memberships[0];
 
   if (requestedId !== active.company_id) {
-    cookieStore.set(ACTIVE_COMPANY_COOKIE, active.company_id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    cookieStore.set(ACTIVE_COMPANY_COOKIE, active.company_id, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
   }
 
   return active.company;
@@ -97,32 +122,17 @@ export async function setActiveCompany(userId: string, companyId: string) {
   if (!rows.length) throw new Error("You do not have access to that business.");
 
   const cookieStore = await cookies();
-  cookieStore.set(ACTIVE_COMPANY_COOKIE, companyId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  cookieStore.set(ACTIVE_COMPANY_COOKIE, companyId, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
 }
 
-export async function createCompany(
-  userId: string,
-  input: { name: string; industry?: string; companySize?: string; contactPhone?: string }
-) {
+export async function createCompany(userId: string, input: { name: string; industry?: string; companySize?: string; contactPhone?: string }) {
   const name = input.name.trim().slice(0, 200);
   if (!name) throw new Error("Business name is required.");
 
   const createResponse = await supabaseRequest("companies", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify({
-      name,
-      industry: input.industry?.trim().slice(0, 200) || null,
-      company_size: input.companySize?.trim().slice(0, 200) || null,
-      contact_phone: input.contactPhone?.trim().slice(0, 200) || null,
-      created_by: userId,
-    }),
+    body: JSON.stringify({ name, industry: input.industry?.trim().slice(0, 200) || null, company_size: input.companySize?.trim().slice(0, 200) || null, contact_phone: input.contactPhone?.trim().slice(0, 200) || null, created_by: userId }),
   });
   if (!createResponse.ok) throw new Error(`Could not create business (${createResponse.status}).`);
   const companies = await createResponse.json() as Company[];
@@ -130,12 +140,9 @@ export async function createCompany(
   if (!company) throw new Error("Business was not created.");
 
   const membershipResponse = await supabaseRequest("company_memberships", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ company_id: company.id, user_id: userId, role: "owner" }),
+    method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ company_id: company.id, user_id: userId, role: "owner" }),
   });
   if (!membershipResponse.ok) throw new Error(`Could not create business membership (${membershipResponse.status}).`);
-
   await setActiveCompany(userId, company.id);
   return company;
 }
