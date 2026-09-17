@@ -210,6 +210,33 @@ export default function CFOBriefing() {
     </div>
   );
 
+  const trendChange = Number.isFinite(data.revenueChange) ? data.revenueChange : Number.NaN;
+  const trendPoints = (() => {
+    const values = data.trend.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+    if (!values.length) return [];
+    const width = 720;
+    const height = 220;
+    const left = 18;
+    const right = 18;
+    const top = 22;
+    const bottom = 30;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    return values.map((value, index) => {
+      const x = values.length === 1 ? width / 2 : left + (index / (values.length - 1)) * (width - left - right);
+      const normalized = range === 0 ? 0.5 : (value - min) / range;
+      const y = top + (1 - normalized) * (height - top - bottom);
+      return { x, y, value };
+    });
+  })();
+  const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const trendLabelIndices = (() => {
+    const last = Math.max(0, data.periods.length - 1);
+    if (last === 0) return [0];
+    return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
+  })();
+
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
@@ -284,9 +311,23 @@ export default function CFOBriefing() {
 
           {selectedMetric && <div className="mt-6 hidden md:block">{renderMetricDetail(selectedMetric)}</div>}
 
-          <div className="mt-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
-            <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span></div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">{data.alerts.slice(0, 3).map((alert, index) => <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left"><p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p><p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p></div>)}{!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div>
+          <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+              <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900">KPI trend — Revenue performance</p><p className="mt-1 text-xs text-slate-500">Trailing {data.trend.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
+              <div className="relative mt-5 h-56 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
+                <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label="Revenue trend over available periods" preserveAspectRatio="none">
+                  <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
+                  {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className="text-blue-600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+                  {trendPoints.map((point, index) => <circle key={`${data.periods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className="text-blue-600"><title>{`${data.periods[index] || "Period"}: ${currency.format(point.value)}`}</title></circle>)}
+                </svg>
+              </div>
+              <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${data.periods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{data.periods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm sm:p-7">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">What needs attention</p><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">{data.attention} {data.attention === 1 ? "alert" : "alerts"}</span></div>
+              <div className="mt-4 space-y-3">{data.alerts.slice(0, 3).map((alert, index) => <div key={`${alert}-${index}`} className="w-full rounded-xl border border-amber-100 bg-white/80 p-3 text-left"><p className="text-xs font-semibold text-slate-900">{index === 0 ? "Priority exception" : "Detected variance"}</p><p className="mt-1 text-xs leading-5 text-slate-500">{alert}</p></div>)}{!data.alerts.length && <p className="text-sm text-slate-500">No major exceptions were detected.</p>}</div>
+            </div>
           </div>
 
           <div className="mt-10 grid gap-5 lg:grid-cols-2">
