@@ -142,6 +142,7 @@ export default function FinancialTrends() {
 
   const byName = new Map(series.map((item) => [item.name, item]));
   const cards = [
+    { title: "Revenue", tone: "positive" as const, chartColor: "text-blue-600" },
     { title: "Gross Margin", tone: "watch" as const, chartColor: "text-indigo-600" },
     { title: "Cash Position", tone: "positive" as const, chartColor: "text-emerald-600" },
     { title: "Inventory", tone: "watch" as const, chartColor: "text-violet-600" },

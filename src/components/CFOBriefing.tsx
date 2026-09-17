@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   type BriefingData,
@@ -8,6 +8,7 @@ import {
   demoData,
   currency,
   formatPercentValue,
+  percent,
   analyzeWorkbook,
   buildDeterministicExecutiveSummary,
 } from "../lib/briefing/engine";
@@ -39,19 +40,60 @@ export default function CFOBriefing() {
   const [liveSource, setLiveSource] = useState<"demo" | "upload" | "quickbooks">("demo");
   const [hasValidAnalysis, setHasValidAnalysis] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
+  // The headline trend should describe the latest comparable period, not an
+  // empty/zero first month in a newly connected QuickBooks history.
+  const trendChange = Number.isFinite(data.revenueChange) ? data.revenueChange : Number.NaN;
   const marginBaseline = data.drivers.some((driver) => driver.id === "margin-baseline");
+
+  const trendPoints = useMemo(() => {
+    const values = data.trend.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+    if (!values.length) return [];
+    const width = 720;
+    const height = 220;
+    const left = 18;
+    const right = 18;
+    const top = 22;
+    const bottom = 30;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    return data.trend.map((value, index) => {
+      const x = data.trend.length === 1 ? width / 2 : left + (index / (data.trend.length - 1)) * (width - left - right);
+      const normalized = range === 0 ? 0.5 : (value - min) / range;
+      const y = top + (1 - normalized) * (height - top - bottom);
+      return { x, y, value };
+    });
+  }, [data.trend]);
+
+  const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const trendLabelIndices = useMemo(() => {
+    const last = Math.max(0, data.periods.length - 1);
+    if (last === 0) return [0];
+    return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
+  }, [data.periods.length]);
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
 
-  async function loadQuickBooksBriefing(allowCachedFallback = true) {
+  async function loadQuickBooksBriefing() {
     try {
+      const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
+      if (cachedBriefing) {
+        const cached = JSON.parse(cachedBriefing) as BriefingData;
+        if (cached?.companyName && Array.isArray(cached.alerts)) {
+          setData(cached);
+          setLiveSource("quickbooks");
+          setHasValidAnalysis(true);
+          setError("");
+          cacheAnalysisInput(cached);
+          return;
+        }
+      }
+
       const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
       const statusPayload = await statusResponse.json();
-      if (!statusResponse.ok || !statusPayload?.connection?.connected) return false;
+      if (!statusResponse.ok || !statusPayload?.connection?.connected) return;
 
       const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
       const payload = await response.json();
@@ -66,51 +108,16 @@ export default function CFOBriefing() {
       setError("");
       window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
       window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
-      if (payload.syncedAt) {
-        window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
-        setLastSyncedAt(payload.syncedAt);
-      }
+      if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
       cacheAnalysisInput(briefing);
-      return true;
     } catch (err) {
-      if (allowCachedFallback) {
-        try {
-          const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
-          if (cachedBriefing) {
-            const cached = JSON.parse(cachedBriefing) as BriefingData;
-            if (cached?.companyName && Array.isArray(cached.alerts)) {
-              setData(cached);
-              setLiveSource("quickbooks");
-              setHasValidAnalysis(true);
-              setLastSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at"));
-              setError("Live QuickBooks refresh failed, so the last saved briefing is being shown.");
-              cacheAnalysisInput(cached);
-              return false;
-            }
-          }
-        } catch {
-          // Fall through to the live error below.
-        }
-      }
       setHasValidAnalysis(false);
       setError(err instanceof Error ? err.message : "ClearCFO could not load your QuickBooks financial data.");
-      return false;
-    }
-  }
-
-  async function syncQuickBooks() {
-    if (syncing) return;
-    setSyncing(true);
-    setError("");
-    try {
-      await loadQuickBooksBriefing(false);
-    } finally {
-      setSyncing(false);
     }
   }
 
   useEffect(() => {
-    void loadQuickBooksBriefing(true);
+    void loadQuickBooksBriefing();
 
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
@@ -123,7 +130,7 @@ export default function CFOBriefing() {
         cacheAnalysisInput(briefing);
         return;
       }
-      void loadQuickBooksBriefing(true);
+      void loadQuickBooksBriefing();
     };
 
     const handleDisconnect = () => {
@@ -131,7 +138,6 @@ export default function CFOBriefing() {
       window.localStorage.removeItem("clearcfo_qb_last_synced_at");
       window.localStorage.removeItem("clearcfo_qb_initial_sync");
       window.localStorage.removeItem("clearcfo_analysis_input");
-      setLastSyncedAt(null);
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setError("");
@@ -210,33 +216,6 @@ export default function CFOBriefing() {
     </div>
   );
 
-  const trendChange = Number.isFinite(data.revenueChange) ? data.revenueChange : Number.NaN;
-  const trendPoints = (() => {
-    const values = data.trend.map((value) => Number(value)).filter((value) => Number.isFinite(value));
-    if (!values.length) return [];
-    const width = 720;
-    const height = 220;
-    const left = 18;
-    const right = 18;
-    const top = 22;
-    const bottom = 30;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min;
-    return values.map((value, index) => {
-      const x = values.length === 1 ? width / 2 : left + (index / (values.length - 1)) * (width - left - right);
-      const normalized = range === 0 ? 0.5 : (value - min) / range;
-      const y = top + (1 - normalized) * (height - top - bottom);
-      return { x, y, value };
-    });
-  })();
-  const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
-  const trendLabelIndices = (() => {
-    const last = Math.max(0, data.periods.length - 1);
-    if (last === 0) return [0];
-    return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
-  })();
-
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
@@ -254,14 +233,6 @@ export default function CFOBriefing() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {liveSource === "quickbooks" && (
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={syncQuickBooks} disabled={syncing} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-                    {syncing ? "Syncing…" : "Sync now"}
-                  </button>
-                  {lastSyncedAt && <span className="text-[10px] text-slate-400">Synced {new Date(lastSyncedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>}
-                </div>
-              )}
               <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Excel"}</button>
               <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${data.health === "strong" ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : data.health === "watch" ? "border border-amber-100 bg-amber-50 text-amber-700" : "border border-red-100 bg-red-50 text-red-700"}`}>
                 <span className={`h-2 w-2 rounded-full ${data.health === "strong" ? "bg-emerald-500" : data.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} />Business health: {data.health}
