@@ -102,7 +102,8 @@ export async function GET() {
     if (!reportHasFinancialValues(pnl)) throw new Error("QuickBooks is connected, but no financial activity was returned for the selected period.");
 
     const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection?.companyName || null, detailReports);
-    return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), source: "quickbooks", companyId: connection?.companyId || null, periods: briefing.periods, trendSeries: briefing.trendSeries, briefing, diagnostics, reports: { profitAndLoss: pnl, balanceSheet, detail: detailReports } }, { headers: { "Cache-Control": "no-store" } });
+    // Raw reports are not consumed by the client and can be megabytes of JSON. Keep the diagnostics summary, which is the inspectable record.
+    return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), source: "quickbooks", companyId: connection?.companyId || null, periods: briefing.periods, trendSeries: briefing.trendSeries, briefing, diagnostics }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[ClearCFO QuickBooks] Sync failed:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "QuickBooks sync failed." }, { status: 500 });
