@@ -415,16 +415,6 @@ export default function CFOBriefing() {
     return driverMap[activeMetricKey] || driverMap.revenue;
   }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change]);
 
-  if (!hasValidAnalysis) {
-    return (
-      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
-        {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
-        <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
-      </div>
-    );
-  }
-
   const renderMetricDetail = (metric: (typeof metrics)[number]) => (
     <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">KPI detail</p><h3 className="mt-1 text-lg font-bold text-slate-900">{metric.label}</h3></div><button type="button" onClick={() => setExpandedMetric(null)} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition-colors hover:bg-white hover:text-blue-600">Close</button></div>
