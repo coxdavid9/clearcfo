@@ -1,4 +1,5 @@
-import type { BriefingData, FinancialDriver } from "./briefing/engine";
+import type { BriefingData, FinancialDriver, DetailDriver } from "./briefing/engine";
+import { currency } from "./briefing/engine";
 
 type Series = { name: string; values: number[]; periods: string[] };
 type ReportNode = { label: string; values: number[]; group: string; type: string };
