@@ -8,6 +8,10 @@ const AI_CACHE_KEY = "clearcfo_qb_ai_analysis_cache";
 
 type Props = { enabled?: boolean };
 
+function briefingSignature(briefing: BriefingData): string {
+  return JSON.stringify({ revenue: briefing.revenue, revenueChange: briefing.revenueChange, margin: briefing.grossMargin, marginChange: briefing.marginChange, cash: briefing.cash, cashChange: briefing.cashChange, inventory: briefing.inventory, inventoryChange: briefing.inventoryChange, operatingExpense: briefing.operatingExpense, previousOperatingExpense: briefing.previousOperatingExpense, drivers: briefing.drivers, detailDrivers: briefing.detailDrivers, relationships: briefing.relationships, unknowns: briefing.unknowns, trend: briefing.trend, periods: briefing.periods });
+}
+
 function normalizePercentageText(value: string): string {
   return value.replace(/(-?\d+)\.0%\b/g, "$1%");
 }
@@ -43,7 +47,11 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
           if (parsed?.companyName && Array.isArray(parsed.alerts)) setBriefing(parsed);
         }
         const cachedAnalysis = window.localStorage.getItem(AI_CACHE_KEY);
-        if (cachedAnalysis) setAnalysis(normalizeAnalysis(JSON.parse(cachedAnalysis) as AIAnalysis));
+        const cachedSignature = window.localStorage.getItem(`${AI_CACHE_KEY}_signature`);
+        if (cachedAnalysis && cachedSignature && cachedBriefing) {
+          const parsedBriefing = JSON.parse(cachedBriefing) as BriefingData;
+          if (cachedSignature === briefingSignature(parsedBriefing)) setAnalysis(normalizeAnalysis(JSON.parse(cachedAnalysis) as AIAnalysis));
+        }
       } catch {
         // Ignore malformed local cache and allow a fresh analysis.
       }
@@ -58,6 +66,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         setError("");
         setExpanded(false);
         window.localStorage.removeItem(AI_CACHE_KEY);
+        window.localStorage.removeItem(`${AI_CACHE_KEY}_signature`);
       } else {
         loadCache();
       }
@@ -83,6 +92,8 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         cashChange: briefing.cashChange,
         inventory: briefing.inventory,
         inventoryChange: briefing.inventoryChange,
+        operatingExpense: briefing.operatingExpense,
+        previousOperatingExpense: briefing.previousOperatingExpense,
       },
       detectedIssues: briefing.alerts,
       financialDrivers: briefing.drivers,
@@ -121,6 +132,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
           const nextAnalysis = normalizeAnalysis(payload.analysis as AIAnalysis);
           setAnalysis(nextAnalysis);
           window.localStorage.setItem(AI_CACHE_KEY, JSON.stringify(nextAnalysis));
+          window.localStorage.setItem(`${AI_CACHE_KEY}_signature`, briefingSignature(briefing));
           return;
         } catch (err) {
           lastError = err instanceof Error ? err.message : "ClearCFO could not reach the AI analysis service.";
