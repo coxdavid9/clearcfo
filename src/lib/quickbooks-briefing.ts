@@ -1,4 +1,4 @@
-import type { BriefingData, FinancialDriver, FinancialRatio, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
+import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
 import { currency } from "./briefing/engine";
 
 type Series = { name: string; values: number[]; periods: string[] };
@@ -557,7 +557,58 @@ function buildManagementQuestions(
   return questions.slice(0, 5);
 }
 
-export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
+export // Indirect-method operating cash flow bridge for the latest synced period.
+// Starts from net income and adjusts for working-capital changes. The
+// "other operating changes" line is the plug that reconciles the bridge to
+// the reported change in cash — it is labeled as such, never hidden.
+function buildCashFlow(args: {
+  pnlRows: ReportNode[];
+  pnlPeriods: string[];
+  currentLabel: string;
+  balanceRows: ReportNode[];
+  balancePeriods: string[];
+  previousLabel: string | null;
+  currentCash: number;
+  previousCash: number;
+  cashKnown: boolean;
+}): { bridge: CashFlowBridge | null; unknowns: string[] } {
+  const unknowns: string[] = [];
+  const { pnlRows, pnlPeriods, currentLabel, balanceRows, balancePeriods, previousLabel, currentCash, previousCash, cashKnown } = args;
+  const netRow = pnlRows.find((row) => row.type === "Section" && clean(row.label) === "net income");
+  const netSeries = netRow ? netRow.values : pickSeries(pnlRows, [/^netincome$/], [/^net income$/], pnlPeriods.length);
+  const netByLabel = new Map<string, number>();
+  if (netSeries) pnlPeriods.forEach((label, index) => { if (Number.isFinite(netSeries[index])) netByLabel.set(label, netSeries[index]); });
+  const netIncome = netByLabel.get(currentLabel);
+  if (netIncome === undefined) {
+    unknowns.push("QuickBooks did not return a net income figure, so ClearCFO could not build the cash flow bridge.");
+    return { bridge: null, unknowns };
+  }
+  const point = (labels: RegExp[]) => balancePoint(balanceRows, balancePeriods, [], labels, currentLabel, previousLabel);
+  const receivables = point([/^accounts receivable$/, /^total accounts receivable$/]);
+  const payables = point([/^accounts payable$/, /^total accounts payable$/]);
+  const inventoryPt = point([/^inventory asset$/, /^inventory$/, /^total inventory asset$/, /^total inventory$/]);
+  const lines: CashFlowLine[] = [{ label: "Net income", value: netIncome }];
+  const both = (p: BalancePoint) => p.hasCurrent && p.hasPrevious;
+  if (both(receivables)) {
+    const delta = receivables.current - receivables.previous;
+    lines.push({ label: delta >= 0 ? "Increase in accounts receivable" : "Decrease in accounts receivable", value: -delta });
+  }
+  if (both(inventoryPt)) {
+    const delta = inventoryPt.current - inventoryPt.previous;
+    lines.push({ label: delta >= 0 ? "Increase in inventory" : "Decrease in inventory", value: -delta });
+  }
+  if (both(payables)) {
+    const delta = payables.current - payables.previous;
+    lines.push({ label: delta >= 0 ? "Increase in accounts payable" : "Decrease in accounts payable", value: delta });
+  }
+  const cashChange = cashKnown ? currentCash - previousCash : null;
+  const subtotal = lines.reduce((sum, line) => sum + line.value, 0);
+  if (cashChange !== null) lines.push({ label: "Other operating changes", value: cashChange - subtotal });
+  const operatingCashFlow = lines.reduce((sum, line) => sum + line.value, 0);
+  return { bridge: { lines, operatingCashFlow, cashChange }, unknowns };
+}
+
+function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
   const pnlPeriods = reportPeriods(profitAndLoss);
   const pnlRows = collectRows(profitAndLoss?.Rows, pnlPeriods.length);
   if (!pnlPeriods.length) throw new Error("ClearCFO received a QuickBooks P&L report, but no reporting periods were returned.");
@@ -629,6 +680,17 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     operatingExpense: currentExpense,
     inventory: Number.isFinite(inventoryAligned[current]) ? inventoryAligned[current] : Number.NaN,
   });
+  const cashFlowResult = buildCashFlow({
+    pnlRows,
+    pnlPeriods,
+    currentLabel: activePeriods[current],
+    balanceRows,
+    balancePeriods,
+    previousLabel: previous >= 0 ? activePeriods[previous] : null,
+    currentCash,
+    previousCash,
+    cashKnown: Number.isFinite(cashAligned[current]) && (previous < 0 || Number.isFinite(cashAligned[previous])),
+  });
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
   const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);
@@ -672,7 +734,9 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     trendSeries,
     mtdComparison: buildDayMatchedComparison(detailReports.mtdCurrent, detailReports.mtdPrevious),
     ratios: ratioResult.ratios,
+    cashFlow: cashFlowResult.bridge,
     unknowns: [
+      ...cashFlowResult.unknowns,
       ...ratioResult.unknowns,
       ...(cashSeries ? [] : ["QuickBooks did not return a cash balance series for the requested periods."]),
       ...(inventory ? [] : ["QuickBooks did not return an inventory balance series for the requested periods."]),
