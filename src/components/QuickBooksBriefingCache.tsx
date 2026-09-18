@@ -17,6 +17,7 @@ function evictCache() {
   window.localStorage.removeItem(CACHE_KEY);
   window.localStorage.removeItem(DIAGNOSTICS_KEY);
   window.localStorage.removeItem(SYNC_KEY);
+  window.localStorage.removeItem("clearcfo_qb_cache_company_id");
 }
 
 export default function QuickBooksBriefingCache() {
