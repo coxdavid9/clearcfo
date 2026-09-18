@@ -103,10 +103,10 @@ function latestPopulatedIndex(series: number[][]): number {
   return -1;
 }
 
-function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number): FinancialDriver[] {
+function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
   if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2) {
-    drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
+    drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Operating expense dollars: ${Math.round(previousExpense).toLocaleString()} to ${Math.round(currentExpense).toLocaleString()} (${currentExpense - previousExpense >= 0 ? "+" : ""}${Math.round(currentExpense - previousExpense).toLocaleString()})`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
   }
   if (Number.isFinite(cashChange) && cashChange < -5) {
     drivers.push({ id: "cash-pressure", category: "Cash", title: "Cash is under pressure", observation: `Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`, evidence: [`Cash change: ${formatPercent(cashChange)}`], direction: "down", severity: cashChange < -15 ? "High" : "Medium", impact: 5, confidence: 0.94, managementQuestion: "What near-term cash commitments could create additional pressure?" });
@@ -116,7 +116,7 @@ function buildDrivers(revenueChange: number, marginChange: number, cashChange: n
   }
   if (Number.isFinite(marginChange) && marginChange < -2) {
     if ((previousCogs || 0) === 0 && (currentCogs || 0) > 0) {
-      drivers.push({ id: "margin-baseline", category: "Margin", title: "COGS appeared this period after none in the prior period", observation: `COGS of $${Math.round(currentCogs).toLocaleString()} was recorded this period versus $0 in the prior period, which accounts for the margin change.`, evidence: [`Current COGS: $${Math.round(currentCogs).toLocaleString()}`, `Prior COGS: $0`], direction: "down", severity: "Medium", impact: 2, confidence: 0.88, managementQuestion: "Is all prior-period COGS now recorded, or is more still to come?" });
+      drivers.push({ id: "margin-baseline", category: "Margin", title: "COGS appeared this period after none in the prior period", observation: `COGS of ${Math.round(currentCogs).toLocaleString()} was recorded this period versus $0 in the prior period. That change coincides with the margin movement, but the prior-period baseline should be validated before treating it as a recurring margin driver.`, evidence: [`Current COGS: $${Math.round(currentCogs).toLocaleString()}`, `Prior COGS: $0`], direction: "down", severity: "Medium", impact: 2, confidence: 0.88, managementQuestion: "Was prior-period COGS omitted, or is this the beginning of a recurring COGS pattern?" });
     } else {
       drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercent(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercent(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
     }
@@ -419,7 +419,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const expenseChange = previous >= 0 ? changePercent(currentExpense, previousExpense) : Number.NaN;
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
-  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue);
+  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
 
   const trendSeries: Series[] = [
