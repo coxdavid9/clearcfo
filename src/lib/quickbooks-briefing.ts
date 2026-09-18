@@ -557,7 +557,7 @@ function buildManagementQuestions(
   return questions.slice(0, 5);
 }
 
-export // Indirect-method operating cash flow bridge for the latest synced period.
+// Indirect-method operating cash flow bridge for the latest synced period.
 // Starts from net income and adjusts for working-capital changes. The
 // "other operating changes" line is the plug that reconciles the bridge to
 // the reported change in cash — it is labeled as such, never hidden.
@@ -608,7 +608,7 @@ function buildCashFlow(args: {
   return { bridge: { lines, operatingCashFlow, cashChange }, unknowns };
 }
 
-function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
+export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
   const pnlPeriods = reportPeriods(profitAndLoss);
   const pnlRows = collectRows(profitAndLoss?.Rows, pnlPeriods.length);
   if (!pnlPeriods.length) throw new Error("ClearCFO received a QuickBooks P&L report, but no reporting periods were returned.");
