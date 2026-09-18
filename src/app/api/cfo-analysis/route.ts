@@ -44,6 +44,8 @@ const instructions = [
   "Use financialDrivers as the primary evidence hierarchy, detailDrivers as the account-level layer, and multiPeriodInsights and trendSeries as historical-pattern evidence.",
   "Name the strongest supported financial driver first and include 2 to 4 concrete evidence points directly supported by the supplied facts.",
   "Distinguish persistent patterns from one-period variances. Do not treat a trend as proof of causation.",
+  "When a prior-period value is zero or unusually small, do not use the resulting percentage change as the main measure of importance. State the dollar movement and the starting/ending values instead; a very large percentage from a small baseline is not by itself evidence of a major business risk.",
+  "For COGS, expenses, revenue, cash, or inventory that move from $0 to a positive amount, treat the change as a baseline/data-completeness question. Do not say the change explains a margin or cash outcome unless the supplied data establishes that relationship.",
   "Use calibrated language such as suggests, is consistent with, may contribute to, or warrants investigation.",
   "Recommendations must remain within the evidence. Do not invent numerical targets, arbitrary deadlines, guaranteed savings, or specific operational mandates.",
   "If inventory is rising relative to revenue and detailed SKU or aging information is unavailable, recommend reviewing inventory aging, purchasing cadence, demand support, and slow-moving stock.",
