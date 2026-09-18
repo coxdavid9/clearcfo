@@ -1,4 +1,4 @@
-import type { BriefingData, FinancialDriver, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
+import type { BriefingData, FinancialDriver, FinancialRatio, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
 import { currency } from "./briefing/engine";
 
 type Series = { name: string; values: number[]; periods: string[] };
@@ -390,6 +390,81 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
   return { drivers, details, relationships, unknowns };
 }
 
+// Balance-sheet point-in-time value aligned to a P&L period label. Periods
+// with no balance-sheet value are reported as missing, never as zero.
+type BalancePoint = { current: number; previous: number; hasCurrent: boolean; hasPrevious: boolean };
+
+function balancePoint(balanceRows: ReportNode[], balancePeriods: string[], groupPatterns: RegExp[], labelPatterns: RegExp[], currentLabel: string, previousLabel: string | null): BalancePoint {
+  const series = balancePeriods.length ? pickSeries(balanceRows, groupPatterns, labelPatterns, balancePeriods.length) : null;
+  const byLabel = new Map<string, number>();
+  if (series) balancePeriods.forEach((label, index) => { if (Number.isFinite(series[index])) byLabel.set(label, series[index]); });
+  const current = byLabel.get(currentLabel);
+  const previous = previousLabel ? byLabel.get(previousLabel) : undefined;
+  return { current: current ?? 0, previous: previous ?? 0, hasCurrent: current !== undefined, hasPrevious: previous !== undefined };
+}
+
+// Deterministic balance-sheet health ratios for the latest synced period.
+// Day-count ratios assume monthly reporting periods. Ratios whose inputs
+// are unavailable are skipped, never fabricated.
+function buildRatios(args: {
+  balanceRows: ReportNode[];
+  balancePeriods: string[];
+  currentLabel: string;
+  previousLabel: string | null;
+  revenue: number;
+  cogs: number;
+  operatingExpense: number;
+  inventory: number;
+}): { ratios: FinancialRatio[]; unknowns: string[] } {
+  const ratios: FinancialRatio[] = [];
+  const unknowns: string[] = [];
+  const { balanceRows, balancePeriods, currentLabel, previousLabel, revenue, cogs, operatingExpense, inventory } = args;
+  const point = (groups: RegExp[], labels: RegExp[]) => balancePoint(balanceRows, balancePeriods, groups, labels, currentLabel, previousLabel);
+  const assets = point([], [/^total assets$/]);
+  const liabilities = point([], [/^total liabilities$/]);
+  const currentAssets = point([], [/^total current assets$/]);
+  const currentLiabilities = point([], [/^total current liabilities$/]);
+  const receivables = point([], [/^accounts receivable$/, /^total accounts receivable$/]);
+  const payables = point([], [/^accounts payable$/, /^total accounts payable$/]);
+  if (!assets.hasCurrent || !balancePeriods.length) {
+    unknowns.push("QuickBooks did not return a usable balance sheet, so ClearCFO could not compute financial ratios.");
+    return { ratios, unknowns };
+  }
+  const push = (id: string, label: string, value: string, interpretation: string, health: FinancialRatio["health"]) => ratios.push({ id, label, value, interpretation, health });
+  if (currentAssets.hasCurrent && currentLiabilities.hasCurrent && currentLiabilities.current !== 0) {
+    const value = currentAssets.current / currentLiabilities.current;
+    push("current-ratio", "Current ratio", `${value.toFixed(2)}x`, `Current assets cover current liabilities ${value.toFixed(2)} times.`, value >= 1.5 ? "strong" : value >= 1 ? "watch" : "attention");
+  }
+  if (currentAssets.hasCurrent && currentLiabilities.hasCurrent && currentLiabilities.current !== 0) {
+    const quickAssets = currentAssets.current - (Number.isFinite(inventory) ? inventory : 0);
+    const value = quickAssets / currentLiabilities.current;
+    push("quick-ratio", "Quick ratio", `${value.toFixed(2)}x`, `Liquid assets excluding inventory cover current liabilities ${value.toFixed(2)} times.`, value >= 1 ? "strong" : value >= 0.7 ? "watch" : "attention");
+  }
+  const equity = assets.current - liabilities.current;
+  if (liabilities.hasCurrent && equity !== 0) {
+    const value = liabilities.current / equity;
+    push("debt-to-equity", "Debt-to-equity", `${value.toFixed(2)}x`, equity < 0 ? "Liabilities exceed assets: the balance sheet shows negative equity." : `Creditors finance ${value.toFixed(2)}x of what owners finance.`, equity < 0 || value > 2 ? "attention" : value > 1 ? "watch" : "strong");
+  }
+  if (receivables.hasCurrent && revenue > 0) {
+    const value = (receivables.current / revenue) * 30;
+    push("dso", "Days sales outstanding", `${Math.round(value)} days`, `It takes about ${Math.round(value)} days on average to collect a dollar of sales.`, value <= 30 ? "strong" : value <= 45 ? "watch" : "attention");
+  }
+  const spend = cogs + operatingExpense;
+  if (payables.hasCurrent && spend > 0) {
+    const value = (payables.current / spend) * 30;
+    push("dpo", "Days payable outstanding", `${Math.round(value)} days`, `It takes about ${Math.round(value)} days on average to pay suppliers.`, value <= 60 ? "strong" : "watch");
+  }
+  if (Number.isFinite(inventory) && inventory > 0 && cogs > 0) {
+    const value = (inventory / cogs) * 30;
+    push("inventory-days", "Inventory days", `${Math.round(value)} days`, `Inventory on hand covers about ${Math.round(value)} days of cost of goods sold.`, value <= 30 ? "strong" : value <= 60 ? "watch" : "attention");
+  }
+  if (currentAssets.hasCurrent && currentLiabilities.hasCurrent) {
+    const value = currentAssets.current - currentLiabilities.current;
+    push("working-capital", "Working capital", currency.format(Math.round(value)), value >= 0 ? "Short-term resources exceed short-term obligations." : "Short-term obligations exceed short-term resources.", value >= 0 ? "strong" : "attention");
+  }
+  return { ratios, unknowns };
+}
+
 function buildManagementQuestions(
   detailReports: Record<string, any>,
   context: {
@@ -543,6 +618,16 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
   const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory);
+  const ratioResult = buildRatios({
+    balanceRows,
+    balancePeriods,
+    currentLabel: activePeriods[current],
+    previousLabel: previous >= 0 ? activePeriods[previous] : null,
+    revenue: currentRevenue,
+    cogs: currentCogsValue,
+    operatingExpense: currentExpense,
+    inventory: Number.isFinite(inventoryAligned[current]) ? inventoryAligned[current] : Number.NaN,
+  });
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
   const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);
@@ -585,7 +670,9 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     trendInsights: [],
     trendSeries,
     mtdComparison: buildDayMatchedComparison(detailReports.mtdCurrent, detailReports.mtdPrevious),
+    ratios: ratioResult.ratios,
     unknowns: [
+      ...ratioResult.unknowns,
       ...(cashSeries ? [] : ["QuickBooks did not return a cash balance series for the requested periods."]),
       ...(inventory ? [] : ["QuickBooks did not return an inventory balance series for the requested periods."]),
       ...detailed.unknowns,
