@@ -441,6 +441,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     cashChange,
     inventory: currentInventory,
     inventoryChange,
+    operatingExpense: currentExpense,
+    previousOperatingExpense: previousExpense,
     attention: drivers.length,
     alerts,
     recommendation: drivers[0]?.observation || "Review the latest QuickBooks financial signals and determine the most important management action.",
