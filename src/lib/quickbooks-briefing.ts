@@ -312,7 +312,24 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
   return { drivers, details, relationships, unknowns };
 }
 
-function buildManagementQuestions(detailReports: Record<string, any>): ManagementQuestion[] {
+function buildManagementQuestions(
+  detailReports: Record<string, any>,
+  context: {
+    revenue: number;
+    previousRevenue: number;
+    revenueChange: number;
+    currentExpense: number;
+    previousExpense: number;
+    expenseChange: number;
+    currentCash: number;
+    previousCash: number;
+    cashChange: number;
+    currentInventory: number;
+    previousInventory: number;
+    inventoryChange: number;
+    marginChange: number;
+  },
+): ManagementQuestion[] {
   const questions: ManagementQuestion[] = [];
 
   const customers = topReportRows(detailReports.incomeByCustomer, 3);
@@ -324,6 +341,11 @@ function buildManagementQuestions(detailReports: Record<string, any>): Managemen
       category: "Revenue",
       question: `Which customers are driving the current revenue mix? ${top.label} is the largest reported customer at ${currency.format(top.value)}, representing about ${share.toFixed(0)}% of the top customers returned by QuickBooks.`,
     });
+  } else if (Number.isFinite(context.revenueChange)) {
+    questions.push({
+      category: "Revenue",
+      question: `Revenue moved from ${currency.format(context.previousRevenue)} to ${currency.format(context.revenue)} (${formatPercent(context.revenueChange)}). What changed in customer volume, pricing, or mix to produce that movement?`,
+    });
   }
 
   const vendors = topReportRows(detailReports.expenseByVendor, 3);
@@ -331,7 +353,7 @@ function buildManagementQuestions(detailReports: Record<string, any>): Managemen
     const top = vendors[0];
     questions.push({
       category: "Expenses",
-      question: `Which vendor relationships are driving spending? ${top.label} is the largest reported vendor at ${currency.format(Math.abs(top.value))}; review whether the spend is recurring, necessary, or unusually high versus prior periods.`,
+      question: `Which vendor relationships are driving spending? ${top.label} is the largest reported vendor at ${currency.format(Math.abs(top.value))}; review whether the spend is recurring, necessary, or unusual versus prior periods.`,
     });
   }
 
@@ -343,6 +365,11 @@ function buildManagementQuestions(detailReports: Record<string, any>): Managemen
       category: "Profitability",
       question: `What is driving the expense line ${top.label}? QuickBooks shows ${currency.format(Math.abs(top.value))} in the latest reported period; compare it with the prior period before deciding whether the movement is structural or temporary.`,
     });
+  } else if (Number.isFinite(context.expenseChange)) {
+    questions.push({
+      category: "Expenses",
+      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). Which expense accounts make up the ${currency.format(Math.abs(context.currentExpense - context.previousExpense))} change, and which items are recurring?`,
+    });
   }
 
   const receivables = topReportRows(detailReports.agedReceivables, 3);
@@ -352,6 +379,11 @@ function buildManagementQuestions(detailReports: Record<string, any>): Managemen
       category: "Cash",
       question: `Which receivables need attention? ${top.label} is the largest customer balance returned in the aged-receivables detail at ${currency.format(Math.abs(top.value))}; review age and collection timing before relying on the balance as available cash.`,
     });
+  } else if (context.cashChange < 0) {
+    questions.push({
+      category: "Cash",
+      question: `Cash declined from ${currency.format(context.previousCash)} to ${currency.format(context.currentCash)} (${formatPercent(context.cashChange)}). How much of the decline came from receivables, inventory, payables, debt, capital spending, or owner distributions?`,
+    });
   }
 
   const inventory = topReportRows(detailReports.inventoryValuation, 3);
@@ -360,6 +392,11 @@ function buildManagementQuestions(detailReports: Record<string, any>): Managemen
     questions.push({
       category: "Inventory",
       question: `What is tying up the most inventory cash? ${top.label} has the largest reported inventory value at ${currency.format(Math.abs(top.value))}; compare its value with recent sales velocity and aging.`,
+    });
+  } else if (context.inventoryChange > 0 || context.marginChange < -2) {
+    questions.push({
+      category: "Inventory",
+      question: `Inventory is ${currency.format(context.currentInventory)} and its period-over-period change is ${Number.isFinite(context.inventoryChange) ? formatPercent(context.inventoryChange) : "unavailable"}. How does inventory movement relate to the ${Number.isFinite(context.marginChange) ? Math.abs(context.marginChange).toFixed(1) : "current"}-point gross-margin change and recent sales?`,
     });
   }
 
@@ -455,7 +492,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "upload",
     drivers,
-    managementQuestions: buildManagementQuestions(detailReports),
+    managementQuestions: buildManagementQuestions(detailReports, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
     relationships: drivers.map((driver) => driver.observation),
     detailDrivers: [],
     trendInsights: [],
