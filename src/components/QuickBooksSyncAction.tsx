@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { saveQuickBooksBriefingCache } from "../lib/company-scoped-cache";
 
 export default function QuickBooksSyncAction() {
   const [connected, setConnected] = useState(false);
