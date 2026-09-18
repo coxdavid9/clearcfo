@@ -42,7 +42,7 @@ export default function CFOBriefing() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<BriefingData>(demoData);
   const [liveSource, setLiveSource] = useState<"demo" | "upload" | "quickbooks">("demo");
-  const [hasValidAnalysis, setHasValidAnalysis] = useState(true);
+  const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
