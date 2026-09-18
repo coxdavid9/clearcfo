@@ -45,6 +45,8 @@ export default function CFOBriefing() {
   const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [syncNotice, setSyncNotice] = useState("");
+  const [lastSyncedLabel, setLastSyncedLabel] = useState("");
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
   const marginBaseline = data.drivers.some((driver) => driver.id === "margin-baseline");
@@ -163,6 +165,15 @@ export default function CFOBriefing() {
 
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
 
+  function formatSyncedAt(raw: string | null): string {
+    try {
+      const time = raw ? new Date(raw).getTime() : NaN;
+      return Number.isFinite(time) ? new Date(time).toLocaleString() : "";
+    } catch {
+      return "";
+    }
+  }
+
   async function loadQuickBooksBriefing() {
     try {
       const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
@@ -181,6 +192,7 @@ export default function CFOBriefing() {
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           cacheAnalysisInput(cached);
+          setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
         }
         return;
       }
@@ -197,6 +209,8 @@ export default function CFOBriefing() {
         setLiveSource("quickbooks");
         setHasValidAnalysis(true);
         setError("");
+        setSyncNotice("");
+        setLastSyncedLabel(formatSyncedAt(payload.syncedAt || null));
         window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
         window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
         if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
@@ -207,7 +221,9 @@ export default function CFOBriefing() {
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           cacheAnalysisInput(cached);
-          setError("");
+          const staleLabel = formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at"));
+          setLastSyncedLabel(staleLabel);
+          setSyncNotice(staleLabel ? `Couldn't refresh your QuickBooks data — showing your last synced briefing from ${staleLabel}.` : "Couldn't refresh your QuickBooks data — showing your last synced briefing.");
           return;
         }
         throw syncErr;
@@ -229,6 +245,8 @@ export default function CFOBriefing() {
         setLiveSource("quickbooks");
         setHasValidAnalysis(true);
         setError("");
+        setSyncNotice("");
+        setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
         cacheAnalysisInput(briefing);
         return;
       }
@@ -243,6 +261,8 @@ export default function CFOBriefing() {
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setError("");
+      setSyncNotice("");
+      setLastSyncedLabel("");
     };
 
     window.addEventListener("clearcfo:quickbooks-sync", handleSync);
@@ -268,6 +288,8 @@ export default function CFOBriefing() {
       setData(analyzed);
       setLiveSource("upload");
       setHasValidAnalysis(true);
+      setSyncNotice("");
+      setLastSyncedLabel("");
       cacheAnalysisInput(analyzed);
     } catch (err) {
       setHasValidAnalysis(false);
@@ -491,9 +513,10 @@ export default function CFOBriefing() {
           <div className="mb-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Today&apos;s CFO Briefing</p>
             <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Hello, David — here&apos;s what deserves your attention today.</h2>
-            <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}</p>
+            <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}{liveSource === "quickbooks" && lastSyncedLabel ? ` · Last synced ${lastSyncedLabel}` : ""}</p>
           </div>
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+          {syncNotice && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{syncNotice}</div>}
 
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
