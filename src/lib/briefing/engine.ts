@@ -11,6 +11,8 @@ export type BriefingData = {
   cashChange: number;
   inventory: number;
   inventoryChange: number;
+  operatingExpense?: number;
+  previousOperatingExpense?: number;
   attention: number;
   alerts: string[];
   recommendation: string;
@@ -370,6 +372,8 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
     cashChange,
     inventory,
     inventoryChange,
+    operatingExpense: expense,
+    previousOperatingExpense: previousExpense,
     attention: alerts.length,
     alerts,
     recommendation: drivers[0]?.observation || "Review the latest financial signals and determine the most important management action.",
