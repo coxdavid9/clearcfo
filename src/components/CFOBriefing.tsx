@@ -461,7 +461,7 @@ export default function CFOBriefing() {
       driver.id === "expense-detail" || driver.id === "vendor-spend"
     );
     const primaryObserved = detailed[0];
-    const fallback: Record<string, Array<{ title: string; observation: string }>> = {
+    const fallback: Record<string, Array<{ title: string; observation: string; estimatedImpact?: number }>> = {
       revenue: [
         { title: "Sales volume", observation: `Revenue is ${currentText} and ${observedChange(current, change)}. Review units or customer activity to determine whether the movement is volume-driven.` },
         { title: "Pricing & mix", observation: "Compare revenue movement with pricing changes and product or customer mix to separate price effects from changes in sales activity." },
@@ -489,6 +489,7 @@ export default function CFOBriefing() {
       title: primaryObserved.title,
       observation: primaryObserved.observation + (primaryObserved.evidence.length ? ` Evidence: ${primaryObserved.evidence.slice(0, 2).join("; ")}.` : ""),
       severity: primaryObserved.severity === "High" ? "High" as const : "Medium" as const,
+      estimatedImpact: primaryObserved.estimatedImpact,
     };
     return [observed, ...base.filter((item) => item.title !== observed.title).slice(0, 2)];
   }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.drivers]);
@@ -634,9 +635,82 @@ export default function CFOBriefing() {
             </div>
           </div>
 
-          <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
+          {data.ratios && data.ratios.length > 0 && (
+            <div className="mt-10">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial ratios</p>
+                <p className="mt-1 text-xs text-slate-500">Balance-sheet health for the latest synced period.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {data.ratios.map((ratio) => (
+                    <div key={ratio.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ratio.health === "strong" ? "bg-emerald-500" : ratio.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} aria-hidden="true" />
+                        <p className="text-xs font-semibold text-slate-500">{ratio.label}</p>
+                      </div>
+                      <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">{ratio.value}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{ratio.interpretation}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {data.detailDrivers && data.detailDrivers.some((item) => item.category) && (
+            <div className="mt-10">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">What moved</p>
+                <p className="mt-1 text-xs text-slate-500">The largest period-over-period movers behind the headline numbers.</p>
+                {(["Revenue", "Operating Expense"] as const).map((group) => {
+                  const items = data.detailDrivers.filter((item) => item.category === group).slice(0, 5);
+                  if (!items.length) return null;
+                  return (
+                    <div key={group} className="mt-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{group} movers</p>
+                      <div className="mt-2 space-y-2">
+                        {items.map((item) => (
+                          <div key={group + "-" + item.name} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-sm font-semibold text-slate-900">{item.name}</p>
+                            <p className="text-sm">
+                              <span className="text-slate-500">{currency.format(Math.round(item.previous))} → </span>
+                              <span className="font-bold text-slate-900">{currency.format(Math.round(item.current))}</span>
+                              <span className={item.change >= 0 ? "ml-2 font-semibold text-emerald-600" : "ml-2 font-semibold text-red-600"}>{item.change >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(item.change)))}{item.previous !== 0 ? " (" + formatPercentValue(item.percentChange) + ")" : ""}</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p>{driver.estimatedImpact !== undefined && <p className="mt-2 text-xs font-bold text-blue-700">Est. impact: {currency.format(Math.round(driver.estimatedImpact))}</p>}</div>)}</div></div>
           </div>
 
+          {data.cashFlow && (
+            <div className="mt-10">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Cash flow</p>
+                <p className="mt-1 text-xs text-slate-500">From net income to cash: working-capital changes for the latest period.</p>
+                <div className="mt-4 space-y-2">
+                  {data.cashFlow.lines.map((line) => (
+                    <div key={line.label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-900">{line.label}</p>
+                      <p className={line.value >= 0 ? "text-sm font-bold text-emerald-600" : "text-sm font-bold text-red-600"}>{line.value >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(line.value)))}</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3">
+                    <p className="text-sm font-bold text-white">Net cash from operations</p>
+                    <p className="text-sm font-bold text-white">{data.cashFlow.operatingCashFlow >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.operatingCashFlow)))}</p>
+                  </div>
+                </div>
+                {data.cashFlow.cashChange !== null && (
+                  <p className="mt-3 text-xs text-slate-500">Reported change in cash: {data.cashFlow.cashChange >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.cashChange)))}.</p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><p className="mt-1 text-xs text-slate-500">{liveSource === "upload" ? "Questions generated from your uploaded financial data." : "Questions generated from the financial data ClearCFO received from QuickBooks."}</p><div className="mt-4 space-y-3">{(data.managementQuestions?.length ? data.managementQuestions : deterministicManagementQuestions).map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>)}</div></div>
 
           <div className="mt-10 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">

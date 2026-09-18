@@ -104,6 +104,10 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
       financialDrivers: briefing.drivers,
       driverRelationships: briefing.relationships,
       detailDrivers: briefing.detailDrivers,
+      financialRatios: briefing.ratios ?? [],
+      monthToDate: briefing.mtdComparison ?? null,
+      varianceMovers: (briefing.detailDrivers ?? []).slice(0, 10),
+      cashFlowBridge: briefing.cashFlow ?? null,
       currentRecommendation: briefing.recommendation,
       businessHealth: briefing.health,
       analysisConfidence: briefing.confidence,
@@ -183,7 +187,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
             <div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Management question</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.managementQuestion}</p></div>
             <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.recommendedAction}</p></div>
             {analysis.evidence?.length > 0 && <div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Evidence</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">{analysis.evidence.map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
-            {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}
+            {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p>{typeof action.estimatedImpact === "number" && <p className="mt-2 text-xs font-bold text-blue-700">Est. impact: ${Math.round(action.estimatedImpact).toLocaleString("en-US")}</p>}</div>)}</div></div>}
             {(analysis.unknowns ?? []).length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-amber-700">Known unknowns</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">{(analysis.unknowns ?? []).map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
           </div>
         )}

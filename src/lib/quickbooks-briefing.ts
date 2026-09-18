@@ -1,4 +1,4 @@
-import type { BriefingData, FinancialDriver, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
+import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
 import { currency } from "./briefing/engine";
 
 type Series = { name: string; values: number[]; periods: string[] };
@@ -104,26 +104,26 @@ function latestPopulatedIndex(series: number[][]): number {
   return -1;
 }
 
-function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number, previousCash: number, currentCash: number, previousInventory: number, currentInventory: number): FinancialDriver[] {
+function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number, previousCash: number, currentCash: number, previousInventory: number, currentInventory: number, currentRevenue: number, previousRevenue: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
   // Dollar-materiality floors: a percentage move on a tiny base is noise, not a
   // signal. Each driver below keeps its percentage threshold AND requires the
   // underlying dollar movement to clear its floor before firing.
   const MIN_DRIVER_DELTA = 1000;
   if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2 && Math.abs(currentExpense - previousExpense) >= MIN_DRIVER_DELTA) {
-    drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Operating expense dollars: ${Math.round(previousExpense).toLocaleString()} to ${Math.round(currentExpense).toLocaleString()} (${currentExpense - previousExpense >= 0 ? "+" : ""}${Math.round(currentExpense - previousExpense).toLocaleString()})`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
+    drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Operating expense dollars: ${Math.round(previousExpense).toLocaleString()} to ${Math.round(currentExpense).toLocaleString()} (${currentExpense - previousExpense >= 0 ? "+" : ""}${Math.round(currentExpense - previousExpense).toLocaleString()})`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?", estimatedImpact: Math.abs(currentExpense - previousExpense) });
   }
   if (Number.isFinite(cashChange) && cashChange < -5 && Math.abs(currentCash - previousCash) >= MIN_DRIVER_DELTA) {
-    drivers.push({ id: "cash-pressure", category: "Cash", title: "Cash is under pressure", observation: `Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`, evidence: [`Cash change: ${formatPercent(cashChange)}`], direction: "down", severity: cashChange < -15 ? "High" : "Medium", impact: 5, confidence: 0.94, managementQuestion: "What near-term cash commitments could create additional pressure?" });
+    drivers.push({ id: "cash-pressure", category: "Cash", title: "Cash is under pressure", observation: `Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`, evidence: [`Cash change: ${formatPercent(cashChange)}`], direction: "down", severity: cashChange < -15 ? "High" : "Medium", impact: 5, confidence: 0.94, managementQuestion: "What near-term cash commitments could create additional pressure?", estimatedImpact: Math.abs(currentCash - previousCash) });
   }
   if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2 && Math.abs(currentInventory - previousInventory) >= MIN_DRIVER_DELTA) {
-    drivers.push({ id: "inventory-growth", category: "Inventory", title: "Inventory is outpacing revenue", observation: `Inventory changed ${formatPercent(inventoryChange)}, ahead of revenue at ${formatPercent(revenueChange)}.`, evidence: [`Inventory change: ${formatPercent(inventoryChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: "Medium", impact: 3, confidence: 0.9, managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?" });
+    drivers.push({ id: "inventory-growth", category: "Inventory", title: "Inventory is outpacing revenue", observation: `Inventory changed ${formatPercent(inventoryChange)}, ahead of revenue at ${formatPercent(revenueChange)}.`, evidence: [`Inventory change: ${formatPercent(inventoryChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: "Medium", impact: 3, confidence: 0.9, managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?", estimatedImpact: Math.abs(currentInventory - previousInventory) });
   }
   if (Number.isFinite(marginChange) && marginChange < -2) {
     if ((previousCogs || 0) === 0 && (currentCogs || 0) > 0) {
-      drivers.push({ id: "margin-baseline", category: "Margin", title: "COGS appeared this period after none in the prior period", observation: `COGS of ${Math.round(currentCogs).toLocaleString()} was recorded this period versus $0 in the prior period. That change coincides with the margin movement, but the prior-period baseline should be validated before treating it as a recurring margin driver.`, evidence: [`Current COGS: $${Math.round(currentCogs).toLocaleString()}`, `Prior COGS: $0`], direction: "down", severity: "Medium", impact: 2, confidence: 0.88, managementQuestion: "Was prior-period COGS omitted, or is this the beginning of a recurring COGS pattern?" });
+      drivers.push({ id: "margin-baseline", category: "Margin", title: "COGS appeared this period after none in the prior period", observation: `COGS of ${Math.round(currentCogs).toLocaleString()} was recorded this period versus $0 in the prior period. That change coincides with the margin movement, but the prior-period baseline should be validated before treating it as a recurring margin driver.`, evidence: [`Current COGS: $${Math.round(currentCogs).toLocaleString()}`, `Prior COGS: $0`], direction: "down", severity: "Medium", impact: 2, confidence: 0.88, managementQuestion: "Was prior-period COGS omitted, or is this the beginning of a recurring COGS pattern?", estimatedImpact: Math.abs(currentCogs) });
     } else {
-      drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercent(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercent(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
+      drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercent(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercent(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?", estimatedImpact: currentRevenue > 0 ? Math.abs(marginChange / 100) * currentRevenue : undefined });
     }
   }
   return drivers;
@@ -249,7 +249,7 @@ function reportRowsWithPeriods(report: any): Array<{ label: string; current: num
     .filter((row) => !/^total|^net income|^gross profit|^operating income/i.test(row.label));
 }
 
-function detailDriverFromRow(row: { label: string; current: number; previous: number }, direction: "up" | "down"): DetailDriver {
+function detailDriverFromRow(row: { label: string; current: number; previous: number }, direction: "up" | "down", category: "Revenue" | "Operating Expense"): DetailDriver {
   const change = row.current - row.previous;
   return {
     name: row.label,
@@ -259,6 +259,7 @@ function detailDriverFromRow(row: { label: string; current: number; previous: nu
     percentChange: row.previous === 0 ? 0 : (change / Math.abs(row.previous)) * 100,
     direction,
     impact: Math.abs(change),
+    category,
   };
 }
 
@@ -273,8 +274,8 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   const customerUps = customers.filter((row) => row.change > 0).slice(0, 3);
   const customerDowns = customers.filter((row) => row.change < 0).slice(0, 3);
-  customerUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
-  customerDowns.forEach((row) => details.push(detailDriverFromRow(row, "down")));
+  customerUps.forEach((row) => details.push(detailDriverFromRow(row, "up", "Revenue")));
+  customerDowns.forEach((row) => details.push(detailDriverFromRow(row, "down", "Revenue")));
   if (customerUps.length || customerDowns.length) {
     const evidence = [
       ...customerUps.slice(0, 2).map((row) => `${row.label}: +${currency.format(row.change)}`),
@@ -306,7 +307,7 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     .map((row) => ({ ...row, change: row.current - row.previous }))
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   const expenseUps = expenses.filter((row) => row.change > 0).slice(0, 4);
-  expenseUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  expenseUps.forEach((row) => details.push(detailDriverFromRow(row, "up", "Operating Expense")));
   if (expenseUps.length) {
     drivers.push({
       id: "expense-detail",
@@ -331,7 +332,7 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     .map((row) => ({ ...row, change: row.current - row.previous }))
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   const vendorUps = vendors.filter((row) => row.change > 0).slice(0, 3);
-  vendorUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  vendorUps.forEach((row) => details.push(detailDriverFromRow(row, "up", "Operating Expense")));
   if (vendorUps.length) {
     drivers.push({
       id: "vendor-spend",
@@ -388,6 +389,81 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
   }
 
   return { drivers, details, relationships, unknowns };
+}
+
+// Balance-sheet point-in-time value aligned to a P&L period label. Periods
+// with no balance-sheet value are reported as missing, never as zero.
+type BalancePoint = { current: number; previous: number; hasCurrent: boolean; hasPrevious: boolean };
+
+function balancePoint(balanceRows: ReportNode[], balancePeriods: string[], groupPatterns: RegExp[], labelPatterns: RegExp[], currentLabel: string, previousLabel: string | null): BalancePoint {
+  const series = balancePeriods.length ? pickSeries(balanceRows, groupPatterns, labelPatterns, balancePeriods.length) : null;
+  const byLabel = new Map<string, number>();
+  if (series) balancePeriods.forEach((label, index) => { if (Number.isFinite(series[index])) byLabel.set(label, series[index]); });
+  const current = byLabel.get(currentLabel);
+  const previous = previousLabel ? byLabel.get(previousLabel) : undefined;
+  return { current: current ?? 0, previous: previous ?? 0, hasCurrent: current !== undefined, hasPrevious: previous !== undefined };
+}
+
+// Deterministic balance-sheet health ratios for the latest synced period.
+// Day-count ratios assume monthly reporting periods. Ratios whose inputs
+// are unavailable are skipped, never fabricated.
+function buildRatios(args: {
+  balanceRows: ReportNode[];
+  balancePeriods: string[];
+  currentLabel: string;
+  previousLabel: string | null;
+  revenue: number;
+  cogs: number;
+  operatingExpense: number;
+  inventory: number;
+}): { ratios: FinancialRatio[]; unknowns: string[] } {
+  const ratios: FinancialRatio[] = [];
+  const unknowns: string[] = [];
+  const { balanceRows, balancePeriods, currentLabel, previousLabel, revenue, cogs, operatingExpense, inventory } = args;
+  const point = (groups: RegExp[], labels: RegExp[]) => balancePoint(balanceRows, balancePeriods, groups, labels, currentLabel, previousLabel);
+  const assets = point([], [/^total assets$/]);
+  const liabilities = point([], [/^total liabilities$/]);
+  const currentAssets = point([], [/^total current assets$/]);
+  const currentLiabilities = point([], [/^total current liabilities$/]);
+  const receivables = point([], [/^accounts receivable$/, /^total accounts receivable$/]);
+  const payables = point([], [/^accounts payable$/, /^total accounts payable$/]);
+  if (!assets.hasCurrent || !balancePeriods.length) {
+    unknowns.push("QuickBooks did not return a usable balance sheet, so ClearCFO could not compute financial ratios.");
+    return { ratios, unknowns };
+  }
+  const push = (id: string, label: string, value: string, interpretation: string, health: FinancialRatio["health"]) => ratios.push({ id, label, value, interpretation, health });
+  if (currentAssets.hasCurrent && currentLiabilities.hasCurrent && currentLiabilities.current !== 0) {
+    const value = currentAssets.current / currentLiabilities.current;
+    push("current-ratio", "Current ratio", `${value.toFixed(2)}x`, `Current assets cover current liabilities ${value.toFixed(2)} times.`, value >= 1.5 ? "strong" : value >= 1 ? "watch" : "attention");
+  }
+  if (currentAssets.hasCurrent && currentLiabilities.hasCurrent && currentLiabilities.current !== 0) {
+    const quickAssets = currentAssets.current - (Number.isFinite(inventory) ? inventory : 0);
+    const value = quickAssets / currentLiabilities.current;
+    push("quick-ratio", "Quick ratio", `${value.toFixed(2)}x`, `Liquid assets excluding inventory cover current liabilities ${value.toFixed(2)} times.`, value >= 1 ? "strong" : value >= 0.7 ? "watch" : "attention");
+  }
+  const equity = assets.current - liabilities.current;
+  if (liabilities.hasCurrent && equity !== 0) {
+    const value = liabilities.current / equity;
+    push("debt-to-equity", "Debt-to-equity", `${value.toFixed(2)}x`, equity < 0 ? "Liabilities exceed assets: the balance sheet shows negative equity." : `Creditors finance ${value.toFixed(2)}x of what owners finance.`, equity < 0 || value > 2 ? "attention" : value > 1 ? "watch" : "strong");
+  }
+  if (receivables.hasCurrent && revenue > 0) {
+    const value = (receivables.current / revenue) * 30;
+    push("dso", "Days sales outstanding", `${Math.round(value)} days`, `It takes about ${Math.round(value)} days on average to collect a dollar of sales.`, value <= 30 ? "strong" : value <= 45 ? "watch" : "attention");
+  }
+  const spend = cogs + operatingExpense;
+  if (payables.hasCurrent && spend > 0) {
+    const value = (payables.current / spend) * 30;
+    push("dpo", "Days payable outstanding", `${Math.round(value)} days`, `It takes about ${Math.round(value)} days on average to pay suppliers.`, value <= 60 ? "strong" : "watch");
+  }
+  if (Number.isFinite(inventory) && inventory > 0 && cogs > 0) {
+    const value = (inventory / cogs) * 30;
+    push("inventory-days", "Inventory days", `${Math.round(value)} days`, `Inventory on hand covers about ${Math.round(value)} days of cost of goods sold.`, value <= 30 ? "strong" : value <= 60 ? "watch" : "attention");
+  }
+  if (currentAssets.hasCurrent && currentLiabilities.hasCurrent) {
+    const value = currentAssets.current - currentLiabilities.current;
+    push("working-capital", "Working capital", currency.format(Math.round(value)), value >= 0 ? "Short-term resources exceed short-term obligations." : "Short-term obligations exceed short-term resources.", value >= 0 ? "strong" : "attention");
+  }
+  return { ratios, unknowns };
 }
 
 function buildManagementQuestions(
@@ -481,6 +557,57 @@ function buildManagementQuestions(
   return questions.slice(0, 5);
 }
 
+// Indirect-method operating cash flow bridge for the latest synced period.
+// Starts from net income and adjusts for working-capital changes. The
+// "other operating changes" line is the plug that reconciles the bridge to
+// the reported change in cash — it is labeled as such, never hidden.
+function buildCashFlow(args: {
+  pnlRows: ReportNode[];
+  pnlPeriods: string[];
+  currentLabel: string;
+  balanceRows: ReportNode[];
+  balancePeriods: string[];
+  previousLabel: string | null;
+  currentCash: number;
+  previousCash: number;
+  cashKnown: boolean;
+}): { bridge: CashFlowBridge | null; unknowns: string[] } {
+  const unknowns: string[] = [];
+  const { pnlRows, pnlPeriods, currentLabel, balanceRows, balancePeriods, previousLabel, currentCash, previousCash, cashKnown } = args;
+  const netRow = pnlRows.find((row) => row.type === "Section" && clean(row.label) === "net income");
+  const netSeries = netRow ? netRow.values : pickSeries(pnlRows, [/^netincome$/], [/^net income$/], pnlPeriods.length);
+  const netByLabel = new Map<string, number>();
+  if (netSeries) pnlPeriods.forEach((label, index) => { if (Number.isFinite(netSeries[index])) netByLabel.set(label, netSeries[index]); });
+  const netIncome = netByLabel.get(currentLabel);
+  if (netIncome === undefined) {
+    unknowns.push("QuickBooks did not return a net income figure, so ClearCFO could not build the cash flow bridge.");
+    return { bridge: null, unknowns };
+  }
+  const point = (labels: RegExp[]) => balancePoint(balanceRows, balancePeriods, [], labels, currentLabel, previousLabel);
+  const receivables = point([/^accounts receivable$/, /^total accounts receivable$/]);
+  const payables = point([/^accounts payable$/, /^total accounts payable$/]);
+  const inventoryPt = point([/^inventory asset$/, /^inventory$/, /^total inventory asset$/, /^total inventory$/]);
+  const lines: CashFlowLine[] = [{ label: "Net income", value: netIncome }];
+  const both = (p: BalancePoint) => p.hasCurrent && p.hasPrevious;
+  if (both(receivables)) {
+    const delta = receivables.current - receivables.previous;
+    lines.push({ label: delta >= 0 ? "Increase in accounts receivable" : "Decrease in accounts receivable", value: -delta });
+  }
+  if (both(inventoryPt)) {
+    const delta = inventoryPt.current - inventoryPt.previous;
+    lines.push({ label: delta >= 0 ? "Increase in inventory" : "Decrease in inventory", value: -delta });
+  }
+  if (both(payables)) {
+    const delta = payables.current - payables.previous;
+    lines.push({ label: delta >= 0 ? "Increase in accounts payable" : "Decrease in accounts payable", value: delta });
+  }
+  const cashChange = cashKnown ? currentCash - previousCash : null;
+  const subtotal = lines.reduce((sum, line) => sum + line.value, 0);
+  if (cashChange !== null) lines.push({ label: "Other operating changes", value: cashChange - subtotal });
+  const operatingCashFlow = lines.reduce((sum, line) => sum + line.value, 0);
+  return { bridge: { lines, operatingCashFlow, cashChange }, unknowns };
+}
+
 export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
   const pnlPeriods = reportPeriods(profitAndLoss);
   const pnlRows = collectRows(profitAndLoss?.Rows, pnlPeriods.length);
@@ -542,7 +669,28 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const expenseChange = previous >= 0 ? changePercent(currentExpense, previousExpense) : Number.NaN;
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
-  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory);
+  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory, currentRevenue, previousRevenue);
+  const ratioResult = buildRatios({
+    balanceRows,
+    balancePeriods,
+    currentLabel: activePeriods[current],
+    previousLabel: previous >= 0 ? activePeriods[previous] : null,
+    revenue: currentRevenue,
+    cogs: currentCogsValue,
+    operatingExpense: currentExpense,
+    inventory: Number.isFinite(inventoryAligned[current]) ? inventoryAligned[current] : Number.NaN,
+  });
+  const cashFlowResult = buildCashFlow({
+    pnlRows,
+    pnlPeriods,
+    currentLabel: activePeriods[current],
+    balanceRows,
+    balancePeriods,
+    previousLabel: previous >= 0 ? activePeriods[previous] : null,
+    currentCash,
+    previousCash,
+    cashKnown: Number.isFinite(cashAligned[current]) && (previous < 0 || Number.isFinite(cashAligned[previous])),
+  });
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
   const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);
@@ -585,7 +733,11 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     trendInsights: [],
     trendSeries,
     mtdComparison: buildDayMatchedComparison(detailReports.mtdCurrent, detailReports.mtdPrevious),
+    ratios: ratioResult.ratios,
+    cashFlow: cashFlowResult.bridge,
     unknowns: [
+      ...cashFlowResult.unknowns,
+      ...ratioResult.unknowns,
       ...(cashSeries ? [] : ["QuickBooks did not return a cash balance series for the requested periods."]),
       ...(inventory ? [] : ["QuickBooks did not return an inventory balance series for the requested periods."]),
       ...detailed.unknowns,
