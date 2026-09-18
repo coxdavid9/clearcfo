@@ -329,13 +329,180 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
   };
 }
 
+function detailRowsFromSheet(sheet: XLSX.WorkSheet): Array<{ label: string; current: number; previous: number }> {
+  const rows = sheetRows(sheet);
+  if (!rows.length) return [];
+  const headerIndex = findHeaderIndex(rows, ["Month", "Date", "Period", "Account", "Customer", "Vendor", "Balance"]);
+  const labels = periodLabels(rows, headerIndex);
+  if (!labels.length) return [];
+
+  return rows
+    .filter((row) => row.length >= 2)
+    .map((row) => {
+      const label = normalizeText(row[0]);
+      const values = rowValues(row, labels.length);
+      return { label, current: values[values.length - 1] ?? 0, previous: values.length > 1 ? values[values.length - 2] ?? 0 : 0 };
+    })
+    .filter((row) => row.label && Number.isFinite(row.current) && row.current !== 0)
+    .filter((row) => !/^total|^net income|^gross profit|^operating income|^revenue|^sales|^cogs/i.test(row.label));
+}
+
+function classifyExcelSheet(sheetName: string, rows: unknown[][]): "customer" | "vendor" | "ar" | "inventory" | "expense" | "other" {
+  const text = `${sheetName} ${rows.slice(0, 8).flat().map(normalizeText).join(" ")}`.toLowerCase();
+  if (/customer|client|sales by customer|income by customer/.test(text)) return "customer";
+  if (/vendor|supplier|expense by vendor|spend by vendor/.test(text)) return "vendor";
+  if (/receivable|accounts receivable|a\/r|ar aging|aged receivable/.test(text)) return "ar";
+  if (/inventory|stock|item valuation/.test(text)) return "inventory";
+  if (/expense|operating cost|op\.? ex\.?/.test(text)) return "expense";
+  return "other";
+}
+
+function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
+  drivers: FinancialDriver[];
+  details: DetailDriver[];
+  relationships: string[];
+  questions: Array<{ category: string; question: string }>;
+  unknowns: string[];
+} {
+  const drivers: FinancialDriver[] = [];
+  const details: DetailDriver[] = [];
+  const relationships: string[] = [];
+  const questions: Array<{ category: string; question: string }> = [];
+  const unknowns: string[] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+    const rows = sheetRows(sheet);
+    const type = classifyExcelSheet(sheetName, rows);
+    const candidates = detailRowsFromSheet(sheet).sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
+    if (!candidates.length) continue;
+
+    if (type === "customer") {
+      const increases = candidates.filter((row) => row.current > row.previous).slice(0, 5);
+      const decreases = candidates.filter((row) => row.current < row.previous).slice(0, 3);
+      const movement = [...increases, ...decreases].reduce((sum, row) => sum + Math.abs(row.current - row.previous), 0);
+      for (const row of [...increases, ...decreases].slice(0, 6)) {
+        details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
+      }
+      if (increases.length || decreases.length) {
+        drivers.push({
+          id: `excel-customer-mix-${sheetName}`, category: "Revenue", title: "Customer revenue movement is concentrated",
+          observation: `The uploaded customer detail shows ${increases.length} customer increases and ${decreases.length} customer decreases among the largest reported movements.`,
+          evidence: [...increases.slice(0, 3), ...decreases.slice(0, 2)].map((row) => `${row.label}: ${formatCurrency(row.current - row.previous)} change`),
+          direction: increases.length >= decreases.length ? "up" : "mixed", severity: movement > 50000 ? "High" : "Medium",
+          impact: Math.min(10, Math.max(1, Math.round(movement / 10000))), confidence: 0.86,
+          managementQuestion: "Are the largest customer movements recurring, or are they tied to one-time orders or timing?",
+        });
+        relationships.push("Customer-level revenue movement can be reviewed alongside total revenue to determine whether growth is broad-based or concentrated.");
+        questions.push({ category: "Revenue", question: `Which customers explain the largest revenue changes in ${sheetName}, and are those changes expected to continue?` });
+      }
+    }
+
+    if (type === "expense") {
+      const increases = candidates.filter((row) => row.current > row.previous).slice(0, 5);
+      if (increases.length) {
+        const totalIncrease = increases.reduce((sum, row) => sum + Math.max(0, row.current - row.previous), 0);
+        for (const row of increases) {
+          details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: "up", impact: Math.abs(row.current - row.previous) });
+        }
+        drivers.push({
+          id: `excel-expense-detail-${sheetName}`, category: "Operating Expense", title: "Specific expense accounts are driving the movement",
+          observation: `The largest reported expense increases total ${formatCurrency(totalIncrease)} across the uploaded detail.`,
+          evidence: increases.slice(0, 4).map((row) => `${row.label}: +${formatCurrency(row.current - row.previous)}`),
+          direction: "up", severity: totalIncrease > 50000 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(totalIncrease / 10000))),
+          confidence: 0.88, managementQuestion: "Which of the largest expense increases are recurring, discretionary, or timing-related?",
+        });
+        relationships.push("The largest expense-account movements should be compared with revenue growth to determine whether operating costs are scaling with the business.");
+        questions.push({ category: "Expenses", question: `Which expense accounts explain the largest increase in ${sheetName}, and which of those costs are recurring?` });
+      }
+    }
+
+    if (type === "vendor") {
+      const increases = candidates.filter((row) => row.current > row.previous).slice(0, 5);
+      if (increases.length) {
+        const totalIncrease = increases.reduce((sum, row) => sum + Math.max(0, row.current - row.previous), 0);
+        for (const row of increases) {
+          details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: "up", impact: Math.abs(row.current - row.previous) });
+        }
+        drivers.push({
+          id: `excel-vendor-spend-${sheetName}`, category: "Operating Expense", title: "Vendor spend has identifiable concentration",
+          observation: `The largest reported vendor increases total ${formatCurrency(totalIncrease)}.`,
+          evidence: increases.slice(0, 4).map((row) => `${row.label}: +${formatCurrency(row.current - row.previous)}`),
+          direction: "up", severity: totalIncrease > 50000 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(totalIncrease / 10000))),
+          confidence: 0.84, managementQuestion: "What is driving the largest vendor spend increases, and are they expected to persist?",
+        });
+        relationships.push("Vendor-level spend detail can identify whether expense growth is concentrated in a small number of suppliers.");
+        questions.push({ category: "Vendors", question: `Which vendors account for the largest spend increases in ${sheetName}, and are those increases recurring?` });
+      }
+    }
+
+    if (type === "ar") {
+      const balances = candidates.sort((a, b) => b.current - a.current).slice(0, 5);
+      const total = balances.reduce((sum, row) => sum + Math.max(0, row.current), 0);
+      drivers.push({
+        id: `excel-ar-detail-${sheetName}`, category: "Cash", title: "Accounts receivable detail is available",
+        observation: `The uploaded receivables detail shows ${formatCurrency(total)} across the largest reported balances. This can be used to investigate cash conversion pressure.`,
+        evidence: balances.slice(0, 4).map((row) => `${row.label}: ${formatCurrency(row.current)}`),
+        direction: "watch", severity: "Watch", impact: Math.min(10, Math.max(1, Math.round(total / 50000))), confidence: 0.8,
+        managementQuestion: "Which receivable balances are most important to collect, and when are they expected to convert to cash?",
+      });
+      relationships.push("Receivables detail provides a direct bridge between reported sales activity and the timing of cash collection.");
+      questions.push({ category: "Cash", question: `Which receivable balances are largest in ${sheetName}, and when are they expected to convert to cash?` });
+      for (const row of balances) details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
+    }
+
+    if (type === "inventory") {
+      const balances = candidates.sort((a, b) => b.current - a.current).slice(0, 5);
+      if (balances.length) {
+        drivers.push({
+          id: `excel-inventory-detail-${sheetName}`, category: "Inventory", title: "Inventory detail is available",
+          observation: "The uploaded inventory detail identifies the largest reported inventory balances for further review.",
+          evidence: balances.slice(0, 4).map((row) => `${row.label}: ${formatCurrency(row.current)}`),
+          direction: "watch", severity: "Watch", impact: Math.min(10, Math.max(1, Math.round(balances[0].current / 50000))), confidence: 0.8,
+          managementQuestion: "Which inventory items are tying up the most cash, and are they moving at the expected rate?",
+        });
+        relationships.push("Inventory detail can be compared with revenue growth to identify stock that may be building faster than demand.");
+        questions.push({ category: "Inventory", question: `Which inventory balances are largest in ${sheetName}, and are those items moving at the expected rate?` });
+        for (const row of balances) details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
+      }
+    }
+  }
+
+  if (!drivers.length) unknowns.push("No customer, vendor, receivables, inventory, or expense-detail sheet with usable period values was identified in the uploaded workbook.");
+
+  return {
+    drivers: drivers.sort((a, b) => b.impact - a.impact).slice(0, 8),
+    details: details.sort((a, b) => b.impact - a.impact).slice(0, 12),
+    relationships: relationships.slice(0, 8),
+    questions: questions.slice(0, 8),
+    unknowns: unknowns.slice(0, 10),
+  };
+}
+
 export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   const sheetName = workbook.SheetNames[0] || "Financial Data";
   const sheet = findSheet(workbook, ["P&L", "Profit and Loss", "Income Statement", sheetName]) || workbook.Sheets[sheetName];
   if (!sheet) throw new Error("No financial worksheet was found.");
   const rows = sheetRows(sheet);
   if (!rows.length) throw new Error("The financial worksheet is empty.");
-  return buildBriefingFromRows(rows, sheetName);
+
+  const base = buildBriefingFromRows(rows, sheetName);
+  const detailed = detailedExcelAnalysis(workbook);
+  const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
+
+  return {
+    ...base,
+    drivers: allDrivers,
+    attention: base.alerts.length + detailed.drivers.filter((driver) => driver.severity !== "Watch").length,
+    recommendation: allDrivers[0]?.observation || base.recommendation,
+    impact: allDrivers[0]?.impact || base.impact,
+    impactReason: allDrivers[0]?.observation || base.impactReason,
+    managementQuestions: detailed.questions,
+    relationships: [...base.relationships, ...detailed.relationships].slice(0, 8),
+    detailDrivers: detailed.details,
+    unknowns: detailed.unknowns,
+  };
 }
 
 export function buildDeterministicExecutiveSummary(data: BriefingData): string {
