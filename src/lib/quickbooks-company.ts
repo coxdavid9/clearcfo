@@ -299,10 +299,10 @@ export async function disconnectQuickBooks(userId: string) {
 
 async function revokeIntuitTokens(refreshToken: string) {
   const { clientId, clientSecret } = config();
-  const response = await fetch(QB_REVOKE_URL, {
+  const response = await intuitFetch(QB_REVOKE_URL, {
     method: "POST", headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({ token: refreshToken }).toString(),
-  });
+  }, 1);
   if (!response.ok) console.error(`[ClearCFO QuickBooks] Token revocation failed (${response.status}).`);
 }
 
