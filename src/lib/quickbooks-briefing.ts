@@ -154,6 +154,163 @@ function topReportRows(report: any, limit = 3): Array<{ label: string; value: nu
     .slice(0, limit);
 }
 
+
+function reportRowsWithPeriods(report: any): Array<{ label: string; current: number; previous: number }> {
+  if (!report) return [];
+  const periods = reportPeriods(report);
+  if (!periods.length) return [];
+  return collectRows(report?.Rows, periods.length)
+    .filter((row) => row.type !== "Section")
+    .map((row) => ({
+      label: row.label,
+      current: row.values[periods.length - 1] || 0,
+      previous: periods.length > 1 ? row.values[periods.length - 2] || 0 : 0,
+    }))
+    .filter((row) => row.label && Number.isFinite(row.current) && row.current !== 0)
+    .filter((row) => !/^total|^net income|^gross profit|^operating income/i.test(row.label));
+}
+
+function detailDriverFromRow(row: { label: string; current: number; previous: number }, direction: "up" | "down"): DetailDriver {
+  const change = row.current - row.previous;
+  return {
+    name: row.label,
+    current: row.current,
+    previous: row.previous,
+    change,
+    percentChange: row.previous === 0 ? 0 : (change / Math.abs(row.previous)) * 100,
+    direction,
+    impact: Math.abs(change),
+  };
+}
+
+function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: FinancialDriver[]; details: DetailDriver[]; relationships: string[]; unknowns: string[] } {
+  const drivers: FinancialDriver[] = [];
+  const details: DetailDriver[] = [];
+  const relationships: string[] = [];
+  const unknowns: string[] = [];
+
+  const customers = reportRowsWithPeriods(detailReports.incomeByCustomer)
+    .map((row) => ({ ...row, change: row.current - row.previous }))
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+  const customerUps = customers.filter((row) => row.change > 0).slice(0, 3);
+  const customerDowns = customers.filter((row) => row.change < 0).slice(0, 3);
+  customerUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  customerDowns.forEach((row) => details.push(detailDriverFromRow(row, "down")));
+  if (customerUps.length || customerDowns.length) {
+    const evidence = [
+      ...customerUps.slice(0, 2).map((row) => `${row.label}: +${currency.format(row.change)}`),
+      ...customerDowns.slice(0, 2).map((row) => `${row.label}: ${currency.format(row.change)}`),
+    ];
+    drivers.push({
+      id: "revenue-customer-mix",
+      category: "Revenue",
+      title: "Customer mix is driving revenue movement",
+      observation: "The customer-level report identifies specific accounts contributing to the period-over-period revenue change.",
+      evidence,
+      direction: customerUps.length && customerDowns.length ? "mixed" : customerUps.length ? "up" : "down",
+      severity: "Watch",
+      impact: Math.min(10, Math.max(1, Math.round(Math.max(...customers.map((row) => Math.abs(row.change)), 0) / 10000))),
+      confidence: 0.95,
+      managementQuestion: customerDowns.length
+        ? `What changed with ${customerDowns[0].label}, which moved ${currency.format(customerDowns[0].change)} versus the prior period?`
+        : `Is the growth from ${customerUps[0]?.label || "the largest customer"} recurring, or was it driven by a one-time order?`,
+    });
+    relationships.push(customerUps.length
+      ? `Customer growth is concentrated in ${customerUps[0].label}, which increased ${currency.format(customerUps[0].change)} versus the prior period.`
+      : "Customer-level revenue data shows the largest reported revenue movements.");
+  } else {
+    unknowns.push("Customer-level revenue detail was not available, so ClearCFO cannot attribute revenue movement to specific customers.");
+  }
+
+  const expenses = reportRowsWithPeriods(detailReports.profitAndLossDetail)
+    .filter((row) => !/income|revenue|sales|cost of goods|gross profit|net income/i.test(row.label))
+    .map((row) => ({ ...row, change: row.current - row.previous }))
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+  const expenseUps = expenses.filter((row) => row.change > 0).slice(0, 4);
+  expenseUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  if (expenseUps.length) {
+    drivers.push({
+      id: "expense-detail",
+      category: "Operating Expense",
+      title: "Specific expense lines are driving the change",
+      observation: "The detailed P&L identifies the largest expense movements instead of treating operating expenses as one combined number.",
+      evidence: expenseUps.slice(0, 3).map((row) => `${row.label}: +${currency.format(row.change)}`),
+      direction: "up",
+      severity: "Medium",
+      impact: Math.min(10, Math.max(1, Math.round(expenseUps[0].change / 10000))),
+      confidence: 0.95,
+      managementQuestion: `What caused ${expenseUps[0].label} to increase by ${currency.format(expenseUps[0].change)} versus the prior period?`,
+    });
+    relationships.push(`${expenseUps[0].label} is the largest reported expense increase at ${currency.format(expenseUps[0].change)}.`);
+  } else if (detailReports.profitAndLossDetail) {
+    unknowns.push("The detailed P&L did not provide a meaningful period-over-period expense movement.");
+  } else {
+    unknowns.push("Detailed P&L data was not available, so expense changes cannot yet be attributed to specific accounts.");
+  }
+
+  const vendors = reportRowsWithPeriods(detailReports.expenseByVendor)
+    .map((row) => ({ ...row, change: row.current - row.previous }))
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+  const vendorUps = vendors.filter((row) => row.change > 0).slice(0, 3);
+  vendorUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  if (vendorUps.length) {
+    drivers.push({
+      id: "vendor-spend",
+      category: "Operating Expense",
+      title: "Vendor spending is concentrated",
+      observation: "Vendor-level detail shows where reported spending is concentrated and which relationships changed most.",
+      evidence: vendorUps.map((row) => `${row.label}: +${currency.format(row.change)}`),
+      direction: "up",
+      severity: "Watch",
+      impact: Math.min(10, Math.max(1, Math.round(vendorUps[0].change / 10000))),
+      confidence: 0.93,
+      managementQuestion: `Was the ${currency.format(vendorUps[0].change)} increase with ${vendorUps[0].label} planned, recurring, or unusual?`,
+    });
+  }
+
+  const receivables = reportRowsWithPeriods(detailReports.agedReceivables).sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
+  if (receivables.length) {
+    const top = receivables[0];
+    drivers.push({
+      id: "receivables-concentration",
+      category: "Cash",
+      title: "Receivables are concentrated",
+      observation: `${top.label} has the largest reported receivables balance at ${currency.format(Math.abs(top.current))}.`,
+      evidence: receivables.slice(0, 3).map((row) => `${row.label}: ${currency.format(Math.abs(row.current))}`),
+      direction: "watch",
+      severity: "Medium",
+      impact: Math.min(10, Math.max(1, Math.round(Math.abs(top.current) / 10000))),
+      confidence: 0.9,
+      managementQuestion: `How old is ${top.label}'s ${currency.format(Math.abs(top.current))} receivables balance, and when is it expected to convert to cash?`,
+    });
+    relationships.push(`The largest reported receivables balance is ${top.label} at ${currency.format(Math.abs(top.current))}.`);
+  } else {
+    unknowns.push("Accounts-receivable detail was not available, so ClearCFO cannot attribute cash pressure to specific customers.");
+  }
+
+  const inventory = reportRowsWithPeriods(detailReports.inventoryValuation).sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
+  if (inventory.length) {
+    const top = inventory[0];
+    drivers.push({
+      id: "inventory-detail",
+      category: "Inventory",
+      title: "Inventory is concentrated in specific items",
+      observation: `${top.label} has the largest reported inventory value at ${currency.format(Math.abs(top.current))}.`,
+      evidence: inventory.slice(0, 3).map((row) => `${row.label}: ${currency.format(Math.abs(row.current))}`),
+      direction: "watch",
+      severity: "Medium",
+      impact: Math.min(10, Math.max(1, Math.round(Math.abs(top.current) / 10000))),
+      confidence: 0.9,
+      managementQuestion: `Is ${top.label}'s ${currency.format(Math.abs(top.current))} inventory balance turning at an acceptable rate?`,
+    });
+    relationships.push(`The largest reported inventory balance is ${top.label} at ${currency.format(Math.abs(top.current))}.`);
+  } else {
+    unknowns.push("Inventory detail was not available, so ClearCFO cannot identify which items are tying up the most cash.");
+  }
+
+  return { drivers, details, relationships, unknowns };
+}
+
 function buildManagementQuestions(detailReports: Record<string, any>): ManagementQuestion[] {
   const questions: ManagementQuestion[] = [];
 
