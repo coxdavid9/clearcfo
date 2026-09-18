@@ -104,7 +104,7 @@ function latestPopulatedIndex(series: number[][]): number {
   return -1;
 }
 
-function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number): FinancialDriver[] {
+function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number, previousCash: number, currentCash: number, previousInventory: number, currentInventory: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
   // Dollar-materiality floors: a percentage move on a tiny base is noise, not a
   // signal. Each driver below keeps its percentage threshold AND requires the
@@ -471,7 +471,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const expenseChange = previous >= 0 ? changePercent(currentExpense, previousExpense) : Number.NaN;
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
-  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense);
+  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
   const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);
