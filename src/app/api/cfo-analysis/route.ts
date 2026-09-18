@@ -212,10 +212,24 @@ export async function POST(request: Request) {
     const bodyObject = body as Record<string, unknown>;
     const model = process.env.OPENAI_MODEL || "gpt-5-mini";
     const scenarioSignals = deriveScenarioSignals(bodyObject);
+    const snapshot = bodyObject.financialSnapshot && typeof bodyObject.financialSnapshot === "object"
+      ? bodyObject.financialSnapshot as Record<string, unknown>
+      : {};
+    const currentExpense = asFiniteNumber(snapshot.operatingExpense);
+    const previousExpense = asFiniteNumber(snapshot.previousOperatingExpense);
+    const expenseDelta = currentExpense !== null && previousExpense !== null ? currentExpense - previousExpense : null;
+    const materialityDirectives = [];
+    if (currentExpense !== null && previousExpense !== null && Math.abs(previousExpense) < 1000) {
+      materialityDirectives.push(`Operating expense prior-period baseline is only ${Math.round(previousExpense).toLocaleString("en-US")} and current expense is ${Math.round(currentExpense).toLocaleString("en-US")}. Do not use the resulting percentage change as a headline fact, primary driver, management question, or action rationale. Use the dollar movement of ${Math.abs(Math.round(expenseDelta ?? 0)).toLocaleString("en-US")} and the starting/ending balances instead.`);
+    }
+    if (currentExpense !== null && previousExpense !== null && expenseDelta !== null) {
+      materialityDirectives.push(`For operating expense, the observed dollar movement is ${expenseDelta >= 0 ? "+" : ""}${Math.round(expenseDelta).toLocaleString("en-US")} from ${Math.round(previousExpense).toLocaleString("en-US")} to ${Math.round(currentExpense).toLocaleString("en-US")}. Treat this dollar movement as more informative than the percentage when the baseline is small.`);
+    }
     const scenarioDirectives = [
       scenarioSignals.inventoryBuildup ? "Inventory buildup is a confirmed deterministic signal. Explicitly name inventory as the primary working-capital pattern; do not replace it with a generic margin or revenue statement." : "",
       scenarioSignals.expenseSpikeRecovery ? "Operating expenses spiked and then recovered. Explicitly name the OPEX spike/recovery pattern and keep it distinct from any revenue spike." : "",
       scenarioSignals.revenueVolatility ? `Revenue volatility is a deterministic signal: revenue spans $${Math.round(scenarioSignals.revenueVolatility.min).toLocaleString("en-US")} to $${Math.round(scenarioSignals.revenueVolatility.max).toLocaleString("en-US")} (${scenarioSignals.revenueVolatility.maxMinRatio.toFixed(1)}x). Discuss volatility explicitly; seasonality is only a hypothesis.` : "",
+    ...materialityDirectives,
     ].filter(Boolean).join(" ");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
