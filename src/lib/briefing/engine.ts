@@ -30,6 +30,25 @@ export type BriefingData = {
   trendInsights: string[];
   trendSeries: { name: string; values: number[]; periods: string[] }[];
   unknowns: string[];
+  mtdComparison?: MtdComparison | null;
+};
+
+// Day-matched month-to-date comparison (e.g. Sep 1–18 vs Aug 1–18). Built
+// from daily-granularity P&L data. Sums are computed from reported daily
+// values only — never projected or filled in.
+export type MtdMetricComparison = {
+  current: number;
+  previous: number;
+  change: number;
+};
+
+export type MtdComparison = {
+  currentLabel: string;
+  previousLabel: string;
+  revenue: MtdMetricComparison;
+  grossProfit: MtdMetricComparison;
+  operatingExpense: MtdMetricComparison;
+  netIncome: MtdMetricComparison;
 };
 
 export type DetailDriver = {

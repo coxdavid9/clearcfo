@@ -339,6 +339,15 @@ export default function CFOBriefing() {
     { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: !Number.isFinite(data.inventoryChange) ? "text-slate-500" : data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
   ];
   const selectedMetric = expandedMetric ? metrics.find((metric) => metric.key === expandedMetric) : null;
+  const mtd = data.mtdComparison;
+  const mtdMetrics = mtd
+    ? [
+        { label: "Revenue", comparison: mtd.revenue, goodWhenUp: true },
+        { label: "Gross Profit", comparison: mtd.grossProfit, goodWhenUp: true },
+        { label: "Operating Expenses", comparison: mtd.operatingExpense, goodWhenUp: false },
+        { label: "Net Income", comparison: mtd.netIncome, goodWhenUp: true },
+      ]
+    : [];
   const attentionDrivers = useMemo(() => {
     const keywordMap: Record<string, string[]> = {
       revenue: ["revenue", "sales", "top-line"],
@@ -571,6 +580,34 @@ export default function CFOBriefing() {
           </div>
 
           {selectedMetric && <div className="mt-6 hidden md:block">{renderMetricDetail(selectedMetric)}</div>}
+
+          {mtd && mtdMetrics.length > 0 && (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Month to date</p>
+                  <p className="mt-1 text-xs text-slate-500">{mtd.currentLabel} vs {mtd.previousLabel} · same days, prior month</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {mtdMetrics.map((item) => {
+                  const change = item.comparison.change;
+                  const positive = change > 0;
+                  const negative = change < 0;
+                  const good = item.goodWhenUp ? positive : negative;
+                  const bad = item.goodWhenUp ? negative : positive;
+                  const tone = !Number.isFinite(change) ? "text-slate-400" : good ? "text-emerald-600" : bad ? "text-red-600" : "text-slate-500";
+                  return (
+                    <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                      <p className="text-xs font-medium text-slate-500">{item.label}</p>
+                      <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">{currency.format(item.comparison.current)}</p>
+                      <p className="mt-1 text-xs font-semibold"><span className={tone}>{displayChange(change)}</span> <span className="font-normal text-slate-400">vs {mtd.previousLabel}</span></p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">

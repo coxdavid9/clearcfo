@@ -60,6 +60,14 @@ export async function GET() {
     start.setDate(1);
     const reportParams = { start_date: isoDate(start), end_date: isoDate(end), summarize_column_by: "Month" };
 
+    // Day-matched MTD: daily P&L for the elapsed days of the current month
+    // and the same days of the previous month (capped at the previous
+    // month's length, e.g. Mar 31 -> Feb 1-28).
+    const currentMonthStart = new Date(end.getFullYear(), end.getMonth(), 1);
+    const prevMonthStart = new Date(end.getFullYear(), end.getMonth() - 1, 1);
+    const prevMonthLength = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+    const prevMonthEnd = new Date(end.getFullYear(), end.getMonth() - 1, Math.min(end.getDate(), prevMonthLength));
+
     const [pnl, balanceSheet, connection] = await Promise.all([
       quickBooksReport(user.id, "ProfitAndLoss", reportParams),
       quickBooksReport(user.id, "BalanceSheet", reportParams),
@@ -73,6 +81,8 @@ export async function GET() {
       agedReceivables: quickBooksReport(user.id, "AgedReceivableDetail", { end_date: reportParams.end_date }),
       agedPayables: quickBooksReport(user.id, "AgedPayableDetail", { end_date: reportParams.end_date }),
       inventoryValuation: quickBooksReport(user.id, "InventoryValuationSummary", { end_date: reportParams.end_date }),
+      mtdCurrent: quickBooksReport(user.id, "ProfitAndLoss", { start_date: isoDate(currentMonthStart), end_date: isoDate(end), summarize_column_by: "Day" }),
+      mtdPrevious: quickBooksReport(user.id, "ProfitAndLoss", { start_date: isoDate(prevMonthStart), end_date: isoDate(prevMonthEnd), summarize_column_by: "Day" }),
     } as const;
 
     const detailEntries = await Promise.all(
