@@ -105,10 +105,25 @@ export default function CFOBriefing() {
   }, [trendPeriods.length]);
   const deterministicManagementQuestions = useMemo(() => {
     const questions: Array<{ category: string; question: string }> = [];
+    const priorFromChange = (current: number, change: number): number | null => {
+      if (!Number.isFinite(current) || !Number.isFinite(change) || change === -100) return null;
+      const prior = current / (1 + change / 100);
+      return Number.isFinite(prior) ? prior : null;
+    };
+    const changeDescription = (current: number, change: number): string => {
+      const prior = priorFromChange(current, change);
+      if (prior === null) return "the prior-period comparison is unavailable";
+      const delta = current - prior;
+      const percentText = formatPercentValue(Math.abs(change));
+      if (Math.abs(change) >= 100 || Math.abs(prior) < 1000) {
+        return `${delta >= 0 ? "up" : "down"} ${currency.format(Math.abs(delta))} (${percentText}) from ${currency.format(prior)}`;
+      }
+      return `${delta >= 0 ? "up" : "down"} ${percentText}`;
+    };
     if (Number.isFinite(data.revenueChange)) {
       questions.push({
         category: "Revenue",
-        question: `Revenue moved ${formatPercentValue(Math.abs(data.revenueChange))} ${data.revenueChange >= 0 ? "up" : "down"} versus the prior period. What changed in customer volume, pricing, or mix to produce that movement?`,
+        question: `Revenue is ${currency.format(data.revenue)} and moved ${changeDescription(data.revenue, data.revenueChange)} versus the prior period. What changed in customer volume, pricing, or mix to produce that movement?`,
       });
     }
     if (Number.isFinite(data.operatingExpense) && Number.isFinite(data.previousOperatingExpense)) {
@@ -128,7 +143,7 @@ export default function CFOBriefing() {
     if (Number.isFinite(data.cashChange) && data.cashChange < 0) {
       questions.push({
         category: "Cash",
-        question: `Cash declined ${formatPercentValue(Math.abs(data.cashChange))}. How much of the change came from receivables, inventory, payables, debt, capital spending, or owner distributions?`,
+        question: `Cash is ${currency.format(data.cash)} and moved ${changeDescription(data.cash, data.cashChange)} versus the prior period. How much of the change came from receivables, inventory, payables, debt, capital spending, or owner distributions?`,
       });
     }
     if (Number.isFinite(data.marginChange) && data.marginChange < -2) {
@@ -140,7 +155,7 @@ export default function CFOBriefing() {
     if (Number.isFinite(data.inventoryChange) && data.inventoryChange !== 0) {
       questions.push({
         category: "Inventory",
-        question: `Inventory changed ${formatPercentValue(Math.abs(data.inventoryChange))}. Is inventory moving in line with sales, and are any items becoming slow-moving?`,
+        question: `Inventory is ${currency.format(data.inventory)} and moved ${changeDescription(data.inventory, data.inventoryChange)} versus the prior period. Is inventory moving in line with sales, and are any items becoming slow-moving?`,
       });
     }
     return questions.slice(0, 5);
