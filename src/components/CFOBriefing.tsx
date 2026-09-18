@@ -313,8 +313,11 @@ export default function CFOBriefing() {
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-xl text-blue-600">✦</div>
       <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
       <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Your CFO Briefing starts with your data.</h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">Upload a financial workbook to generate KPIs, trends, exceptions, and prioritized recommendations.</p>
-      <button type="button" onClick={() => fileRef.current?.click()} className="mt-7 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Financial Data"}</button>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">Connect QuickBooks or upload a financial workbook to generate KPIs, trends, exceptions, and prioritized recommendations.</p>
+      <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <a href="/api/quickbooks/connect" className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">Connect QuickBooks</a>
+        <button type="button" onClick={() => fileRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Financial Data"}</button>
+      </div>
       <p className="mt-3 text-xs text-slate-400">Your real customer dashboard will start here — no fake numbers.</p>
     </div>
   );
