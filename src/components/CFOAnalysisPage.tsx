@@ -46,6 +46,10 @@ function analysisFingerprint(input: BriefingData) {
     inventoryChange: input.inventoryChange,
     trend: input.trend.slice(-12),
     periods: input.periods.slice(-12),
+    drivers: input.drivers,
+    detailDrivers: input.detailDrivers,
+    relationships: input.relationships,
+    unknowns: input.unknowns,
   });
 }
 
