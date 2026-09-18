@@ -96,6 +96,7 @@ export type FinancialDriver = {
   impact: number;
   confidence: number;
   managementQuestion: string;
+  estimatedImpact?: number;
 };
 
 export type AIAction = {
@@ -103,6 +104,7 @@ export type AIAction = {
   rationale: string;
   priority: "High" | "Medium" | "Watch";
   score?: number;
+  estimatedImpact?: number;
 };
 
 export type AIAnalysis = {
