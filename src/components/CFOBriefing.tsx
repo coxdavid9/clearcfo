@@ -103,6 +103,47 @@ export default function CFOBriefing() {
     if (last === 0) return [0];
     return Array.from(new Set([0, Math.round(last / 3), Math.round((last * 2) / 3), last]));
   }, [trendPeriods.length]);
+  const deterministicManagementQuestions = useMemo(() => {
+    const questions: Array<{ category: string; question: string }> = [];
+    if (Number.isFinite(data.revenueChange)) {
+      questions.push({
+        category: "Revenue",
+        question: `Revenue moved ${formatPercentValue(Math.abs(data.revenueChange))} ${data.revenueChange >= 0 ? "up" : "down"} versus the prior period. What changed in customer volume, pricing, or mix to produce that movement?`,
+      });
+    }
+    if (Number.isFinite(data.operatingExpense) && Number.isFinite(data.previousOperatingExpense)) {
+      const delta = data.operatingExpense - data.previousOperatingExpense;
+      questions.push({
+        category: "Expenses",
+        question: `Operating expenses moved from ${currency.format(data.previousOperatingExpense)} to ${currency.format(data.operatingExpense)} (${delta >= 0 ? "+" : ""}${currency.format(delta)}). Which expense accounts make up that dollar movement, and which costs are recurring?`,
+      });
+    } else if (Number.isFinite(data.revenueChange)) {
+      questions.push({
+        category: "Expenses",
+        question: "Which expense accounts are responsible for the largest change in operating costs, and which increases are recurring versus one-time?",
+      });
+    }
+    if (Number.isFinite(data.cashChange) && data.cashChange < 0) {
+      questions.push({
+        category: "Cash",
+        question: `Cash declined ${formatPercentValue(Math.abs(data.cashChange))}. How much of the change came from receivables, inventory, payables, debt, capital spending, or owner distributions?`,
+      });
+    }
+    if (Number.isFinite(data.marginChange) && data.marginChange < -2) {
+      questions.push({
+        category: "Margin",
+        question: `Gross margin declined ${Math.abs(data.marginChange).toFixed(1)} percentage points. Was the movement driven by pricing, product mix, or direct-cost changes?`,
+      });
+    }
+    if (Number.isFinite(data.inventoryChange) && data.inventoryChange !== 0) {
+      questions.push({
+        category: "Inventory",
+        question: `Inventory changed ${formatPercentValue(Math.abs(data.inventoryChange))}. Is inventory moving in line with sales, and are any items becoming slow-moving?`,
+      });
+    }
+    return questions.slice(0, 5);
+  }, [data.revenueChange, data.operatingExpense, data.previousOperatingExpense, data.cashChange, data.marginChange, data.inventoryChange]);
+
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
 
   async function loadQuickBooksBriefing() {
@@ -472,7 +513,7 @@ export default function CFOBriefing() {
           <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
           </div>
 
-          <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><p className="mt-1 text-xs text-slate-500">Questions generated from the financial data ClearCFO received from QuickBooks.</p><div className="mt-4 space-y-3">{data.managementQuestions?.length ? data.managementQuestions.map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>) : <p className="text-sm text-slate-500">No management questions were generated from the available financial data.</p>}</div></div>
+          <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><p className="mt-1 text-xs text-slate-500">Questions generated from the financial data ClearCFO received from QuickBooks.</p><div className="mt-4 space-y-3">{(data.managementQuestions?.length ? data.managementQuestions : deterministicManagementQuestions).map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>)}</div></div>
 
           <div className="mt-10 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
             <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p></div>
