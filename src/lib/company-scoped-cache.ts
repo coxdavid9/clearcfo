@@ -49,13 +49,31 @@ export function stampQuickBooksCacheCompany(companyId: string | null | undefined
  * offline stale-cache fallback keeps working. A definite mismatch evicts
  * the other business's caches and returns false.
  */
+export function saveQuickBooksBriefingCache(briefing: unknown, companyId: string | null | undefined): void {
+  try {
+    window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
+  } catch {
+    return;
+  }
+  stampQuickBooksCacheCompany(companyId);
+}
+
+/**
+ * A verified business may only consume a cache carrying the same company
+ * stamp. Unlabeled or mismatched data is evicted. If the business cannot be
+ * verified, only a provably offline browser may use the cache.
+ */
 export function isQuickBooksCacheUsable(activeCompanyId: string | null | undefined): boolean {
   const cachedCompanyId = getCachedCompanyId();
-  if (activeCompanyId && cachedCompanyId && cachedCompanyId !== activeCompanyId) {
-    evictQuickBooksCache();
-    return false;
+  if (activeCompanyId) {
+    if (cachedCompanyId !== activeCompanyId) {
+      evictQuickBooksCache();
+      return false;
+    }
+    return true;
   }
-  return true;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  return false;
 }
 
 let activeCompanyIdPromise: Promise<string | null> | null = null;

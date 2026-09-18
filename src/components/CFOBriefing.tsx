@@ -15,7 +15,7 @@ import {
 import {
   evictQuickBooksCache,
   isQuickBooksCacheUsable,
-  stampQuickBooksCacheCompany,
+  saveQuickBooksBriefingCache,
 } from "../lib/company-scoped-cache";
 
 function cacheAnalysisInput(briefing: BriefingData) {
@@ -233,9 +233,8 @@ export default function CFOBriefing() {
         setSyncNotice("");
         setLastSyncedLabel(formatSyncedAt(payload.syncedAt || null));
         window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
-        window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
+        saveQuickBooksBriefingCache(briefing, payload.companyId);
         if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
-        stampQuickBooksCacheCompany(payload.companyId);
         cacheAnalysisInput(briefing);
       } catch (syncErr) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
