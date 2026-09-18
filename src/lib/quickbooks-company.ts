@@ -6,9 +6,11 @@ import { getActiveCompany } from "./company";
 const QB_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const QB_REVOKE_URL = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
-const QB_API_BASE = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox"
-  ? "https://sandbox-quickbooks.api.intuit.com"
-  : "https://quickbooks.api.intuit.com";
+// Default to sandbox unless production is explicitly requested: an unset
+// QUICKBOOKS_ENVIRONMENT must never silently target the production API.
+const QB_API_BASE = process.env.QUICKBOOKS_ENVIRONMENT === "production"
+  ? "https://quickbooks.api.intuit.com"
+  : "https://sandbox-quickbooks.api.intuit.com";
 const STATE_COOKIE = "clearcfo_qb_oauth_state";
 const STATE_MAX_AGE = 10 * 60;
 const APP_URL = process.env.NODE_ENV === "production"
