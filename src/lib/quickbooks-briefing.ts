@@ -1,4 +1,4 @@
-import type { BriefingData, FinancialDriver, DetailDriver } from "./briefing/engine";
+import type { BriefingData, FinancialDriver, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
 import { currency } from "./briefing/engine";
 
 type Series = { name: string; values: number[]; periods: string[] };
@@ -148,6 +148,64 @@ function latestNonZeroValue(values: number[]): number {
     if (Number.isFinite(values[index]) && values[index] !== 0) return values[index];
   }
   return 0;
+}
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function sumDailyMetric(rows: ReportNode[], groupPatterns: RegExp[], labelPatterns: RegExp[], dayCount: number, fallbackPatterns?: RegExp[]): number {
+  const series = pickSeries(rows, groupPatterns, labelPatterns, dayCount)
+    || (fallbackPatterns ? sumDataRows(rows, fallbackPatterns, dayCount) : null)
+    || [];
+  return series.slice(0, dayCount).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+}
+
+// Day-matched month-to-date: sums daily P&L values for the elapsed days of
+// the current month versus the same days of the previous month. Returns null
+// when either daily report is missing or has no usable data, in which case
+// the UI simply omits the MTD section (no projection, no filler).
+function buildDayMatchedComparison(mtdCurrent: any, mtdPrevious: any): MtdComparison | null {
+  if (!mtdCurrent || !mtdPrevious) return null;
+  const currentPeriods = reportPeriods(mtdCurrent);
+  const previousPeriods = reportPeriods(mtdPrevious);
+  if (!currentPeriods.length || !previousPeriods.length) return null;
+  if (currentPeriods.length > 31 || previousPeriods.length > 31) return null;
+
+  const now = new Date();
+  const currentRows = collectRows(mtdCurrent?.Rows, currentPeriods.length);
+  const previousRows = collectRows(mtdPrevious?.Rows, previousPeriods.length);
+
+  const metric = (rows: ReportNode[], dayCount: number, groups: RegExp[], labels: RegExp[], fallback?: RegExp[]) => sumDailyMetric(rows, groups, labels, dayCount, fallback);
+  const revenueGroups = [/^income$/, /^revenue$/, /^sales$/];
+  const revenueLabels = [/^total income$/, /^total revenue$/, /^net revenue$/, /^total sales$/, /^net sales$/];
+  const cogsGroups = [/^cogs$/, /^costofgoodssold$/, /^costofsales$/, /^costofrevenue$/];
+  const cogsLabels = [/^total cost of goods sold$/, /^cost of goods sold$/, /^cost of sales$/, /^cost of revenue$/];
+  const expenseGroups = [/^expenses$/, /^operatingexpenses$/];
+  const expenseLabels = [/^total operating expenses$/, /^operating expenses$/, /^total expenses$/, /^expenses$/];
+  const netGroups = [/^netincome$/, /^netoperatingincome$/];
+  const netLabels = [/^net income$/, /^net operating income$/];
+
+  const currentRevenue = metric(currentRows, currentPeriods.length, revenueGroups, revenueLabels, [/revenue/, /^sales$/]);
+  const previousRevenue = metric(previousRows, previousPeriods.length, revenueGroups, revenueLabels, [/revenue/, /^sales$/]);
+  if (currentRevenue === 0 && previousRevenue === 0) return null;
+
+  const currentCogs = metric(currentRows, currentPeriods.length, cogsGroups, cogsLabels);
+  const previousCogs = metric(previousRows, previousPeriods.length, cogsGroups, cogsLabels);
+  const currentExpense = metric(currentRows, currentPeriods.length, expenseGroups, expenseLabels, [/expense/]);
+  const previousExpense = metric(previousRows, previousPeriods.length, expenseGroups, expenseLabels, [/expense/]);
+  const currentNet = metric(currentRows, currentPeriods.length, netGroups, netLabels);
+  const previousNet = metric(previousRows, previousPeriods.length, netGroups, netLabels);
+
+  const compare = (current: number, previous: number): MtdMetricComparison => ({ current, previous, change: changePercent(current, previous) });
+  const monthLabel = (date: Date, dayCount: number) => `${SHORT_MONTHS[date.getMonth()]} 1–${dayCount}, ${date.getFullYear()}`;
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return {
+    currentLabel: monthLabel(now, currentPeriods.length),
+    previousLabel: monthLabel(prevMonth, previousPeriods.length),
+    revenue: compare(currentRevenue, previousRevenue),
+    grossProfit: compare(currentRevenue - currentCogs, previousRevenue - previousCogs),
+    operatingExpense: compare(currentExpense, previousExpense),
+    netIncome: compare(currentNet, previousNet),
+  };
 }
 
 function topReportRows(report: any, limit = 3): Array<{ label: string; value: number }> {
