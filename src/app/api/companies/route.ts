@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
-import { createCompany, listUserCompanies, requireCurrentCompanyUser } from "../../../lib/company";
+import { createCompany, getActiveCompany, listUserCompanies, requireCurrentCompanyUser } from "../../../lib/company";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
     const userId = await requireCurrentCompanyUser();
+    const companies = await listUserCompanies(userId);
+    // Resolve the active company without creating one: getActiveCompany
+    // auto-creates when the user has none, so only call it when memberships
+    // already exist.
+    const activeCompany = companies.length ? await getActiveCompany(userId) : null;
     return NextResponse.json(
-      { companies: await listUserCompanies(userId) },
+      { companies, activeCompanyId: activeCompany?.id || null },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
