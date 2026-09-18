@@ -687,6 +687,29 @@ export default function CFOBriefing() {
           <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
           </div>
 
+          {data.cashFlow && (
+            <div className="mt-10">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Cash flow</p>
+                <p className="mt-1 text-xs text-slate-500">From net income to cash: working-capital changes for the latest period.</p>
+                <div className="mt-4 space-y-2">
+                  {data.cashFlow.lines.map((line) => (
+                    <div key={line.label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-900">{line.label}</p>
+                      <p className={line.value >= 0 ? "text-sm font-bold text-emerald-600" : "text-sm font-bold text-red-600"}>{line.value >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(line.value)))}</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3">
+                    <p className="text-sm font-bold text-white">Net cash from operations</p>
+                    <p className="text-sm font-bold text-white">{data.cashFlow.operatingCashFlow >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.operatingCashFlow)))}</p>
+                  </div>
+                </div>
+                {data.cashFlow.cashChange !== null && (
+                  <p className="mt-3 text-xs text-slate-500">Reported change in cash: {data.cashFlow.cashChange >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.cashChange)))}.</p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><p className="mt-1 text-xs text-slate-500">{liveSource === "upload" ? "Questions generated from your uploaded financial data." : "Questions generated from the financial data ClearCFO received from QuickBooks."}</p><div className="mt-4 space-y-3">{(data.managementQuestions?.length ? data.managementQuestions : deterministicManagementQuestions).map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>)}</div></div>
 
           <div className="mt-10 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
