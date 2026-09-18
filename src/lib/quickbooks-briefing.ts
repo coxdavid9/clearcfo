@@ -571,6 +571,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     detailDrivers: detailed.details,
     trendInsights: [],
     trendSeries,
+    mtdComparison: buildDayMatchedComparison(detailReports.mtdCurrent, detailReports.mtdPrevious),
     unknowns: [
       ...(cashSeries ? [] : ["QuickBooks did not return a cash balance series for the requested periods."]),
       ...(inventory ? [] : ["QuickBooks did not return an inventory balance series for the requested periods."]),
