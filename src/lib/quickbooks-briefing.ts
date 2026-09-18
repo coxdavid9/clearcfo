@@ -130,11 +130,14 @@ function buildDrivers(revenueChange: number, marginChange: number, cashChange: n
 }
 
 function buildAlerts(revenueChange: number, cashChange: number, inventoryChange: number, expenseChange: number): string[] {
+  // Exception-driven, mirroring the upload path: only genuinely notable
+  // movements become alerts. Calm periods produce no alerts, and the
+  // executive summary then reports "no major exceptions" instead of
+  // restating every metric.
   const alerts: string[] = [];
-  if (Number.isFinite(revenueChange)) alerts.push(`Revenue changed ${formatPercent(revenueChange)} from the prior period.`);
-  if (Number.isFinite(expenseChange)) alerts.push(`Operating expenses changed ${formatPercent(expenseChange)} from the prior period.`);
-  if (Number.isFinite(cashChange)) alerts.push(`Cash changed ${formatPercent(cashChange)} from the prior period.`);
-  if (Number.isFinite(inventoryChange)) alerts.push(`Inventory changed ${formatPercent(inventoryChange)} from the prior period.`);
+  if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2) alerts.push(`Operating expenses increased ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`);
+  if (Number.isFinite(cashChange) && cashChange < -5) alerts.push(`Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`);
+  if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2) alerts.push(`Inventory increased ${formatPercent(inventoryChange)}, outpacing revenue change of ${formatPercent(revenueChange)}.`);
   return alerts;
 }
 
