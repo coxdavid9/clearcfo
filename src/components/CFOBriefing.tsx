@@ -184,9 +184,17 @@ export default function CFOBriefing() {
         cached = null;
       }
 
-      const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
-      const statusPayload = await statusResponse.json();
-      if (!statusResponse.ok || !statusPayload?.connection?.connected) {
+      let statusPayload: any = null;
+      let statusOk = false;
+      try {
+        const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+        statusOk = statusResponse.ok;
+        statusPayload = await statusResponse.json();
+      } catch {
+        // A transient non-JSON status response must not error the whole page:
+        // fall through to the cached briefing below.
+      }
+      if (!statusOk || !statusPayload?.connection?.connected) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
           setLiveSource("quickbooks");
