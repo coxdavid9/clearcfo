@@ -218,7 +218,25 @@ export async function POST(request: Request) {
     const currentExpense = asFiniteNumber(snapshot.operatingExpense);
     const previousExpense = asFiniteNumber(snapshot.previousOperatingExpense);
     const expenseDelta = currentExpense !== null && previousExpense !== null ? currentExpense - previousExpense : null;
+    const priorFromChange = (current: number | null, change: number | null): number | null => {
+      if (current === null || change === null || change === -100) return null;
+      const prior = current / (1 + change / 100);
+      return Number.isFinite(prior) ? prior : null;
+    };
     const materialityDirectives = [];
+    const snapshotMetrics = [
+      { name: "revenue", current: asFiniteNumber(snapshot.revenue), change: asFiniteNumber(snapshot.revenueChange) },
+      { name: "cash", current: asFiniteNumber(snapshot.cash), change: asFiniteNumber(snapshot.cashChange) },
+      { name: "inventory", current: asFiniteNumber(snapshot.inventory), change: asFiniteNumber(snapshot.inventoryChange) },
+      { name: "operating expense", current: currentExpense, change: asFiniteNumber(snapshot.operatingExpenseChange) },
+    ];
+    for (const metric of snapshotMetrics) {
+      if (metric.current === null || metric.change === null || Math.abs(metric.change) < 100) continue;
+      const prior = priorFromChange(metric.current, metric.change);
+      if (prior === null) continue;
+      const delta = metric.current - prior;
+      materialityDirectives.push(`For ${metric.name}, the reported percentage change is ${metric.change.toFixed(1)}% from ${Math.round(prior).toLocaleString("en-US")} to ${Math.round(metric.current).toLocaleString("en-US")}. Lead with the dollar movement of ${Math.abs(Math.round(delta)).toLocaleString("en-US")} and the starting/ending balances; do not present the percentage alone as evidence of material business impact.`);
+    }
     if (currentExpense !== null && previousExpense !== null && Math.abs(previousExpense) < 1000) {
       materialityDirectives.push(`Operating expense prior-period baseline is only ${Math.round(previousExpense).toLocaleString("en-US")} and current expense is ${Math.round(currentExpense).toLocaleString("en-US")}. Do not use the resulting percentage change as a headline fact, primary driver, management question, or action rationale. Use the dollar movement of ${Math.abs(Math.round(expenseDelta ?? 0)).toLocaleString("en-US")} and the starting/ending balances instead.`);
     }
