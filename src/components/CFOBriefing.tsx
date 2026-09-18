@@ -289,16 +289,6 @@ export default function CFOBriefing() {
     </div>
   );
 
-  if (!hasValidAnalysis) {
-    return (
-      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
-        {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
-        <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
-      </div>
-    );
-  }
-
   const metrics = [
     { key: "revenue" as const, label: "Revenue", value: currency.format(data.revenue), change: data.revenueChange, tone: data.revenueChange > 0 ? "text-emerald-600" : data.revenueChange < 0 ? "text-red-600" : "text-amber-600", signal: data.revenueChange > 0 ? "bg-emerald-500" : data.revenueChange < 0 ? "bg-red-500" : "bg-amber-400" },
     { key: "margin" as const, label: "Gross Margin", value: formatPercentValue(data.grossMargin), change: data.marginChange, tone: marginBaseline ? "text-amber-600" : data.marginChange > 0 ? "text-emerald-600" : data.marginChange < 0 ? "text-red-600" : "text-amber-600", signal: marginBaseline ? "bg-amber-400" : data.marginChange > 0 ? "bg-emerald-500" : data.marginChange < 0 ? "bg-red-500" : "bg-amber-400" },
@@ -424,6 +414,16 @@ export default function CFOBriefing() {
     };
     return driverMap[activeMetricKey] || driverMap.revenue;
   }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change]);
+
+  if (!hasValidAnalysis) {
+    return (
+      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
+        <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
+      </div>
+    );
+  }
 
   const renderMetricDetail = (metric: (typeof metrics)[number]) => (
     <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
