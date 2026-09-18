@@ -115,7 +115,7 @@ export default function CFOBriefing() {
       const delta = data.operatingExpense - data.previousOperatingExpense;
       questions.push({
         category: "Expenses",
-        question: `Operating expenses moved from ${currency.format(data.previousOperatingExpense)} to ${currency.format(data.operatingExpense)} (${delta >= 0 ? "+" : ""}${currency.format(delta)}). Which expense accounts make up that dollar movement, and which costs are recurring?`,
+        question: `Operating expenses moved from ${currency.format(data.previousOperatingExpense ?? 0)} to ${currency.format(data.operatingExpense ?? 0)} (${delta >= 0 ? "+" : ""}${currency.format(delta)}). Which expense accounts make up that dollar movement, and which costs are recurring?`,
       });
     } else if (Number.isFinite(data.revenueChange)) {
       questions.push({
