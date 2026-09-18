@@ -22,7 +22,7 @@ export type BriefingData = {
   periods: string[];
   health: string;
   confidence: number;
-  source: "demo" | "upload";
+  source: "demo" | "upload" | "quickbooks";
   drivers: FinancialDriver[];
   managementQuestions?: Array<{ category: string; question: string }>;
   relationships: string[];
