@@ -31,6 +31,17 @@ export type BriefingData = {
   trendSeries: { name: string; values: number[]; periods: string[] }[];
   unknowns: string[];
   mtdComparison?: MtdComparison | null;
+  ratios?: FinancialRatio[];
+};
+
+// Balance-sheet health ratios for the latest synced period. All values are
+// computed deterministically from synced QuickBooks data — never estimated.
+export type FinancialRatio = {
+  id: string;
+  label: string;
+  value: string;
+  interpretation: string;
+  health: "strong" | "watch" | "attention";
 };
 
 // Day-matched month-to-date comparison (e.g. Sep 1–18 vs Aug 1–18). Built
