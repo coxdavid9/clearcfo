@@ -195,24 +195,11 @@ export default function CFOBriefing() {
         // fall through to the cached briefing below.
       }
       // Multi-company isolation: the cached briefing belongs to exactly one
-      // business. Only trust it when ownership can be verified against the
-      // active company id from the status response. When the status call
-      // itself failed (e.g. offline), the company cannot be verified, so fall
-      // through to the legacy behavior and let the stale-cache fallback work.
-      // A definite mismatch means the user switched businesses (or created a
-      // new one): evict the other business's cache and treat it as absent.
+      // business. isQuickBooksCacheUsable evicts the other business's caches
+      // on a definite mismatch; when the company cannot be verified (e.g.
+      // offline) it keeps the legacy stale-cache fallback.
       const activeCompanyId = statusPayload?.activeCompanyId || statusPayload?.connection?.companyId || null;
-      let cachedCompanyId: string | null = null;
-      try {
-        cachedCompanyId = window.localStorage.getItem("clearcfo_qb_cache_company_id");
-      } catch {
-        cachedCompanyId = null;
-      }
-      if (activeCompanyId && cachedCompanyId && cachedCompanyId !== activeCompanyId) {
-        window.localStorage.removeItem("clearcfo_qb_briefing_cache");
-        window.localStorage.removeItem("clearcfo_qb_last_synced_at");
-        window.localStorage.removeItem("clearcfo_qb_diagnostics");
-        window.localStorage.removeItem("clearcfo_qb_cache_company_id");
+      if (!isQuickBooksCacheUsable(activeCompanyId)) {
         cached = null;
       }
       if (!statusOk || !statusPayload?.connection?.connected) {
@@ -243,8 +230,7 @@ export default function CFOBriefing() {
         window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
         window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
         if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
-        if (payload.companyId) window.localStorage.setItem("clearcfo_qb_cache_company_id", payload.companyId);
-        else window.localStorage.removeItem("clearcfo_qb_cache_company_id");
+        stampQuickBooksCacheCompany(payload.companyId);
         cacheAnalysisInput(briefing);
       } catch (syncErr) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
@@ -285,11 +271,7 @@ export default function CFOBriefing() {
     };
 
     const handleDisconnect = () => {
-      window.localStorage.removeItem("clearcfo_qb_briefing_cache");
-      window.localStorage.removeItem("clearcfo_qb_last_synced_at");
-      window.localStorage.removeItem("clearcfo_qb_cache_company_id");
-      window.localStorage.removeItem("clearcfo_qb_initial_sync");
-      window.localStorage.removeItem("clearcfo_analysis_input");
+      evictQuickBooksCache();
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setError("");
