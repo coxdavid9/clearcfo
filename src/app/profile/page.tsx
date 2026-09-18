@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import CustomerProfile from "../../components/CustomerProfile";
 import QuickBooksProfileConnection from "../../components/QuickBooksProfileConnection";
+import BusinessManager from "../../components/BusinessManager";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,8 @@ export default async function ProfilePage() {
         />
 
         <QuickBooksProfileConnection />
+
+        <BusinessManager />
 
         <section className="mb-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
