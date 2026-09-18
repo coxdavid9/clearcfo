@@ -1,6 +1,7 @@
 "use client";
 
 import { useInsertionEffect } from "react";
+import { evictQuickBooksCache } from "../lib/company-scoped-cache";
 
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
 const DIAGNOSTICS_KEY = "clearcfo_qb_diagnostics";
@@ -14,10 +15,7 @@ const TREND_VERSION_KEY = "clearcfo_qb_trend_series_v4";
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 function evictCache() {
-  window.localStorage.removeItem(CACHE_KEY);
-  window.localStorage.removeItem(DIAGNOSTICS_KEY);
-  window.localStorage.removeItem(SYNC_KEY);
-  window.localStorage.removeItem("clearcfo_qb_cache_company_id");
+  evictQuickBooksCache();
 }
 
 export default function QuickBooksBriefingCache() {

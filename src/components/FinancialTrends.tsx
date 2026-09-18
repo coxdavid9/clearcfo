@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
 
 type TrendSeries = { name: string; values: number[]; periods: string[] };
 type TrendCardProps = { title: string; series: TrendSeries | undefined; tone: "positive" | "watch"; chartColor: string };
@@ -83,8 +84,11 @@ export default function FinancialTrends() {
     };
     const load = async () => {
       try {
+        // The cached briefing belongs to exactly one business; never render
+        // another business's trends here.
+        const activeCompanyId = await getActiveCompanyId();
         const cached = window.localStorage.getItem("clearcfo_qb_briefing_cache");
-        if (cached) { applyPayload(JSON.parse(cached)); return; }
+        if (cached && isQuickBooksCacheUsable(activeCompanyId)) { applyPayload(JSON.parse(cached)); return; }
         const status = await fetch("/api/quickbooks/status", { cache: "no-store" });
         const statusPayload = await status.json();
         if (!status.ok || !statusPayload?.connection?.connected) return;

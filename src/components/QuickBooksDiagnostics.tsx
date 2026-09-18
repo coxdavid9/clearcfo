@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
 
 const DIAGNOSTICS_KEY = "clearcfo_qb_diagnostics";
 
@@ -25,8 +26,15 @@ export default function QuickBooksDiagnostics() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const load = () => {
+    const load = async () => {
       try {
+        // Diagnostics belong to the business that synced them; never show
+        // another business's diagnostics here.
+        const activeCompanyId = await getActiveCompanyId();
+        if (!isQuickBooksCacheUsable(activeCompanyId)) {
+          setDiagnostics(null);
+          return;
+        }
         const cached = window.localStorage.getItem(DIAGNOSTICS_KEY);
         setDiagnostics(cached ? JSON.parse(cached) : null);
       } catch {
@@ -37,7 +45,7 @@ export default function QuickBooksDiagnostics() {
     const handleUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (detail) setDiagnostics(detail);
-      else load();
+      else void load();
     };
     window.addEventListener("clearcfo:quickbooks-diagnostics", handleUpdate);
     return () => window.removeEventListener("clearcfo:quickbooks-diagnostics", handleUpdate);

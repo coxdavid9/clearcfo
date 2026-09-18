@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { type AIAnalysis, type BriefingData, demoData } from "../lib/briefing/engine";
+import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
 
 const ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v2";
 
@@ -65,7 +66,12 @@ export default function CFOAnalysisPage() {
     const load = async () => {
       try {
         let briefing: BriefingData | null = null;
-        const stored = window.localStorage.getItem("clearcfo_analysis_input") || window.localStorage.getItem("clearcfo_qb_briefing_cache");
+        // The cached analysis input belongs to exactly one business; never
+        // analyze another business's numbers here.
+        const activeCompanyId = await getActiveCompanyId();
+        const stored = isQuickBooksCacheUsable(activeCompanyId)
+          ? window.localStorage.getItem("clearcfo_analysis_input") || window.localStorage.getItem("clearcfo_qb_briefing_cache")
+          : null;
         if (stored) {
           const parsed = JSON.parse(stored) as BriefingData;
           if (parsed?.companyName && Array.isArray(parsed.alerts)) briefing = parsed;

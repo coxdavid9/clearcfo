@@ -147,6 +147,28 @@ export async function createCompany(userId: string, input: { name: string; indus
   return company;
 }
 
+export async function updateCompany(userId: string, companyId: string, input: { name?: string }) {
+  const memberships = await listUserCompanies(userId);
+  const membership = memberships.find((item) => item.company_id === companyId);
+  if (!membership) throw new Error("Business not found.");
+  if (membership.role !== "owner" && membership.role !== "admin") throw new Error("Only owners and admins can rename a business.");
+
+  const name = input.name?.trim().slice(0, 200);
+  if (name !== undefined && !name) throw new Error("Business name is required.");
+  if (name === undefined) throw new Error("Nothing to update.");
+
+  const response = await supabaseRequest(`companies?id=eq.${encodeURIComponent(companyId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error(`Could not rename business (${response.status}).`);
+  const companies = await response.json() as Company[];
+  const company = companies[0];
+  if (!company) throw new Error("Business was not updated.");
+  return company;
+}
+
 export async function getCompanyContext() {
   const userId = await requireCurrentCompanyUser();
   const company = await getActiveCompany(userId);
