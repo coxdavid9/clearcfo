@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createCompany, getActiveCompany, listUserCompanies, requireCurrentCompanyUser } from "../../../lib/company";
+import { createCompany, getActiveCompany, listUserCompanies, requireCurrentCompanyUser, updateCompany } from "../../../lib/company";
 
 export const runtime = "nodejs";
 
@@ -18,6 +18,23 @@ export async function GET() {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load businesses.";
     return NextResponse.json({ error: message }, { status: message === "Unauthorized" ? 401 : 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const userId = await requireCurrentCompanyUser();
+    const body = await request.json().catch(() => ({}));
+    const companyId = typeof body?.companyId === "string" ? body.companyId : "";
+    if (!companyId) return NextResponse.json({ error: "Business id is required." }, { status: 400 });
+    const company = await updateCompany(userId, companyId, {
+      name: typeof body?.name === "string" ? body.name : undefined,
+    });
+    return NextResponse.json({ company });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to rename business.";
+    const status = message === "Unauthorized" ? 401 : message === "Business not found." ? 404 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
