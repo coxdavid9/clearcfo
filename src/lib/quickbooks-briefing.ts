@@ -184,6 +184,19 @@ function buildDayMatchedComparison(mtdCurrent: any, mtdPrevious: any): MtdCompar
   const netGroups = [/^netincome$/, /^netoperatingincome$/];
   const netLabels = [/^net income$/, /^net operating income$/];
 
+  // Net Income must come from the true Net Income row. The generic picker
+  // takes the first matching section in report order, which is Net Operating
+  // Income — pairing current Net Income against a prior operating-income
+  // baseline once showed -101.3% for a nearly flat bottom line.
+  const netIncomeSeries = (rows: ReportNode[], dayCount: number): number[] | null => {
+    const exact = rows.find((row) => row.type === "Section" && clean(row.label) === "net income");
+    if (exact) return exact.values.slice(0, dayCount);
+    return pickSeries(rows, netGroups, netLabels, dayCount);
+  };
+  const netMetric = (rows: ReportNode[], dayCount: number): number =>
+    (netIncomeSeries(rows, dayCount) || []).slice(0, dayCount)
+      .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+
   const currentRevenue = metric(currentRows, currentPeriods.length, revenueGroups, revenueLabels, [/revenue/, /^sales$/]);
   const previousRevenue = metric(previousRows, previousPeriods.length, revenueGroups, revenueLabels, [/revenue/, /^sales$/]);
   if (currentRevenue === 0 && previousRevenue === 0) return null;
@@ -192,8 +205,8 @@ function buildDayMatchedComparison(mtdCurrent: any, mtdPrevious: any): MtdCompar
   const previousCogs = metric(previousRows, previousPeriods.length, cogsGroups, cogsLabels);
   const currentExpense = metric(currentRows, currentPeriods.length, expenseGroups, expenseLabels, [/expense/]);
   const previousExpense = metric(previousRows, previousPeriods.length, expenseGroups, expenseLabels, [/expense/]);
-  const currentNet = metric(currentRows, currentPeriods.length, netGroups, netLabels);
-  const previousNet = metric(previousRows, previousPeriods.length, netGroups, netLabels);
+  const currentNet = netMetric(currentRows, currentPeriods.length);
+  const previousNet = netMetric(previousRows, previousPeriods.length);
 
   const compare = (current: number, previous: number): MtdMetricComparison => ({ current, previous, change: changePercent(current, previous) });
   const monthLabel = (date: Date, dayCount: number) => `${SHORT_MONTHS[date.getMonth()]} 1–${dayCount}, ${date.getFullYear()}`;
