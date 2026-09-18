@@ -108,37 +108,52 @@ export default function CFOBriefing() {
   async function loadQuickBooksBriefing() {
     try {
       const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
-      if (cachedBriefing) {
-        const cached = JSON.parse(cachedBriefing) as BriefingData;
-        if (cached?.companyName && Array.isArray(cached.alerts)) {
-          setData(cached);
-          setLiveSource("quickbooks");
-          setHasValidAnalysis(true);
-          setError("");
-          cacheAnalysisInput(cached);
-          return;
-        }
+      let cached: BriefingData | null = null;
+      try {
+        if (cachedBriefing) cached = JSON.parse(cachedBriefing) as BriefingData;
+      } catch {
+        cached = null;
       }
 
       const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
       const statusPayload = await statusResponse.json();
-      if (!statusResponse.ok || !statusPayload?.connection?.connected) return;
-
-      const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
-      const payload = await response.json();
-      if (!response.ok || !payload?.briefing) {
-        throw new Error(payload?.error || "ClearCFO could not load your QuickBooks financial data.");
+      if (!statusResponse.ok || !statusPayload?.connection?.connected) {
+        if (cached?.companyName && Array.isArray(cached.alerts)) {
+          setData(cached);
+          setLiveSource("quickbooks");
+          setHasValidAnalysis(true);
+          cacheAnalysisInput(cached);
+        }
+        return;
       }
 
-      const briefing = payload.briefing as BriefingData;
-      setData(briefing);
-      setLiveSource("quickbooks");
-      setHasValidAnalysis(true);
-      setError("");
-      window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
-      window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
-      if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
-      cacheAnalysisInput(briefing);
+      try {
+        const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload?.briefing) {
+          throw new Error(payload?.error || "ClearCFO could not load your QuickBooks financial data.");
+        }
+
+        const briefing = payload.briefing as BriefingData;
+        setData(briefing);
+        setLiveSource("quickbooks");
+        setHasValidAnalysis(true);
+        setError("");
+        window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
+        window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
+        if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
+        cacheAnalysisInput(briefing);
+      } catch (syncErr) {
+        if (cached?.companyName && Array.isArray(cached.alerts)) {
+          setData(cached);
+          setLiveSource("quickbooks");
+          setHasValidAnalysis(true);
+          cacheAnalysisInput(cached);
+          setError("");
+          return;
+        }
+        throw syncErr;
+      }
     } catch (err) {
       setHasValidAnalysis(false);
       setError(err instanceof Error ? err.message : "ClearCFO could not load your QuickBooks financial data.");
