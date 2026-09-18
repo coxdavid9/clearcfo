@@ -310,12 +310,22 @@ export async function quickBooksReport(userId: string, reportName: string, param
   if (!/^[A-Za-z]+$/.test(reportName)) throw new Error("Invalid QuickBooks report.");
   const connection = await getConnection(userId);
   if (!connection) throw new Error("QuickBooks is not connected for the selected business.");
-  const { accessToken } = await accessTokenForConnection(connection);
   const search = new URLSearchParams(params);
-  const response = await fetch(`${QB_API_BASE}/v3/company/${encodeURIComponent(connection.realm_id)}/reports/${reportName}?${search.toString()}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, cache: "no-store",
-  });
-  const payload = await response.json().catch(() => ({}));
+  const url = `${QB_API_BASE}/v3/company/${encodeURIComponent(connection.realm_id)}/reports/${reportName}?${search.toString()}`;
+  const readReport = async (accessToken: string) => {
+    const response = await intuitFetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok && response.status !== 401) throw new Error(payload?.Fault?.Error?.[0]?.Message || `QuickBooks ${reportName} report failed.`);
+    return { response, payload };
+  };
+  const { accessToken } = await accessTokenForConnection(connection);
+  let { response, payload } = await readReport(accessToken);
+  if (response.status === 401) {
+    const refreshed = await accessTokenForConnection(connection, true);
+    ({ response, payload } = await readReport(refreshed.accessToken));
+  }
   if (!response.ok) throw new Error(payload?.Fault?.Error?.[0]?.Message || `QuickBooks ${reportName} report failed.`);
   return payload;
 }
