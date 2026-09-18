@@ -81,8 +81,8 @@ export async function GET() {
       agedReceivables: quickBooksReport(user.id, "AgedReceivableDetail", { end_date: reportParams.end_date }),
       agedPayables: quickBooksReport(user.id, "AgedPayableDetail", { end_date: reportParams.end_date }),
       inventoryValuation: quickBooksReport(user.id, "InventoryValuationSummary", { end_date: reportParams.end_date }),
-      mtdCurrent: quickBooksReport(user.id, "ProfitAndLoss", { start_date: isoDate(currentMonthStart), end_date: isoDate(end), summarize_column_by: "Day" }),
-      mtdPrevious: quickBooksReport(user.id, "ProfitAndLoss", { start_date: isoDate(prevMonthStart), end_date: isoDate(prevMonthEnd), summarize_column_by: "Day" }),
+      mtdCurrent: quickBooksReport(user.id, "ProfitAndLoss", { start_date: isoDate(currentMonthStart), end_date: isoDate(end), summarize_column_by: "Days" }),
+      mtdPrevious: quickBooksReport(user.id, "ProfitAndLoss", { start_date: isoDate(prevMonthStart), end_date: isoDate(prevMonthEnd), summarize_column_by: "Days" }),
     } as const;
 
     const detailEntries = await Promise.all(
