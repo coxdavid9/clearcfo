@@ -506,7 +506,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     periods: trendSeries[0].periods,
     health: mergedDrivers.some((driver) => driver.severity === "High") ? "attention" : mergedDrivers.length ? "watch" : "strong",
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
-    source: "upload",
+    source: "quickbooks",
     drivers: mergedDrivers,
     managementQuestions: buildManagementQuestions(detailReports, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
     relationships: mergedDrivers.map((driver) => driver.observation),
