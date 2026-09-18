@@ -388,32 +388,68 @@ export default function CFOBriefing() {
     const current = activeMetricDefinition.current;
     const change = activeMetricDefinition.change;
     const currentText = activeMetricKey === "margin" ? formatPercentValue(current) : currency.format(current);
-    const changeText = Number.isFinite(change) ? (activeMetricKey === "margin" ? `${Math.abs(change).toFixed(1)} percentage points` : formatPercentValue(Math.abs(change))) : "an unavailable prior-period comparison";
-    const direction = Number.isFinite(change) ? (change >= 0 ? "increased" : "decreased") : "changed";
-    const driverMap: Record<string, Array<{ title: string; observation: string; severity: "High" | "Medium" | "Low" }>> = {
+    const priorFromChange = (currentValue: number, changeValue: number): number | null => {
+      if (!Number.isFinite(currentValue) || !Number.isFinite(changeValue) || changeValue === -100) return null;
+      const prior = currentValue / (1 + changeValue / 100);
+      return Number.isFinite(prior) ? prior : null;
+    };
+    const observedChange = (currentValue: number, changeValue: number): string => {
+      const prior = priorFromChange(currentValue, changeValue);
+      if (prior === null) return "the prior-period comparison is unavailable";
+      const delta = currentValue - prior;
+      if (activeMetricKey === "margin") return `${changeValue >= 0 ? "up" : "down"} ${Math.abs(changeValue).toFixed(1)} percentage points`;
+      if (Math.abs(changeValue) >= 100 || Math.abs(prior) < 1000) return `${delta >= 0 ? "up" : "down"} ${currency.format(Math.abs(delta))} (${formatPercentValue(Math.abs(changeValue))}) from ${currency.format(prior)}`;
+      return `${changeValue >= 0 ? "up" : "down"} ${formatPercentValue(Math.abs(changeValue))}`;
+    };
+    const categoryMap: Record<string, string> = { revenue: "Revenue", margin: "Margin", cash: "Cash", inventory: "Inventory" };
+    const category = categoryMap[activeMetricKey] || "Revenue";
+    const observedDrivers = data.drivers.filter((driver) => driver.category === category);
+    const detailed = observedDrivers.filter((driver) =>
+      ["revenue-customer-mix", "margin-pressure", "receivables-concentration", "inventory-detail"].includes(driver.id) ||
+      driver.id === "expense-detail" || driver.id === "vendor-spend"
+    );
+    const primaryObserved = detailed[0];
+    const fallback: Record<string, Array<{ title: string; observation: string }>> = {
       revenue: [
-        { title: "Sales volume", observation: `Revenue is ${currentText} and ${direction} by ${changeText}. Review units or customer activity to determine whether the movement is volume-driven.`, severity: change < 0 ? "High" : "Medium" },
-        { title: "Pricing & mix", observation: "Compare revenue movement with pricing changes and product or customer mix to separate price effects from changes in sales activity.", severity: "Medium" },
-        { title: "Customer concentration", observation: "Check whether a small number of customers are driving the change. Concentrated revenue movement can make the trend less durable than the headline KPI suggests.", severity: "Low" },
+        { title: "Sales volume", observation: `Revenue is ${currentText} and ${observedChange(current, change)}. Review units or customer activity to determine whether the movement is volume-driven.` },
+        { title: "Pricing & mix", observation: "Compare revenue movement with pricing changes and product or customer mix to separate price effects from changes in sales activity." },
+        { title: "Customer concentration", observation: "Check whether a small number of customers are driving the change. Concentrated revenue movement can make the trend less durable than the headline KPI suggests." },
       ],
       margin: [
-        { title: "Pricing", observation: `Gross margin is ${currentText} and ${direction} by ${changeText}. Review whether selling prices are keeping pace with direct costs.`, severity: change < 0 ? "High" : "Medium" },
-        { title: "Direct costs", observation: "Review COGS for supplier price increases, labor changes, freight, or other direct-cost movements that may be compressing margin.", severity: "Medium" },
-        { title: "Product mix", observation: "Determine whether the sales mix shifted toward higher- or lower-margin products, services, or customers. Mix can move gross margin even when revenue is stable.", severity: "Low" },
+        { title: "Pricing", observation: `Gross margin is ${currentText} and ${observedChange(current, change)}. Review whether selling prices are keeping pace with direct costs.` },
+        { title: "Direct costs", observation: "Review COGS for supplier price increases, labor changes, freight, or other direct-cost movements that may be compressing margin." },
+        { title: "Product mix", observation: "Determine whether the sales mix shifted toward higher- or lower-margin products, services, or customers. Mix can move gross margin even when revenue is stable." },
       ],
       cash: [
-        { title: "Collections", observation: `Cash is ${currentText} and ${direction} by ${changeText}. Review receivables aging and collection timing to understand the operating cash movement.`, severity: change < 0 ? "High" : "Medium" },
-        { title: "Working capital", observation: "Look at receivables, payables, and inventory together. Working capital can absorb cash even while the income statement remains profitable.", severity: "Medium" },
-        { title: "Debt & capital spending", observation: "Separate operating cash movement from debt payments, owner distributions, and capital purchases to identify what is driving available liquidity.", severity: "Low" },
+        { title: "Collections", observation: `Cash is ${currentText} and ${observedChange(current, change)}. Review receivables aging and collection timing to understand the operating cash movement.` },
+        { title: "Working capital", observation: "Look at receivables, payables, and inventory together. Working capital can absorb cash even while the income statement remains profitable." },
+        { title: "Debt & capital spending", observation: "Separate operating cash movement from debt payments, owner distributions, and capital purchases to identify what is driving available liquidity." },
       ],
       inventory: [
-        { title: "Sales velocity", observation: `Inventory is ${currentText} and ${direction} by ${changeText}. Compare inventory growth with sales growth to see whether stock is building faster than demand.`, severity: change > 0 ? "High" : "Medium" },
-        { title: "Purchasing", observation: "Review purchasing levels, order timing, and supplier commitments. Inventory can rise from planned buying or purchases made ahead of expected demand.", severity: "Medium" },
-        { title: "Slow-moving stock", observation: "Identify aging or slow-moving inventory that may be tying up cash and increasing the risk of markdowns, write-downs, or obsolete stock.", severity: "Low" },
+        { title: "Sales velocity", observation: `Inventory is ${currentText} and ${observedChange(current, change)}. Compare inventory growth with sales growth to see whether stock is building faster than demand.` },
+        { title: "Purchasing", observation: "Review purchasing levels, order timing, and supplier commitments. Inventory can rise from planned buying or purchases made ahead of expected demand." },
+        { title: "Slow-moving stock", observation: "Identify aging or slow-moving inventory that may be tying up cash and increasing the risk of markdowns, write-downs, or obsolete stock." },
       ],
     };
-    return driverMap[activeMetricKey] || driverMap.revenue;
-  }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change]);
+    const base = fallback[activeMetricKey] || fallback.revenue;
+    if (!primaryObserved) return base.map((item) => ({ ...item, severity: "Medium" as const }));
+    const observed = {
+      title: primaryObserved.title,
+      observation: primaryObserved.observation + (primaryObserved.evidence.length ? ` Evidence: ${primaryObserved.evidence.slice(0, 2).join("; ")}.` : ""),
+      severity: primaryObserved.severity === "High" ? "High" as const : "Medium" as const,
+    };
+    return [observed, ...base.filter((item) => item.title !== observed.title).slice(0, 2)];
+  }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.drivers]);
+
+  if (!hasValidAnalysis) {
+    return (
+      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
+        <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
+      </div>
+    );
+  }
 
   const renderMetricDetail = (metric: (typeof metrics)[number]) => (
     <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
