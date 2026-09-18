@@ -655,6 +655,35 @@ export default function CFOBriefing() {
             </div>
           )}
 
+          {data.detailDrivers && data.detailDrivers.some((item) => item.category) && (
+            <div className="mt-10">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">What moved</p>
+                <p className="mt-1 text-xs text-slate-500">The largest period-over-period movers behind the headline numbers.</p>
+                {(["Revenue", "Operating Expense"] as const).map((group) => {
+                  const items = data.detailDrivers.filter((item) => item.category === group).slice(0, 5);
+                  if (!items.length) return null;
+                  return (
+                    <div key={group} className="mt-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{group} movers</p>
+                      <div className="mt-2 space-y-2">
+                        {items.map((item) => (
+                          <div key={group + "-" + item.name} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-sm font-semibold text-slate-900">{item.name}</p>
+                            <p className="text-sm">
+                              <span className="text-slate-500">{currency.format(Math.round(item.previous))} → </span>
+                              <span className="font-bold text-slate-900">{currency.format(Math.round(item.current))}</span>
+                              <span className={item.change >= 0 ? "ml-2 font-semibold text-emerald-600" : "ml-2 font-semibold text-red-600"}>{item.change >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(item.change)))}{item.previous !== 0 ? " (" + formatPercentValue(item.percentChange) + ")" : ""}</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
           </div>
 
