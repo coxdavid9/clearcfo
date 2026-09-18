@@ -45,6 +45,8 @@ export default function CFOBriefing() {
   const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [syncNotice, setSyncNotice] = useState("");
+  const [lastSyncedLabel, setLastSyncedLabel] = useState("");
   const [expandedMetric, setExpandedMetric] = useState<ExpandedMetric>(null);
 
   const marginBaseline = data.drivers.some((driver) => driver.id === "margin-baseline");
@@ -159,9 +161,18 @@ export default function CFOBriefing() {
       });
     }
     return questions.slice(0, 5);
-  }, [data.revenueChange, data.operatingExpense, data.previousOperatingExpense, data.cashChange, data.marginChange, data.inventoryChange]);
+  }, [data.revenue, data.revenueChange, data.operatingExpense, data.previousOperatingExpense, data.cash, data.cashChange, data.marginChange, data.inventory, data.inventoryChange]);
 
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
+
+  function formatSyncedAt(raw: string | null): string {
+    try {
+      const time = raw ? new Date(raw).getTime() : NaN;
+      return Number.isFinite(time) ? new Date(time).toLocaleString() : "";
+    } catch {
+      return "";
+    }
+  }
 
   async function loadQuickBooksBriefing() {
     try {
@@ -173,14 +184,23 @@ export default function CFOBriefing() {
         cached = null;
       }
 
-      const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
-      const statusPayload = await statusResponse.json();
-      if (!statusResponse.ok || !statusPayload?.connection?.connected) {
+      let statusPayload: any = null;
+      let statusOk = false;
+      try {
+        const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+        statusOk = statusResponse.ok;
+        statusPayload = await statusResponse.json();
+      } catch {
+        // A transient non-JSON status response must not error the whole page:
+        // fall through to the cached briefing below.
+      }
+      if (!statusOk || !statusPayload?.connection?.connected) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           cacheAnalysisInput(cached);
+          setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
         }
         return;
       }
@@ -197,6 +217,8 @@ export default function CFOBriefing() {
         setLiveSource("quickbooks");
         setHasValidAnalysis(true);
         setError("");
+        setSyncNotice("");
+        setLastSyncedLabel(formatSyncedAt(payload.syncedAt || null));
         window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
         window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
         if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
@@ -207,7 +229,9 @@ export default function CFOBriefing() {
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           cacheAnalysisInput(cached);
-          setError("");
+          const staleLabel = formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at"));
+          setLastSyncedLabel(staleLabel);
+          setSyncNotice(staleLabel ? `Couldn't refresh your QuickBooks data — showing your last synced briefing from ${staleLabel}.` : "Couldn't refresh your QuickBooks data — showing your last synced briefing.");
           return;
         }
         throw syncErr;
@@ -229,6 +253,8 @@ export default function CFOBriefing() {
         setLiveSource("quickbooks");
         setHasValidAnalysis(true);
         setError("");
+        setSyncNotice("");
+        setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
         cacheAnalysisInput(briefing);
         return;
       }
@@ -243,6 +269,8 @@ export default function CFOBriefing() {
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setError("");
+      setSyncNotice("");
+      setLastSyncedLabel("");
     };
 
     window.addEventListener("clearcfo:quickbooks-sync", handleSync);
@@ -268,6 +296,8 @@ export default function CFOBriefing() {
       setData(analyzed);
       setLiveSource("upload");
       setHasValidAnalysis(true);
+      setSyncNotice("");
+      setLastSyncedLabel("");
       cacheAnalysisInput(analyzed);
     } catch (err) {
       setHasValidAnalysis(false);
@@ -283,8 +313,11 @@ export default function CFOBriefing() {
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-xl text-blue-600">✦</div>
       <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
       <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Your CFO Briefing starts with your data.</h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">Upload a financial workbook to generate KPIs, trends, exceptions, and prioritized recommendations.</p>
-      <button type="button" onClick={() => fileRef.current?.click()} className="mt-7 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Financial Data"}</button>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">Connect QuickBooks or upload a financial workbook to generate KPIs, trends, exceptions, and prioritized recommendations.</p>
+      <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <a href="/api/quickbooks/connect" className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">Connect QuickBooks</a>
+        <button type="button" onClick={() => fileRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Financial Data"}</button>
+      </div>
       <p className="mt-3 text-xs text-slate-400">Your real customer dashboard will start here — no fake numbers.</p>
     </div>
   );
@@ -490,10 +523,11 @@ export default function CFOBriefing() {
         <div className="p-7 sm:p-10">
           <div className="mb-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Today&apos;s CFO Briefing</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Hello, David — here&apos;s what deserves your attention today.</h2>
-            <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Here&apos;s what deserves your attention today.</h2>
+            <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}{liveSource === "quickbooks" && lastSyncedLabel ? ` · Last synced ${lastSyncedLabel}` : ""}</p>
           </div>
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+          {syncNotice && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{syncNotice}</div>}
 
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -556,7 +590,7 @@ export default function CFOBriefing() {
           <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
           </div>
 
-          <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><p className="mt-1 text-xs text-slate-500">Questions generated from the financial data ClearCFO received from QuickBooks.</p><div className="mt-4 space-y-3">{(data.managementQuestions?.length ? data.managementQuestions : deterministicManagementQuestions).map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>)}</div></div>
+          <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Management questions</p><p className="mt-1 text-xs text-slate-500">{liveSource === "upload" ? "Questions generated from your uploaded financial data." : "Questions generated from the financial data ClearCFO received from QuickBooks."}</p><div className="mt-4 space-y-3">{(data.managementQuestions?.length ? data.managementQuestions : deterministicManagementQuestions).map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>)}</div></div>
 
           <div className="mt-10 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
             <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p></div>
