@@ -249,7 +249,7 @@ function reportRowsWithPeriods(report: any): Array<{ label: string; current: num
     .filter((row) => !/^total|^net income|^gross profit|^operating income/i.test(row.label));
 }
 
-function detailDriverFromRow(row: { label: string; current: number; previous: number }, direction: "up" | "down"): DetailDriver {
+function detailDriverFromRow(row: { label: string; current: number; previous: number }, direction: "up" | "down", category: "Revenue" | "Operating Expense"): DetailDriver {
   const change = row.current - row.previous;
   return {
     name: row.label,
@@ -259,6 +259,7 @@ function detailDriverFromRow(row: { label: string; current: number; previous: nu
     percentChange: row.previous === 0 ? 0 : (change / Math.abs(row.previous)) * 100,
     direction,
     impact: Math.abs(change),
+    category,
   };
 }
 
@@ -273,8 +274,8 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   const customerUps = customers.filter((row) => row.change > 0).slice(0, 3);
   const customerDowns = customers.filter((row) => row.change < 0).slice(0, 3);
-  customerUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
-  customerDowns.forEach((row) => details.push(detailDriverFromRow(row, "down")));
+  customerUps.forEach((row) => details.push(detailDriverFromRow(row, "up", "Revenue")));
+  customerDowns.forEach((row) => details.push(detailDriverFromRow(row, "down", "Revenue")));
   if (customerUps.length || customerDowns.length) {
     const evidence = [
       ...customerUps.slice(0, 2).map((row) => `${row.label}: +${currency.format(row.change)}`),
@@ -306,7 +307,7 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     .map((row) => ({ ...row, change: row.current - row.previous }))
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   const expenseUps = expenses.filter((row) => row.change > 0).slice(0, 4);
-  expenseUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  expenseUps.forEach((row) => details.push(detailDriverFromRow(row, "up", "Operating Expense")));
   if (expenseUps.length) {
     drivers.push({
       id: "expense-detail",
@@ -331,7 +332,7 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     .map((row) => ({ ...row, change: row.current - row.previous }))
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   const vendorUps = vendors.filter((row) => row.change > 0).slice(0, 3);
-  vendorUps.forEach((row) => details.push(detailDriverFromRow(row, "up")));
+  vendorUps.forEach((row) => details.push(detailDriverFromRow(row, "up", "Operating Expense")));
   if (vendorUps.length) {
     drivers.push({
       id: "vendor-spend",
