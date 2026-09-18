@@ -196,12 +196,16 @@ async function exchangeCode(code: string): Promise<Tokens> {
 }
 
 async function getCompanyInfo(realmId: string, accessToken: string) {
-  const response = await fetch(`${QB_API_BASE}/v3/company/${encodeURIComponent(realmId)}/companyinfo/${encodeURIComponent(realmId)}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, cache: "no-store",
-  });
-  if (!response.ok) return null;
-  const payload = await response.json().catch(() => null);
-  return payload?.CompanyInfo?.CompanyName || null;
+  try {
+    const response = await intuitFetch(`${QB_API_BASE}/v3/company/${encodeURIComponent(realmId)}/companyinfo/${encodeURIComponent(realmId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    }, 1);
+    if (!response.ok) return null;
+    const payload = await response.json().catch(() => null);
+    return payload?.CompanyInfo?.CompanyName || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireCurrentUser() {
