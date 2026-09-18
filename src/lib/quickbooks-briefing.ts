@@ -439,8 +439,15 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const checkingSavings = balancePeriods.length ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^undeposited funds$/, /^cash on hand$/], balancePeriods.length) : [];
   const cashSeries = cash || (checkingSavings.some((value) => value !== 0) ? checkingSavings : null);
 
-  const cashAligned = cashSeries ? cashSeries.slice(0, activePeriods.length) : [];
-  const inventoryAligned = inventory ? inventory.slice(0, activePeriods.length) : [];
+  // Align balance-sheet values to P&L periods by period LABEL, not position.
+  // A shorter (or differently ordered) balance series must never fabricate
+  // changes: periods with no balance-sheet value are NaN (unavailable), never 0.
+  const cashByPeriod = new Map<string, number>();
+  if (cashSeries) balancePeriods.forEach((label, index) => { if (Number.isFinite(cashSeries[index])) cashByPeriod.set(label, cashSeries[index]); });
+  const inventoryByPeriod = new Map<string, number>();
+  if (inventory) balancePeriods.forEach((label, index) => { if (Number.isFinite(inventory[index])) inventoryByPeriod.set(label, inventory[index]); });
+  const cashAligned = activePeriods.map((label) => (cashByPeriod.has(label) ? cashByPeriod.get(label) as number : Number.NaN));
+  const inventoryAligned = activePeriods.map((label) => (inventoryByPeriod.has(label) ? inventoryByPeriod.get(label) as number : Number.NaN));
   const current = activePeriods.length - 1;
   const previous = current - 1;
 
@@ -448,10 +455,10 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousRevenue = previous >= 0 ? activeRevenue[previous] || 0 : 0;
   const currentGrossProfit = activeGrossProfit[current] || 0;
   const previousGrossProfit = previous >= 0 ? activeGrossProfit[previous] || 0 : 0;
-  const currentCash = cashAligned[current] || 0;
-  const previousCash = previous >= 0 ? cashAligned[previous] || 0 : 0;
-  const currentInventory = inventoryAligned[current] || 0;
-  const previousInventory = previous >= 0 ? inventoryAligned[previous] || 0 : 0;
+  const currentCash = Number.isFinite(cashAligned[current]) ? cashAligned[current] : 0;
+  const previousCash = previous >= 0 && Number.isFinite(cashAligned[previous]) ? cashAligned[previous] : 0;
+  const currentInventory = Number.isFinite(inventoryAligned[current]) ? inventoryAligned[current] : 0;
+  const previousInventory = previous >= 0 && Number.isFinite(inventoryAligned[previous]) ? inventoryAligned[previous] : 0;
   const currentExpense = activeExpenses[current] || 0;
   const previousExpense = previous >= 0 ? activeExpenses[previous] || 0 : 0;
 
@@ -459,8 +466,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const grossMargin = currentRevenue ? (currentGrossProfit / currentRevenue) * 100 : 0;
   const previousMargin = previous >= 0 && previousRevenue ? (previousGrossProfit / previousRevenue) * 100 : Number.NaN;
   const marginChange = Number.isFinite(previousMargin) ? grossMargin - previousMargin : Number.NaN;
-  const cashChange = previous >= 0 ? changePercent(currentCash, previousCash) : Number.NaN;
-  const inventoryChange = previous >= 0 ? changePercent(currentInventory, previousInventory) : Number.NaN;
+  const cashChange = previous >= 0 && Number.isFinite(cashAligned[current]) && Number.isFinite(cashAligned[previous]) ? changePercent(currentCash, previousCash) : Number.NaN;
+  const inventoryChange = previous >= 0 && Number.isFinite(inventoryAligned[current]) && Number.isFinite(inventoryAligned[previous]) ? changePercent(currentInventory, previousInventory) : Number.NaN;
   const expenseChange = previous >= 0 ? changePercent(currentExpense, previousExpense) : Number.NaN;
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
