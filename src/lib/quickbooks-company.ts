@@ -89,6 +89,71 @@ function authHeader(clientId: string, clientSecret: string) {
   return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
 }
 
+// --- Sync reliability: bounded retries, timeouts, serialized refresh ------
+const QB_REQUEST_TIMEOUT_MS = 25_000;
+const QB_REPORT_MAX_ATTEMPTS = 3;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(attempt: number, response: Response | null): number {
+  const retryAfter = response?.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 30_000);
+  }
+  return Math.min(1000 * 2 ** attempt, 8000);
+}
+
+function isRetryableStatus(status: number) {
+  return status === 429 || status >= 500;
+}
+
+async function intuitFetch(url: string, init: RequestInit, attempts = QB_REPORT_MAX_ATTEMPTS): Promise<Response> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(QB_REQUEST_TIMEOUT_MS), cache: "no-store" });
+      if (!isRetryableStatus(response.status) || attempt === attempts - 1) return response;
+      lastError = new Error(`QuickBooks request failed (${response.status}).`);
+      await response.arrayBuffer().catch(() => null);
+      await sleep(retryDelayMs(attempt, response));
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) throw error;
+      await sleep(retryDelayMs(attempt, null));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("QuickBooks request failed.");
+}
+
+const inflightRefreshes = new Map<string, Promise<Tokens>>();
+
+async function refreshTokens(connection: StoredConnection): Promise<Tokens> {
+  const existing = inflightRefreshes.get(connection.id);
+  if (existing) return existing;
+  const pending = (async () => {
+    const { clientId, clientSecret } = config();
+    const response = await intuitFetch(QB_TOKEN_URL, {
+      method: "POST",
+      headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: decrypt(connection.refresh_token_encrypted) }).toString(),
+    }, 1);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error_description || "QuickBooks session expired. Please reconnect QuickBooks.");
+    const tokens = payload as Tokens;
+    await updateTokens(connection.id, tokens);
+    return tokens;
+  })();
+  inflightRefreshes.set(connection.id, pending);
+  try {
+    return await pending;
+  } finally {
+    inflightRefreshes.delete(connection.id);
+  }
+}
+
 function signState(value: string) {
   return crypto.createHmac("sha256", config().key).update(value).digest("base64url");
 }
