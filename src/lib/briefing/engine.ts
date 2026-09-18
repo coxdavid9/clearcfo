@@ -71,6 +71,7 @@ export type DetailDriver = {
   direction: "up" | "down";
   impact: number;
   contributionPct?: number;
+  category?: "Revenue" | "Operating Expense";
 };
 
 export type FinancialDriver = {
