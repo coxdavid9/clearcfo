@@ -32,6 +32,7 @@ export type BriefingData = {
   unknowns: string[];
   mtdComparison?: MtdComparison | null;
   ratios?: FinancialRatio[];
+  cashFlow?: CashFlowBridge | null;
 };
 
 // Balance-sheet health ratios for the latest synced period. All values are
@@ -42,6 +43,16 @@ export type FinancialRatio = {
   value: string;
   interpretation: string;
   health: "strong" | "watch" | "attention";
+};
+
+// Indirect-method operating cash flow bridge: starts from net income and
+// adjusts for working-capital changes. The "other" line is the plug that
+// reconciles the bridge to the reported change in cash.
+export type CashFlowLine = { label: string; value: number };
+export type CashFlowBridge = {
+  lines: CashFlowLine[];
+  operatingCashFlow: number;
+  cashChange: number | null;
 };
 
 // Day-matched month-to-date comparison (e.g. Sep 1–18 vs Aug 1–18). Built
