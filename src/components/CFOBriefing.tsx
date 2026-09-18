@@ -12,6 +12,11 @@ import {
   analyzeWorkbook,
   buildDeterministicExecutiveSummary,
 } from "../lib/briefing/engine";
+import {
+  evictQuickBooksCache,
+  isQuickBooksCacheUsable,
+  stampQuickBooksCacheCompany,
+} from "../lib/company-scoped-cache";
 
 function cacheAnalysisInput(briefing: BriefingData) {
   try {
