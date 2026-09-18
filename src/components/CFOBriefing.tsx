@@ -112,10 +112,12 @@ export default function CFOBriefing() {
       });
     }
     if (Number.isFinite(data.operatingExpense) && Number.isFinite(data.previousOperatingExpense)) {
-      const delta = data.operatingExpense - data.previousOperatingExpense;
+      const currentExpense = data.operatingExpense ?? 0;
+      const previousExpense = data.previousOperatingExpense ?? 0;
+      const delta = currentExpense - previousExpense;
       questions.push({
         category: "Expenses",
-        question: `Operating expenses moved from ${currency.format(data.previousOperatingExpense ?? 0)} to ${currency.format(data.operatingExpense ?? 0)} (${delta >= 0 ? "+" : ""}${currency.format(delta)}). Which expense accounts make up that dollar movement, and which costs are recurring?`,
+        question: `Operating expenses moved from ${currency.format(previousExpense)} to ${currency.format(currentExpense)} (${delta >= 0 ? "+" : ""}${currency.format(delta)}). Which expense accounts make up that dollar movement, and which costs are recurring?`,
       });
     } else if (Number.isFinite(data.revenueChange)) {
       questions.push({
