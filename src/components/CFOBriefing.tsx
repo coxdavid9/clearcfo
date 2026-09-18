@@ -523,7 +523,7 @@ export default function CFOBriefing() {
         <div className="p-7 sm:p-10">
           <div className="mb-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Today&apos;s CFO Briefing</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Hello, David — here&apos;s what deserves your attention today.</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Here&apos;s what deserves your attention today.</h2>
             <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}{liveSource === "quickbooks" && lastSyncedLabel ? ` · Last synced ${lastSyncedLabel}` : ""}</p>
           </div>
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
