@@ -231,6 +231,13 @@ export async function POST(request: Request) {
       { name: "operating expense", current: currentExpense, change: asFiniteNumber(snapshot.operatingExpenseChange) },
     ];
     for (const metric of snapshotMetrics) {
+      if (metric.name === "operating expense" && currentExpense !== null && previousExpense !== null) {
+        const expensePct = previousExpense === 0 ? null : ((currentExpense - previousExpense) / Math.abs(previousExpense)) * 100;
+        if (expensePct !== null && Math.abs(expensePct) >= 100) {
+          materialityDirectives.push(`For operating expense, the reported percentage change is ${expensePct.toFixed(1)}% from ${Math.round(previousExpense).toLocaleString("en-US")} to ${Math.round(currentExpense).toLocaleString("en-US")}. Lead with the dollar movement of ${Math.abs(Math.round(currentExpense - previousExpense)).toLocaleString("en-US")} and the starting/ending balances; do not present the percentage alone as evidence of material business impact.`);
+        }
+        continue;
+      }
       if (metric.current === null || metric.change === null || Math.abs(metric.change) < 100) continue;
       const prior = priorFromChange(metric.current, metric.change);
       if (prior === null) continue;
