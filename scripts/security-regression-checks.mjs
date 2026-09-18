@@ -16,7 +16,7 @@ const proxy = read("proxy.ts");
 const refreshRoute = read("src/app/api/auth/refresh/route.ts");
 const aiRoute = read("src/app/api/cfo-analysis/route.ts");
 const profileRoute = read("src/app/api/customer/profile/route.ts");
-const quickBooks = read("src/lib/quickbooks.ts");
+const quickBooks = read("src/lib/quickbooks-company.ts");
 const envExample = read(".env.example");
 
 assert(packageJson.dependencies.next === "16.3.4", "Next.js security baseline is not pinned to 16.3.4.");
