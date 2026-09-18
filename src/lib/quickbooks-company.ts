@@ -185,11 +185,11 @@ async function getCurrentUser() {
 
 async function exchangeCode(code: string): Promise<Tokens> {
   const { clientId, clientSecret, redirectUri } = config();
-  const response = await fetch(QB_TOKEN_URL, {
+  const response = await intuitFetch(QB_TOKEN_URL, {
     method: "POST",
     headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }).toString(),
-  });
+  }, 1);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error_description || payload?.error || "QuickBooks authorization failed.");
   return payload as Tokens;
