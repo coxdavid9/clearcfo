@@ -106,13 +106,17 @@ function latestPopulatedIndex(series: number[][]): number {
 
 function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
-  if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2) {
+  // Dollar-materiality floors: a percentage move on a tiny base is noise, not a
+  // signal. Each driver below keeps its percentage threshold AND requires the
+  // underlying dollar movement to clear its floor before firing.
+  const MIN_DRIVER_DELTA = 1000;
+  if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2 && Math.abs(currentExpense - previousExpense) >= MIN_DRIVER_DELTA) {
     drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Operating expense dollars: ${Math.round(previousExpense).toLocaleString()} to ${Math.round(currentExpense).toLocaleString()} (${currentExpense - previousExpense >= 0 ? "+" : ""}${Math.round(currentExpense - previousExpense).toLocaleString()})`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
   }
-  if (Number.isFinite(cashChange) && cashChange < -5) {
+  if (Number.isFinite(cashChange) && cashChange < -5 && Math.abs(currentCash - previousCash) >= MIN_DRIVER_DELTA) {
     drivers.push({ id: "cash-pressure", category: "Cash", title: "Cash is under pressure", observation: `Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`, evidence: [`Cash change: ${formatPercent(cashChange)}`], direction: "down", severity: cashChange < -15 ? "High" : "Medium", impact: 5, confidence: 0.94, managementQuestion: "What near-term cash commitments could create additional pressure?" });
   }
-  if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2) {
+  if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2 && Math.abs(currentInventory - previousInventory) >= MIN_DRIVER_DELTA) {
     drivers.push({ id: "inventory-growth", category: "Inventory", title: "Inventory is outpacing revenue", observation: `Inventory changed ${formatPercent(inventoryChange)}, ahead of revenue at ${formatPercent(revenueChange)}.`, evidence: [`Inventory change: ${formatPercent(inventoryChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: "Medium", impact: 3, confidence: 0.9, managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?" });
   }
   if (Number.isFinite(marginChange) && marginChange < -2) {
