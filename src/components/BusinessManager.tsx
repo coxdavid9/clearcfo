@@ -19,6 +19,10 @@ export default function BusinessManager() {
   const [createError, setCreateError] = useState("");
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +61,44 @@ export default function BusinessManager() {
       setSwitchError(error instanceof Error ? error.message : "Unable to switch businesses.");
     } finally {
       setSwitchingId(null);
+    }
+  }
+
+  function startRename(membership: Membership) {
+    setRenamingId(membership.company_id);
+    setRenameName(membership.company.name);
+    setRenameError("");
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameName("");
+    setRenameError("");
+  }
+
+  async function saveRename(event: FormEvent, companyId: string) {
+    event.preventDefault();
+    const trimmedName = renameName.trim();
+    if (!trimmedName) {
+      setRenameError("Business name is required.");
+      return;
+    }
+    setRenameBusy(true);
+    setRenameError("");
+    try {
+      const response = await fetch("/api/companies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, name: trimmedName }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Unable to rename business.");
+      // Reload so the new name appears everywhere (list, navbar switcher).
+      window.location.reload();
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : "Unable to rename business.");
+    } finally {
+      setRenameBusy(false);
     }
   }
 
@@ -103,23 +145,66 @@ export default function BusinessManager() {
           {companies.map((membership) => {
             const isActive = membership.company_id === activeCompanyId;
             const switching = switchingId === membership.company_id;
+            const renaming = renamingId === membership.company_id;
             return (
               <li key={membership.company_id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">{membership.company.name}</p>
-                  <p className="mt-0.5 text-xs capitalize text-slate-500">{membership.role}</p>
+                <div className="min-w-0 flex-1">
+                  {renaming ? (
+                    <form onSubmit={(event) => void saveRename(event, membership.company_id)} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={renameName}
+                        onChange={(event) => setRenameName(event.target.value)}
+                        maxLength={200}
+                        autoFocus
+                        aria-label="Business name"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900 shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-600/10"
+                      />
+                      <button
+                        type="submit"
+                        disabled={renameBusy}
+                        className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {renameBusy ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelRename}
+                        disabled={renameBusy}
+                        className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-400 disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <p className="truncate text-sm font-semibold text-slate-900">{membership.company.name}</p>
+                      <p className="mt-0.5 text-xs capitalize text-slate-500">{membership.role}</p>
+                    </>
+                  )}
                 </div>
-                {isActive ? (
-                  <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Active</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void switchCompany(membership.company_id)}
-                    disabled={switching}
-                    className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-400 hover:text-blue-700 disabled:opacity-60"
-                  >
-                    {switching ? "Switching…" : "Switch"}
-                  </button>
+                {!renaming && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => startRename(membership)}
+                      className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 transition hover:text-blue-700"
+                    >
+                      Rename
+                    </button>
+                    {isActive ? (
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Active</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void switchCompany(membership.company_id)}
+                        disabled={switching}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-400 hover:text-blue-700 disabled:opacity-60"
+                      >
+                        {switching ? "Switching…" : "Switch"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </li>
             );
@@ -127,6 +212,7 @@ export default function BusinessManager() {
         </ul>
       )}
       {switchError ? <p className="mt-3 text-sm font-medium text-red-600">{switchError}</p> : null}
+      {renameError ? <p className="mt-3 text-sm font-medium text-red-600">{renameError}</p> : null}
 
       <form onSubmit={(event) => void addBusiness(event)} className="mt-5 border-t border-slate-100 pt-5">
         <h3 className="text-sm font-semibold text-slate-900">Add another business</h3>
