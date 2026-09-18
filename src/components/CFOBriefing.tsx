@@ -461,7 +461,7 @@ export default function CFOBriefing() {
       driver.id === "expense-detail" || driver.id === "vendor-spend"
     );
     const primaryObserved = detailed[0];
-    const fallback: Record<string, Array<{ title: string; observation: string }>> = {
+    const fallback: Record<string, Array<{ title: string; observation: string; estimatedImpact?: number }>> = {
       revenue: [
         { title: "Sales volume", observation: `Revenue is ${currentText} and ${observedChange(current, change)}. Review units or customer activity to determine whether the movement is volume-driven.` },
         { title: "Pricing & mix", observation: "Compare revenue movement with pricing changes and product or customer mix to separate price effects from changes in sales activity." },
@@ -489,6 +489,7 @@ export default function CFOBriefing() {
       title: primaryObserved.title,
       observation: primaryObserved.observation + (primaryObserved.evidence.length ? ` Evidence: ${primaryObserved.evidence.slice(0, 2).join("; ")}.` : ""),
       severity: primaryObserved.severity === "High" ? "High" as const : "Medium" as const,
+      estimatedImpact: primaryObserved.estimatedImpact,
     };
     return [observed, ...base.filter((item) => item.title !== observed.title).slice(0, 2)];
   }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.drivers]);
@@ -684,7 +685,7 @@ export default function CFOBriefing() {
               </div>
             </div>
           )}
-          <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p></div>)}</div></div>
+          <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p>{driver.estimatedImpact !== undefined && <p className="mt-2 text-xs font-bold text-blue-700">Est. impact: {currency.format(Math.round(driver.estimatedImpact))}</p>}</div>)}</div></div>
           </div>
 
           {data.cashFlow && (
