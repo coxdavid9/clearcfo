@@ -275,17 +275,11 @@ async function updateTokens(id: string, tokens: Tokens) {
   if (!response.ok) throw new Error(`Could not update QuickBooks token (${response.status}).`);
 }
 
-async function accessTokenForConnection(connection: StoredConnection) {
-  if (new Date(connection.access_token_expires_at).getTime() > Date.now() + 60_000) return { accessToken: decrypt(connection.access_token_encrypted) };
-  const { clientId, clientSecret } = config();
-  const response = await fetch(QB_TOKEN_URL, {
-    method: "POST", headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: decrypt(connection.refresh_token_encrypted) }).toString(),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error_description || "QuickBooks session expired. Please reconnect QuickBooks.");
-  const tokens = payload as Tokens;
-  await updateTokens(connection.id, tokens);
+async function accessTokenForConnection(connection: StoredConnection, forceRefresh = false) {
+  if (!forceRefresh && new Date(connection.access_token_expires_at).getTime() > Date.now() + 60_000) {
+    return { accessToken: decrypt(connection.access_token_encrypted) };
+  }
+  const tokens = await refreshTokens(connection);
   return { accessToken: tokens.access_token };
 }
 
