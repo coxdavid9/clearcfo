@@ -459,6 +459,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const currentCogsValue = activeCogs[current] || 0;
   const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
+  const detailed = buildDetailedDrivers(detailReports);
+  const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);
 
   const trendSeries: Series[] = [
     { name: "Revenue", values: activeRevenue.slice(-12), periods: activePeriods.slice(-12) },
@@ -481,25 +483,26 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     inventoryChange,
     operatingExpense: currentExpense,
     previousOperatingExpense: previousExpense,
-    attention: drivers.length,
+    attention: mergedDrivers.length,
     alerts,
-    recommendation: drivers[0]?.observation || "Review the latest QuickBooks financial signals and determine the most important management action.",
-    impact: drivers[0]?.impact || 0,
-    impactReason: drivers[0]?.observation || "No major exceptions were detected.",
+    recommendation: mergedDrivers[0]?.observation || "Review the latest QuickBooks financial signals and determine the most important management action.",
+    impact: mergedDrivers[0]?.impact || 0,
+    impactReason: mergedDrivers[0]?.observation || "No major exceptions were detected.",
     trend: trendSeries[0].values,
     periods: trendSeries[0].periods,
-    health: drivers.some((driver) => driver.severity === "High") ? "attention" : drivers.length ? "watch" : "strong",
+    health: mergedDrivers.some((driver) => driver.severity === "High") ? "attention" : mergedDrivers.length ? "watch" : "strong",
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "upload",
-    drivers,
+    drivers: mergedDrivers,
     managementQuestions: buildManagementQuestions(detailReports, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
-    relationships: drivers.map((driver) => driver.observation),
-    detailDrivers: [],
+    relationships: mergedDrivers.map((driver) => driver.observation),
+    detailDrivers: detailed.details,
     trendInsights: [],
     trendSeries,
     unknowns: [
       ...(cashSeries ? [] : ["QuickBooks did not return a cash balance series for the requested periods."]),
       ...(inventory ? [] : ["QuickBooks did not return an inventory balance series for the requested periods."]),
+      ...detailed.unknowns,
     ],
   };
 }
