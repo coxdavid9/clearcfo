@@ -234,16 +234,76 @@ function safeTrend(values: number[], labels: string[]): { values: number[]; labe
   return { values: values.slice(Math.max(0, values.length - length)), labels: labels.slice(Math.max(0, labels.length - length)) };
 }
 
-function buildDrivers(revenue: number, revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number): FinancialDriver[] {
+function buildDrivers(
+  revenue: number,
+  previousRevenue: number,
+  revenueChange: number,
+  marginChange: number,
+  cash: number,
+  previousCash: number,
+  cashChange: number,
+  inventory: number,
+  previousInventory: number,
+  inventoryChange: number,
+  expense: number,
+  previousExpense: number,
+  expenseChange: number,
+): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
+  const expenseDelta = expense - previousExpense;
+  const revenueDelta = revenue - previousRevenue;
+  const cashDelta = cash - previousCash;
+  const inventoryDelta = inventory - previousInventory;
+
   if (expenseChange > revenueChange + 2) {
-    drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses increased ${formatPercentValue(expenseChange)} while revenue changed ${formatPercentValue(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercentValue(expenseChange)}`, `Revenue change: ${formatPercentValue(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - revenueChange) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
+    const usePercentage = Math.abs(previousExpense) >= 1000;
+    const magnitude = Math.abs(expenseDelta);
+    drivers.push({
+      id: "opex-growth",
+      category: "Operating Expense",
+      title: "Operating expenses are rising faster than revenue",
+      observation: usePercentage
+        ? `Operating expenses increased ${formatPercentValue(expenseChange)} while revenue changed ${formatPercentValue(revenueChange)}.`
+        : `Operating expenses increased ${formatCurrency(magnitude)} (${formatCurrency(previousExpense)} to ${formatCurrency(expense)}) while revenue increased ${formatCurrency(Math.abs(revenueDelta))} (${formatCurrency(previousRevenue)} to ${formatCurrency(revenue)}).`,
+      evidence: [
+        `Operating expenses: ${formatCurrency(previousExpense)} → ${formatCurrency(expense)} (${expenseDelta >= 0 ? "+" : ""}${formatCurrency(expenseDelta)})`,
+        `Revenue: ${formatCurrency(previousRevenue)} → ${formatCurrency(revenue)} (${revenueDelta >= 0 ? "+" : ""}${formatCurrency(revenueDelta)})`,
+        ...(usePercentage ? [`Operating expense change: ${formatPercentValue(expenseChange)}`, `Revenue change: ${formatPercentValue(revenueChange)}`] : []),
+      ],
+      direction: "up",
+      severity: magnitude >= 10000 || expenseChange > 20 ? "High" : "Medium",
+      impact: Math.min(10, Math.max(1, Math.round(Math.max(magnitude / 10000, Math.abs(revenueDelta) / 25000)))),
+      confidence: 0.9,
+      managementQuestion: "Which expense categories are driving the dollar increase, and which are recurring versus one-time?",
+    });
   }
   if (cashChange < -5) {
-    drivers.push({ id: "cash-pressure", category: "Cash", title: "Cash is under pressure", observation: `Cash declined ${formatPercentValue(Math.abs(cashChange))} from the prior period.`, evidence: [`Cash change: ${formatPercentValue(cashChange)}`], direction: "down", severity: cashChange < -15 ? "High" : "Medium", impact: 5, confidence: 0.94, managementQuestion: "What near-term cash commitments could create additional pressure?" });
+    drivers.push({
+      id: "cash-pressure",
+      category: "Cash",
+      title: "Cash is under pressure",
+      observation: `Cash declined ${formatCurrency(Math.abs(cashDelta))} (${formatCurrency(previousCash)} to ${formatCurrency(cash)}) from the prior period.`,
+      evidence: [`Cash: ${formatCurrency(previousCash)} → ${formatCurrency(cash)} (${cashDelta >= 0 ? "+" : ""}${formatCurrency(cashDelta)})`, `Cash change: ${formatPercentValue(cashChange)}`],
+      direction: "down",
+      severity: cashChange < -15 ? "High" : "Medium",
+      impact: 5,
+      confidence: 0.94,
+      managementQuestion: "What near-term cash commitments could create additional pressure?",
+    });
   }
   if (inventoryChange > revenueChange + 2) {
-    drivers.push({ id: "inventory-growth", category: "Inventory", title: "Inventory is outpacing revenue", observation: `Inventory increased ${formatPercentValue(inventoryChange)}, outpacing revenue change of ${formatPercentValue(revenueChange)}.`, evidence: [`Inventory change: ${formatPercentValue(inventoryChange)}`, `Revenue change: ${formatPercentValue(revenueChange)}`], direction: "up", severity: "Medium", impact: 3, confidence: 0.9, managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?" });
+    drivers.push({
+      id: "inventory-growth",
+      category: "Inventory",
+      title: "Inventory is outpacing revenue",
+      observation: `Inventory increased ${formatCurrency(Math.abs(inventoryDelta))} (${formatCurrency(previousInventory)} to ${formatCurrency(inventory)}) while revenue changed ${formatCurrency(Math.abs(revenueDelta))} (${formatCurrency(previousRevenue)} to ${formatCurrency(revenue)}).`,
+      evidence: [`Inventory: ${formatCurrency(previousInventory)} → ${formatCurrency(inventory)} (${inventoryDelta >= 0 ? "+" : ""}${formatCurrency(inventoryDelta)})`, `Revenue: ${formatCurrency(previousRevenue)} → ${formatCurrency(revenue)} (${revenueDelta >= 0 ? "+" : ""}${formatCurrency(revenueDelta)})`],
+      direction: "up",
+      severity: "Medium",
+      impact: 3,
+      confidence: 0.9,
+      managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?",
+    });
   }
   if (marginChange < -2) {
     drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercentValue(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercentValue(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
@@ -297,7 +357,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
   const cashChange = changePercent(cash, previousCash);
   const inventoryChange = changePercent(inventory, previousInventory);
   const expenseChange = changePercent(expense, previousExpense);
-  const drivers = buildDrivers(revenue, revenueChange, marginChange, cashChange, inventoryChange, expenseChange);
+  const drivers = buildDrivers(revenue, previousRevenue, revenueChange, marginChange, cash, previousCash, cashChange, inventory, previousInventory, inventoryChange, expense, previousExpense, expenseChange);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const trend = safeTrend(revenueValues, labels);
   return {
