@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AIAnalysis, BriefingData } from "../lib/briefing/engine";
+import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
 
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
 const AI_CACHE_KEY = "clearcfo_qb_ai_analysis_cache";
@@ -39,8 +40,12 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
 
   useEffect(() => {
     if (!enabled) return;
-    const loadCache = () => {
+    const loadCache = async () => {
       try {
+        // The cached briefing and analysis belong to exactly one business;
+        // never show another business's analysis here.
+        const activeCompanyId = await getActiveCompanyId();
+        if (!isQuickBooksCacheUsable(activeCompanyId)) return;
         const cachedBriefing = window.localStorage.getItem(CACHE_KEY);
         if (cachedBriefing) {
           const parsed = JSON.parse(cachedBriefing) as BriefingData;
@@ -56,7 +61,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         // Ignore malformed local cache and allow a fresh analysis.
       }
     };
-    loadCache();
+    void loadCache();
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
       const nextBriefing = payload?.briefing as BriefingData | undefined;
@@ -68,7 +73,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         window.localStorage.removeItem(AI_CACHE_KEY);
         window.localStorage.removeItem(`${AI_CACHE_KEY}_signature`);
       } else {
-        loadCache();
+        void loadCache();
       }
     };
     window.addEventListener("clearcfo:quickbooks-sync", handleSync);
