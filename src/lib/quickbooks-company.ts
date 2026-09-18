@@ -185,23 +185,27 @@ async function getCurrentUser() {
 
 async function exchangeCode(code: string): Promise<Tokens> {
   const { clientId, clientSecret, redirectUri } = config();
-  const response = await fetch(QB_TOKEN_URL, {
+  const response = await intuitFetch(QB_TOKEN_URL, {
     method: "POST",
     headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }).toString(),
-  });
+  }, 1);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error_description || payload?.error || "QuickBooks authorization failed.");
   return payload as Tokens;
 }
 
 async function getCompanyInfo(realmId: string, accessToken: string) {
-  const response = await fetch(`${QB_API_BASE}/v3/company/${encodeURIComponent(realmId)}/companyinfo/${encodeURIComponent(realmId)}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, cache: "no-store",
-  });
-  if (!response.ok) return null;
-  const payload = await response.json().catch(() => null);
-  return payload?.CompanyInfo?.CompanyName || null;
+  try {
+    const response = await intuitFetch(`${QB_API_BASE}/v3/company/${encodeURIComponent(realmId)}/companyinfo/${encodeURIComponent(realmId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    }, 1);
+    if (!response.ok) return null;
+    const payload = await response.json().catch(() => null);
+    return payload?.CompanyInfo?.CompanyName || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireCurrentUser() {
@@ -271,17 +275,11 @@ async function updateTokens(id: string, tokens: Tokens) {
   if (!response.ok) throw new Error(`Could not update QuickBooks token (${response.status}).`);
 }
 
-async function accessTokenForConnection(connection: StoredConnection) {
-  if (new Date(connection.access_token_expires_at).getTime() > Date.now() + 60_000) return { accessToken: decrypt(connection.access_token_encrypted) };
-  const { clientId, clientSecret } = config();
-  const response = await fetch(QB_TOKEN_URL, {
-    method: "POST", headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: decrypt(connection.refresh_token_encrypted) }).toString(),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error_description || "QuickBooks session expired. Please reconnect QuickBooks.");
-  const tokens = payload as Tokens;
-  await updateTokens(connection.id, tokens);
+async function accessTokenForConnection(connection: StoredConnection, forceRefresh = false) {
+  if (!forceRefresh && new Date(connection.access_token_expires_at).getTime() > Date.now() + 60_000) {
+    return { accessToken: decrypt(connection.access_token_encrypted) };
+  }
+  const tokens = await refreshTokens(connection);
   return { accessToken: tokens.access_token };
 }
 
@@ -301,10 +299,10 @@ export async function disconnectQuickBooks(userId: string) {
 
 async function revokeIntuitTokens(refreshToken: string) {
   const { clientId, clientSecret } = config();
-  const response = await fetch(QB_REVOKE_URL, {
+  const response = await intuitFetch(QB_REVOKE_URL, {
     method: "POST", headers: { Authorization: authHeader(clientId, clientSecret), "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({ token: refreshToken }).toString(),
-  });
+  }, 1);
   if (!response.ok) console.error(`[ClearCFO QuickBooks] Token revocation failed (${response.status}).`);
 }
 
@@ -312,12 +310,22 @@ export async function quickBooksReport(userId: string, reportName: string, param
   if (!/^[A-Za-z]+$/.test(reportName)) throw new Error("Invalid QuickBooks report.");
   const connection = await getConnection(userId);
   if (!connection) throw new Error("QuickBooks is not connected for the selected business.");
-  const { accessToken } = await accessTokenForConnection(connection);
   const search = new URLSearchParams(params);
-  const response = await fetch(`${QB_API_BASE}/v3/company/${encodeURIComponent(connection.realm_id)}/reports/${reportName}?${search.toString()}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, cache: "no-store",
-  });
-  const payload = await response.json().catch(() => ({}));
+  const url = `${QB_API_BASE}/v3/company/${encodeURIComponent(connection.realm_id)}/reports/${reportName}?${search.toString()}`;
+  const readReport = async (accessToken: string) => {
+    const response = await intuitFetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok && response.status !== 401) throw new Error(payload?.Fault?.Error?.[0]?.Message || `QuickBooks ${reportName} report failed.`);
+    return { response, payload };
+  };
+  const { accessToken } = await accessTokenForConnection(connection);
+  let { response, payload } = await readReport(accessToken);
+  if (response.status === 401) {
+    const refreshed = await accessTokenForConnection(connection, true);
+    ({ response, payload } = await readReport(refreshed.accessToken));
+  }
   if (!response.ok) throw new Error(payload?.Fault?.Error?.[0]?.Message || `QuickBooks ${reportName} report failed.`);
   return payload;
 }
