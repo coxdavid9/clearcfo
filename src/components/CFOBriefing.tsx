@@ -343,7 +343,7 @@ export default function CFOBriefing() {
       const previousCogs = Number.isFinite(previousGrossProfit) ? previousRevenue - previousGrossProfit : NaN;
       const items = [
         Number.isFinite(change)
-          ? `Gross margin is ${valueText}, down ${Math.abs(change).toFixed(1)} percentage points versus the prior period.`
+          ? `Gross margin is ${valueText}, ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(1)} percentage points versus the prior period.`
           : `Gross margin is ${valueText}; the prior-period comparison is unavailable.`,
       ];
       if (Number.isFinite(cogs) && Number.isFinite(previousCogs)) {
