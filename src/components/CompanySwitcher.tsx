@@ -19,7 +19,9 @@ export default function CompanySwitcher() {
       .then((data) => {
         if (!Array.isArray(data?.companies)) return;
         setCompanies(data.companies);
-        if (data.companies[0]) setSelected(data.companies[0].company_id);
+        // Reflect the actual active business (from the server cookie), not
+        // just the first membership in the list.
+        setSelected(data.activeCompanyId || data.companies[0]?.company_id || "");
       })
       .catch(() => undefined);
   }, []);
