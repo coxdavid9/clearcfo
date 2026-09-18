@@ -104,15 +104,19 @@ function latestPopulatedIndex(series: number[][]): number {
   return -1;
 }
 
-function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number): FinancialDriver[] {
+function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number, previousCash: number, currentCash: number, previousInventory: number, currentInventory: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
-  if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2) {
+  // Dollar-materiality floors: a percentage move on a tiny base is noise, not a
+  // signal. Each driver below keeps its percentage threshold AND requires the
+  // underlying dollar movement to clear its floor before firing.
+  const MIN_DRIVER_DELTA = 1000;
+  if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2 && Math.abs(currentExpense - previousExpense) >= MIN_DRIVER_DELTA) {
     drivers.push({ id: "opex-growth", category: "Operating Expense", title: "Operating expenses are rising faster than revenue", observation: `Operating expenses changed ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`, evidence: [`Operating expense change: ${formatPercent(expenseChange)}`, `Operating expense dollars: ${Math.round(previousExpense).toLocaleString()} to ${Math.round(currentExpense).toLocaleString()} (${currentExpense - previousExpense >= 0 ? "+" : ""}${Math.round(currentExpense - previousExpense).toLocaleString()})`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: expenseChange > 20 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(Math.abs(expenseChange - (Number.isFinite(revenueChange) ? revenueChange : 0)) / 5))), confidence: 0.9, managementQuestion: "Which expense categories are driving the increase, and which are controllable or temporary?" });
   }
-  if (Number.isFinite(cashChange) && cashChange < -5) {
+  if (Number.isFinite(cashChange) && cashChange < -5 && Math.abs(currentCash - previousCash) >= MIN_DRIVER_DELTA) {
     drivers.push({ id: "cash-pressure", category: "Cash", title: "Cash is under pressure", observation: `Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`, evidence: [`Cash change: ${formatPercent(cashChange)}`], direction: "down", severity: cashChange < -15 ? "High" : "Medium", impact: 5, confidence: 0.94, managementQuestion: "What near-term cash commitments could create additional pressure?" });
   }
-  if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2) {
+  if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2 && Math.abs(currentInventory - previousInventory) >= MIN_DRIVER_DELTA) {
     drivers.push({ id: "inventory-growth", category: "Inventory", title: "Inventory is outpacing revenue", observation: `Inventory changed ${formatPercent(inventoryChange)}, ahead of revenue at ${formatPercent(revenueChange)}.`, evidence: [`Inventory change: ${formatPercent(inventoryChange)}`, `Revenue change: ${formatPercent(revenueChange)}`], direction: "up", severity: "Medium", impact: 3, confidence: 0.9, managementQuestion: "What is driving the inventory build, and how quickly can it be converted to sales?" });
   }
   if (Number.isFinite(marginChange) && marginChange < -2) {
@@ -126,11 +130,14 @@ function buildDrivers(revenueChange: number, marginChange: number, cashChange: n
 }
 
 function buildAlerts(revenueChange: number, cashChange: number, inventoryChange: number, expenseChange: number): string[] {
+  // Exception-driven, mirroring the upload path: only genuinely notable
+  // movements become alerts. Calm periods produce no alerts, and the
+  // executive summary then reports "no major exceptions" instead of
+  // restating every metric.
   const alerts: string[] = [];
-  if (Number.isFinite(revenueChange)) alerts.push(`Revenue changed ${formatPercent(revenueChange)} from the prior period.`);
-  if (Number.isFinite(expenseChange)) alerts.push(`Operating expenses changed ${formatPercent(expenseChange)} from the prior period.`);
-  if (Number.isFinite(cashChange)) alerts.push(`Cash changed ${formatPercent(cashChange)} from the prior period.`);
-  if (Number.isFinite(inventoryChange)) alerts.push(`Inventory changed ${formatPercent(inventoryChange)} from the prior period.`);
+  if (Number.isFinite(expenseChange) && expenseChange > (Number.isFinite(revenueChange) ? revenueChange : 0) + 2) alerts.push(`Operating expenses increased ${formatPercent(expenseChange)} while revenue changed ${formatPercent(revenueChange)}.`);
+  if (Number.isFinite(cashChange) && cashChange < -5) alerts.push(`Cash declined ${formatPercent(Math.abs(cashChange))} from the prior period.`);
+  if (Number.isFinite(inventoryChange) && Number.isFinite(revenueChange) && inventoryChange > revenueChange + 2) alerts.push(`Inventory increased ${formatPercent(inventoryChange)}, outpacing revenue change of ${formatPercent(revenueChange)}.`);
   return alerts;
 }
 
@@ -432,8 +439,15 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const checkingSavings = balancePeriods.length ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^undeposited funds$/, /^cash on hand$/], balancePeriods.length) : [];
   const cashSeries = cash || (checkingSavings.some((value) => value !== 0) ? checkingSavings : null);
 
-  const cashAligned = cashSeries ? cashSeries.slice(0, activePeriods.length) : [];
-  const inventoryAligned = inventory ? inventory.slice(0, activePeriods.length) : [];
+  // Align balance-sheet values to P&L periods by period LABEL, not position.
+  // A shorter (or differently ordered) balance series must never fabricate
+  // changes: periods with no balance-sheet value are NaN (unavailable), never 0.
+  const cashByPeriod = new Map<string, number>();
+  if (cashSeries) balancePeriods.forEach((label, index) => { if (Number.isFinite(cashSeries[index])) cashByPeriod.set(label, cashSeries[index]); });
+  const inventoryByPeriod = new Map<string, number>();
+  if (inventory) balancePeriods.forEach((label, index) => { if (Number.isFinite(inventory[index])) inventoryByPeriod.set(label, inventory[index]); });
+  const cashAligned = activePeriods.map((label) => (cashByPeriod.has(label) ? cashByPeriod.get(label) as number : Number.NaN));
+  const inventoryAligned = activePeriods.map((label) => (inventoryByPeriod.has(label) ? inventoryByPeriod.get(label) as number : Number.NaN));
   const current = activePeriods.length - 1;
   const previous = current - 1;
 
@@ -441,10 +455,10 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousRevenue = previous >= 0 ? activeRevenue[previous] || 0 : 0;
   const currentGrossProfit = activeGrossProfit[current] || 0;
   const previousGrossProfit = previous >= 0 ? activeGrossProfit[previous] || 0 : 0;
-  const currentCash = cashAligned[current] || 0;
-  const previousCash = previous >= 0 ? cashAligned[previous] || 0 : 0;
-  const currentInventory = inventoryAligned[current] || 0;
-  const previousInventory = previous >= 0 ? inventoryAligned[previous] || 0 : 0;
+  const currentCash = Number.isFinite(cashAligned[current]) ? cashAligned[current] : 0;
+  const previousCash = previous >= 0 && Number.isFinite(cashAligned[previous]) ? cashAligned[previous] : 0;
+  const currentInventory = Number.isFinite(inventoryAligned[current]) ? inventoryAligned[current] : 0;
+  const previousInventory = previous >= 0 && Number.isFinite(inventoryAligned[previous]) ? inventoryAligned[previous] : 0;
   const currentExpense = activeExpenses[current] || 0;
   const previousExpense = previous >= 0 ? activeExpenses[previous] || 0 : 0;
 
@@ -452,12 +466,12 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const grossMargin = currentRevenue ? (currentGrossProfit / currentRevenue) * 100 : 0;
   const previousMargin = previous >= 0 && previousRevenue ? (previousGrossProfit / previousRevenue) * 100 : Number.NaN;
   const marginChange = Number.isFinite(previousMargin) ? grossMargin - previousMargin : Number.NaN;
-  const cashChange = previous >= 0 ? changePercent(currentCash, previousCash) : Number.NaN;
-  const inventoryChange = previous >= 0 ? changePercent(currentInventory, previousInventory) : Number.NaN;
+  const cashChange = previous >= 0 && Number.isFinite(cashAligned[current]) && Number.isFinite(cashAligned[previous]) ? changePercent(currentCash, previousCash) : Number.NaN;
+  const inventoryChange = previous >= 0 && Number.isFinite(inventoryAligned[current]) && Number.isFinite(inventoryAligned[previous]) ? changePercent(currentInventory, previousInventory) : Number.NaN;
   const expenseChange = previous >= 0 ? changePercent(currentExpense, previousExpense) : Number.NaN;
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
-  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense);
+  const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
   const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);

@@ -58,6 +58,7 @@ export default function CFOAnalysisPage() {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [hasValidBriefing, setHasValidBriefing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,9 +79,13 @@ export default function CFOAnalysisPage() {
             if (response.ok && payload?.briefing) briefing = payload.briefing as BriefingData;
           }
         }
-        const input = briefing || demoData;
+        if (!briefing) {
+          if (!cancelled) setHasValidBriefing(false);
+          return;
+        }
+        const input = briefing;
         const fingerprint = analysisFingerprint(input);
-        if (!cancelled) setData(input);
+        if (!cancelled) { setData(input); setHasValidBriefing(true); }
 
         const cachedRaw = window.localStorage.getItem(ANALYSIS_CACHE_KEY);
         if (cachedRaw) {
@@ -120,8 +125,8 @@ export default function CFOAnalysisPage() {
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16"><div className="mx-auto w-full max-w-5xl">
       <div className="mb-6 flex items-center justify-between gap-4"><a href="/customer/briefing" className="text-sm font-semibold text-blue-600 hover:text-blue-700">← Back to CFO Briefing</a><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">AI Analysis</span></div>
       <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)] sm:p-10">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">What should management do next?</h1><p className="mt-2 text-sm text-slate-500">{data.companyName} · Analysis based on the financial signals currently loaded in ClearCFO.</p>
-        {loading && <div className="mt-8 rounded-2xl bg-slate-50 p-6 text-sm text-slate-600">Loading analysis…</div>}{error && <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-700">{error}</div>}
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">What should management do next?</h1><p className="mt-2 text-sm text-slate-500">{hasValidBriefing ? `${data.companyName} · Analysis based on the financial signals currently loaded in ClearCFO.` : "Connect QuickBooks or upload your financial data to unlock your AI analysis."}</p>
+        {loading && <div className="mt-8 rounded-2xl bg-slate-50 p-6 text-sm text-slate-600">Loading analysis…</div>}{error && <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-700">{error}</div>}{!loading && !hasValidBriefing && !error && <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm leading-6 text-slate-600"><p className="font-semibold text-slate-900">No financial data to analyze yet.</p><p className="mt-1">Connect QuickBooks or upload your financial data from the CFO Briefing, then return here — ClearCFO never analyzes sample or demo numbers.</p><a href="/customer/briefing" className="mt-3 inline-block font-semibold text-blue-600 hover:text-blue-700">Go to CFO Briefing →</a></div>}
         {analysis && <div className="mt-8 space-y-5">
           <div className="rounded-2xl bg-slate-50 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Executive summary</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.executiveSummary}</p></div>
           <div className="grid gap-5 sm:grid-cols-2"><div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Primary driver</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.primaryDriver}</p></div><div className="rounded-2xl border border-slate-200 p-6"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Why it matters</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.whyItMatters}</p></div></div>

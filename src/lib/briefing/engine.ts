@@ -225,9 +225,10 @@ function findDataRow(rows: unknown[][], patterns: RegExp[]): unknown[] | null {
 }
 
 function changePercent(current: number, previous: number): number {
-  // A percentage change is not meaningful when the prior period is zero.
-  // Returning 0 avoids presenting a fabricated +100% change for a new line item.
-  if (previous === 0) return 0;
+  // A percentage change is not meaningful when the prior period is zero or absent.
+  // Return NaN (matching the QuickBooks implementation) so callers render
+  // "comparison unavailable" instead of a fabricated 0%.
+  if (previous === 0) return Number.NaN;
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
@@ -342,20 +343,21 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
   const expenseValues = expenseRow ? rowValues(expenseRow, labels.length) : [];
   const currentIndex = Math.max(0, labels.length - 1);
   const previousIndex = Math.max(0, currentIndex - 1);
+  const hasPreviousPeriod = currentIndex > 0;
   const revenue = revenueValues[currentIndex] ?? valueFromRow(revenueRow || [], ["Revenue", "Total Revenue", "Sales"]);
-  const previousRevenue = revenueValues[previousIndex] ?? 0;
+  const previousRevenue = hasPreviousPeriod ? revenueValues[previousIndex] ?? 0 : 0;
   const grossProfit = grossProfitValues[currentIndex] ?? 0;
-  const previousGrossProfit = grossProfitValues[previousIndex] ?? 0;
+  const previousGrossProfit = hasPreviousPeriod ? grossProfitValues[previousIndex] ?? 0 : 0;
   const cash = cashValues[currentIndex] ?? valueFromRow(cashRow || [], ["Cash"]);
-  const previousCash = cashValues[previousIndex] ?? 0;
+  const previousCash = hasPreviousPeriod ? cashValues[previousIndex] ?? 0 : 0;
   const inventory = inventoryValues[currentIndex] ?? valueFromRow(inventoryRow || [], ["Inventory"]);
-  const previousInventory = inventoryValues[previousIndex] ?? 0;
+  const previousInventory = hasPreviousPeriod ? inventoryValues[previousIndex] ?? 0 : 0;
   const expense = expenseValues[currentIndex] ?? valueFromRow(expenseRow || [], ["Operating Expenses", "Total Operating Expenses", "Expenses"]);
-  const previousExpense = expenseValues[previousIndex] ?? 0;
+  const previousExpense = hasPreviousPeriod ? expenseValues[previousIndex] ?? 0 : 0;
   const revenueChange = changePercent(revenue, previousRevenue);
   const margin = revenue !== 0 ? (grossProfit / revenue) * 100 : 0;
-  const previousMargin = previousRevenue !== 0 ? (previousGrossProfit / previousRevenue) * 100 : margin;
-  const marginChange = margin - previousMargin;
+  const previousMargin = hasPreviousPeriod && previousRevenue !== 0 ? (previousGrossProfit / previousRevenue) * 100 : Number.NaN;
+  const marginChange = Number.isFinite(previousMargin) ? margin - previousMargin : Number.NaN;
   const cashChange = changePercent(cash, previousCash);
   const inventoryChange = changePercent(inventory, previousInventory);
   const expenseChange = changePercent(expense, previousExpense);
