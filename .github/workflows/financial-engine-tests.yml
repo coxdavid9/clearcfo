@@ -38,7 +38,10 @@ jobs:
         run: npm run test:trends
 
       - name: Run alert engine scenarios
-        run: npm run test:alerts
+        run: |
+          npm run test:alerts
+          npm run test:due
+          npm run test:email
 
       - name: Verify production build
         run: npm run build

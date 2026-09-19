@@ -18,13 +18,29 @@ function points(value: number | null | undefined): string {
 function severityLabel(severity: Alert["severity"]): string {
   return severity === "high" ? "HIGH" : severity === "medium" ? "MEDIUM" : "WATCH";
 }
+function appUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://theclearcfo.com").trim().replace(/\/$/, "");
+}
+function footerText(companyName: string): string {
+  return [
+    "You're receiving this because email alerts are enabled for " + (companyName || "your business") + " in ClearCFO.",
+    "Manage preferences: " + appUrl() + "/alerts",
+    "Please don't reply to this email — this mailbox isn't monitored.",
+  ].join("\n");
+}
+function footerHtml(companyName: string): string {
+  return '<div style="padding:18px 0 30px;border-top:1px solid #e5e7eb;font-size:12px;color:#94a3b8">' +
+    '<p style="margin:0 0 6px">You\'re receiving this because email alerts are enabled for ' + escapeHtml(companyName || "your business") + ' in ClearCFO.</p>' +
+    '<p style="margin:0 0 6px"><a href="' + escapeHtml(appUrl() + "/alerts") + '" style="color:#2563eb">Manage preferences</a></p>' +
+    '<p style="margin:0">Please don\'t reply to this email — this mailbox isn\'t monitored.</p></div></div>';
+}
 function shell(companyName: string, body: string): string {
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:0 auto;color:#17213a;line-height:1.6">' +
     '<div style="padding:28px 0 22px;border-bottom:1px solid #e5e7eb">' +
     '<img src="https://theclearcfo.com/logo.png" alt="ClearCFO" width="224" style="display:block;width:224px;max-width:100%;height:auto;border:0" />' +
     '<div style="font-size:13px;color:#6b7280;margin-top:8px">Financial clarity. Smarter decisions.</div></div>' +
     '<div style="padding:30px 0"><p style="margin:0 0 6px;font-size:13px;color:#64748b">' + escapeHtml(companyName) + '</p>' + body + '</div>' +
-    '<div style="padding:18px 0 30px;border-top:1px solid #e5e7eb;font-size:12px;color:#94a3b8">ClearCFO · Financial clarity. Smarter decisions.</div></div>';
+    footerHtml(companyName);
 }
 function alertCard(alert: Alert): string {
   const color = alert.severity === "high" ? "#b91c1c" : alert.severity === "medium" ? "#b45309" : "#475569";
@@ -40,7 +56,7 @@ export function buildAlertEmail(companyName: string, alerts: Alert[]): EmailTemp
   const subject = '[ClearCFO] ' + (top?.title || "Financial alert") + ' — ' + safeCompany;
   const text = ['ClearCFO alerts — ' + (companyName || "Your business"), "",
     ...alerts.flatMap((alert) => [severityLabel(alert.severity) + ": " + alert.title, alert.detail, "Estimated impact: " + money(alert.estimatedImpact), ""]),
-    "View your briefing: https://theclearcfo.com"].join("\n");
+    "View your briefing: https://theclearcfo.com", "", footerText(companyName)].join("\n");
   const html = shell(safeCompany,
     '<h2 style="margin:0 0 10px;font-size:24px;line-height:1.3">Your ClearCFO alerts</h2>' +
     '<p style="margin:0 0 24px;color:#64748b">A few financial items deserve your attention.</p>' +
@@ -81,7 +97,7 @@ export function buildWeeklyReportEmail(companyName: string, briefing: BriefingDa
       "Operating expense: " + money(mtd.operatingExpense.current) + " (" + pct(mtd.operatingExpense.change) + ")",
       "Net income: " + money(mtd.netIncome.current) + " (" + pct(mtd.netIncome.change) + ")");
   }
-  textParts.push("", "View your briefing: https://theclearcfo.com");
+  textParts.push("", "View your briefing: https://theclearcfo.com", "", footerText(companyName));
   const text = textParts.join("\n");
   const riskHtml = risks.length ? risks.map((driver) => "<li style=\"margin:0 0 8px\">" + escapeHtml(driverText(driver).slice(2)) + "</li>").join("") : "<li>No high-severity risks were identified.</li>";
   const opportunityHtml = opportunityLines.length ? opportunityLines.map((item) => "<li style=\"margin:0 0 8px\">" + escapeHtml(item.slice(2)) + "</li>").join("") : "<li>No positive drivers were identified in the available data.</li>";

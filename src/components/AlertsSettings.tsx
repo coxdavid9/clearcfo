@@ -17,6 +17,9 @@ type Preferences = {
   weekly_report_day: number;
   report_recipient_email: string | null;
   auto_sync_enabled: boolean;
+  alert_delivery_time: string;
+  weekly_report_time: string;
+  timezone: string;
 };
 
 const DEFAULTS: Preferences = {
@@ -25,6 +28,9 @@ const DEFAULTS: Preferences = {
   weekly_report_day: 1,
   report_recipient_email: null,
   auto_sync_enabled: true,
+  alert_delivery_time: "07:00",
+  weekly_report_time: "07:30",
+  timezone: "America/Chicago",
 };
 
 const metrics = [
@@ -36,6 +42,7 @@ const metrics = [
 ] as const;
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const timezones = [["America/Chicago", "Central Time"], ["America/New_York", "Eastern Time"], ["America/Denver", "Mountain Time"], ["America/Los_Angeles", "Pacific Time"], ["America/Anchorage", "Alaska Time"], ["Pacific/Honolulu", "Hawaii Time"], ["UTC", "UTC"]];
 
 export default function AlertsSettings() {
   const [preferences, setPreferences] = useState(DEFAULTS);
@@ -138,6 +145,32 @@ export default function AlertsSettings() {
           <h2 className="mt-1 text-lg font-semibold text-slate-900">Alerts &amp; reports</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">Choose what ClearCFO sends you and how often it keeps watch.</p>
         </div>
+        <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <h3 className="font-semibold text-slate-900">Email schedule</h3>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-semibold text-slate-700">
+              Send alerts at
+              <input type="time" value={preferences.alert_delivery_time} onChange={(e) => setPreferences((p) => ({ ...p, alert_delivery_time: e.target.value }))} onBlur={() => void save({ alert_delivery_time: preferences.alert_delivery_time })} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-700" />
+              <span className="mt-1 block text-xs font-normal text-slate-400">Alerts are delivered once per day, after this time.</span>
+            </label>
+            <div className="text-sm font-semibold text-slate-700">
+              <span>Weekly CFO report</span>
+              <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+                <select value={preferences.weekly_report_day} onChange={(e) => void save({ weekly_report_day: Number(e.target.value) })} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-700">
+                  {days.map((day, index) => <option key={day} value={index + 1}>{day}</option>)}
+                </select>
+                <input type="time" value={preferences.weekly_report_time} onChange={(e) => setPreferences((p) => ({ ...p, weekly_report_time: e.target.value }))} onBlur={() => void save({ weekly_report_time: preferences.weekly_report_time })} className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-700" />
+              </div>
+            </div>
+            <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
+              Timezone
+              <select value={preferences.timezone} onChange={(e) => void save({ timezone: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-700">
+                {timezones.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <span className="mt-1 block text-xs font-normal text-slate-400">All times use this timezone; daylight saving is handled automatically.</span>
+            </label>
+          </div>
+        </div>
         <div className="mt-6 divide-y divide-slate-100">
           {[
             ["alerts_enabled", "Proactive alerts", "Get warned when a material financial issue deserves attention."],
@@ -165,12 +198,6 @@ export default function AlertsSettings() {
           })}
         </div>
         <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6 sm:grid-cols-2">
-          <label className="text-sm font-semibold text-slate-700">
-            Report day
-            <select value={preferences.weekly_report_day} onChange={(e) => void save({ weekly_report_day: Number(e.target.value) })} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-700">
-              {days.map((day, index) => <option key={day} value={index + 1}>{day}</option>)}
-            </select>
-          </label>
           <label className="text-sm font-semibold text-slate-700">
             Recipient email
             <input
