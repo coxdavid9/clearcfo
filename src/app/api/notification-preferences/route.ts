@@ -11,6 +11,11 @@ const DEFAULTS = {
   weekly_report_day: 1,
   report_recipient_email: null as string | null,
   auto_sync_enabled: true,
+  alert_delivery_time: "07:00",
+  weekly_report_time: "07:30",
+  timezone: "America/Chicago",
+  last_alert_delivery_at: null as string | null,
+  last_weekly_delivery_at: null as string | null,
 };
 
 async function activeCompany() {
@@ -30,7 +35,7 @@ export async function GET() {
   try {
     const company = await activeCompany();
     const { url, key } = config();
-    const response = await fetch(`${url}/rest/v1/notification_preferences?company_id=eq.${encodeURIComponent(company.id)}&select=alerts_enabled,weekly_report_enabled,weekly_report_day,report_recipient_email,auto_sync_enabled&limit=1`, {
+    const response = await fetch(`${url}/rest/v1/notification_preferences?company_id=eq.${encodeURIComponent(company.id)}&select=alerts_enabled,weekly_report_enabled,weekly_report_day,report_recipient_email,auto_sync_enabled,alert_delivery_time,weekly_report_time,timezone,last_alert_delivery_at,last_weekly_delivery_at&limit=1`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store",
     });
     if (!response.ok) throw new Error(`Could not read notification preferences (${response.status}).`);
@@ -61,6 +66,19 @@ export async function PATCH(request: Request) {
       const day = Number(body.weekly_report_day);
       if (!Number.isInteger(day) || day < 1 || day > 7) return NextResponse.json({ error: "weekly_report_day must be 1–7." }, { status: 400 });
       updates.weekly_report_day = day;
+    }
+    if (body?.alert_delivery_time !== undefined) {
+      if (typeof body.alert_delivery_time !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.alert_delivery_time)) return NextResponse.json({ error: "alert_delivery_time must use HH:MM in 24-hour time." }, { status: 400 });
+      updates.alert_delivery_time = body.alert_delivery_time;
+    }
+    if (body?.weekly_report_time !== undefined) {
+      if (typeof body.weekly_report_time !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.weekly_report_time)) return NextResponse.json({ error: "weekly_report_time must use HH:MM in 24-hour time." }, { status: 400 });
+      updates.weekly_report_time = body.weekly_report_time;
+    }
+    if (body?.timezone !== undefined) {
+      if (typeof body.timezone !== "string" || body.timezone.length < 1 || body.timezone.length > 100) return NextResponse.json({ error: "timezone must be a valid IANA timezone." }, { status: 400 });
+      try { new Intl.DateTimeFormat("en-US", { timeZone: body.timezone }).format(); } catch { return NextResponse.json({ error: "timezone must be a valid IANA timezone." }, { status: 400 }); }
+      updates.timezone = body.timezone;
     }
     if (body?.report_recipient_email !== undefined) {
       if (body.report_recipient_email !== null && (typeof body.report_recipient_email !== "string" || body.report_recipient_email.length > 254 || !EMAIL_RE.test(body.report_recipient_email))) {
