@@ -183,10 +183,40 @@ export default function CFOBriefing() {
     try {
       const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
       let cached: BriefingData | null = null;
+      let cachedSyncedAt: string | null = null;
       try {
         if (cachedBriefing) cached = JSON.parse(cachedBriefing) as BriefingData;
+        cachedSyncedAt = window.localStorage.getItem("clearcfo_qb_last_synced_at");
       } catch {
         cached = null;
+        cachedSyncedAt = null;
+      }
+
+      let serverBriefing: BriefingData | null = null;
+      let serverSyncedAt: string | null = null;
+      try {
+        const latestResponse = await fetch("/api/briefing/latest", { cache: "no-store" });
+        if (latestResponse.ok) {
+          const latestPayload = await latestResponse.json();
+          if (latestPayload?.briefing?.companyName && Array.isArray(latestPayload.briefing.trend)) {
+            serverBriefing = latestPayload.briefing as BriefingData;
+            serverSyncedAt = typeof latestPayload.syncedAt === "string" ? latestPayload.syncedAt : null;
+          }
+        }
+      } catch {
+        // Server storage is optional; preserve the existing local-cache fallback.
+      }
+
+      const serverTime = serverSyncedAt ? new Date(serverSyncedAt).getTime() : NaN;
+      const cachedTime = cachedSyncedAt ? new Date(cachedSyncedAt).getTime() : NaN;
+      const useServerBriefing = Boolean(serverBriefing) && (
+        !cached ||
+        !Number.isFinite(cachedTime) ||
+        (Number.isFinite(serverTime) && serverTime > cachedTime)
+      );
+      if (useServerBriefing && serverBriefing) {
+        cached = serverBriefing;
+        cachedSyncedAt = serverSyncedAt;
       }
 
       let statusPayload: any = null;
@@ -204,8 +234,13 @@ export default function CFOBriefing() {
       // on a definite mismatch; when the company cannot be verified (e.g.
       // offline) it keeps the legacy stale-cache fallback.
       const activeCompanyId = statusPayload?.activeCompanyId || statusPayload?.connection?.companyId || null;
+      const selectedServerBriefing = useServerBriefing && Boolean(serverBriefing);
       if (!isQuickBooksCacheUsable(activeCompanyId)) {
-        cached = null;
+        cached = selectedServerBriefing ? serverBriefing : null;
+      }
+      if (selectedServerBriefing && cached && activeCompanyId) {
+        saveQuickBooksBriefingCache(cached, activeCompanyId);
+        if (serverSyncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", serverSyncedAt);
       }
       if (!statusOk || !statusPayload?.connection?.connected) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
@@ -213,7 +248,7 @@ export default function CFOBriefing() {
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           cacheAnalysisInput(cached);
-          setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
+          setLastSyncedLabel(formatSyncedAt(cachedSyncedAt));
         }
         return;
       }
