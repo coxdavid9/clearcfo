@@ -199,7 +199,6 @@ export default function AlertsSettings() {
         </div>
         <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6 sm:grid-cols-2">
           <label className="text-sm font-semibold text-slate-700">
-          <label className="text-sm font-semibold text-slate-700">
             Recipient email
             <input
               value={preferences.report_recipient_email || ""}
