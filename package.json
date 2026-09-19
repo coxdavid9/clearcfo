@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:security": "node scripts/security-regression-checks.mjs",
     "test:reasoning": "node scripts/reasoning-scenarios.mjs",
-    "test:trends": "node scripts/trend-scenarios.mjs"
+    "test:trends": "node scripts/trend-scenarios.mjs",
+    "test:alerts": "node scripts/alert-scenarios.mjs"
   },
   "dependencies": {
     "next": "16.3.4",
