@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import { buildAlertEmail, buildWeeklyReportEmail } from "../src/lib/alerts/templates.ts";
+import { buildResendRequest, sendEmail } from "../src/lib/email.ts";
+process.env.RESEND_API_KEY = "test-key";
+process.env.NEXT_PUBLIC_APP_URL = "https://theclearcfo.com";
+const alert = { ruleId: "builtin:cash", key: "builtin:cash", severity: "high", title: "Cash down 20%", detail: "Cash declined 20% vs the prior period.", estimatedImpact: 500, category: "Cash" };
+const briefing = { companyName: "Acme", revenue: 100000, revenueChange: 5, grossMargin: 40, marginChange: 1, cash: 50000, cashChange: 2, inventory: 10000, inventoryChange: 1, operatingExpense: 20000, previousOperatingExpense: 19000, drivers: [], recommendation: "Review cash drivers.", impact: 80, mtdComparison: null };
+const alertEmail = buildAlertEmail("Acme", [alert]);
+const weeklyEmail = buildWeeklyReportEmail("Acme", briefing);
+for (const email of [alertEmail, weeklyEmail]) {
+  assert.match(email.text, /email alerts are enabled for Acme/);
+  assert.match(email.text, /Manage preferences: https:\/\/theclearcfo\.com\/alerts/);
+  assert.match(email.text, /Please don't reply to this email/);
+  assert.match(email.html, /https:\/\/theclearcfo\.com\/alerts/);
+  assert.match(email.html, /Please don.t reply to this email/);
+}
+const request = buildResendRequest({ to: "owner@example.com", ...alertEmail });
+const body = JSON.parse(request.init.body);
+assert.equal(body.headers["List-Unsubscribe"], "<https://theclearcfo.com/alerts>");
+assert.equal(body.headers["Reply-To"], "support@theclearcfo.com");
+const originalFetch = globalThis.fetch;
+let captured = null;
+globalThis.fetch = async (url, init) => { captured = { url, init }; return new Response("{}", { status: 200 }); };
+await sendEmail({ to: "owner@example.com", ...alertEmail });
+globalThis.fetch = originalFetch;
+assert.equal(captured.url, "https://api.resend.com/emails");
+const sentBody = JSON.parse(captured.init.body);
+assert.equal(sentBody.headers["List-Unsubscribe"], "<https://theclearcfo.com/alerts>");
+assert.equal(sentBody.headers["Reply-To"], "support@theclearcfo.com");
+console.log("All email footer/header scenarios passed.");
