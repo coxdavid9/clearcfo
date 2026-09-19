@@ -200,11 +200,16 @@ export type NotificationPreferences = {
   weekly_report_day: number;
   report_recipient_email: string | null;
   auto_sync_enabled: boolean;
+  alert_delivery_time: string;
+  weekly_report_time: string;
+  timezone: string;
+  last_alert_delivery_at: string | null;
+  last_weekly_delivery_at: string | null;
 };
 
 export async function getNotificationPreferences(companyId: string): Promise<NotificationPreferences> {
   const response = await supabaseRequest(
-    `notification_preferences?company_id=eq.${encodeURIComponent(companyId)}&select=alerts_enabled,weekly_report_enabled,weekly_report_day,report_recipient_email,auto_sync_enabled&limit=1`,
+    `notification_preferences?company_id=eq.${encodeURIComponent(companyId)}&select=alerts_enabled,weekly_report_enabled,weekly_report_day,report_recipient_email,auto_sync_enabled,alert_delivery_time,weekly_report_time,timezone,last_alert_delivery_at,last_weekly_delivery_at&limit=1`,
   );
   if (!response.ok) throw new Error(`Could not read notification preferences (${response.status}).`);
   const rows = await response.json() as Partial<NotificationPreferences>[];
@@ -214,7 +219,22 @@ export async function getNotificationPreferences(companyId: string): Promise<Not
     weekly_report_day: rows[0]?.weekly_report_day ?? 1,
     report_recipient_email: rows[0]?.report_recipient_email || null,
     auto_sync_enabled: rows[0]?.auto_sync_enabled ?? true,
+    alert_delivery_time: rows[0]?.alert_delivery_time ?? "07:00",
+    weekly_report_time: rows[0]?.weekly_report_time ?? "07:30",
+    timezone: rows[0]?.timezone ?? "America/Chicago",
+    last_alert_delivery_at: rows[0]?.last_alert_delivery_at ?? null,
+    last_weekly_delivery_at: rows[0]?.last_weekly_delivery_at ?? null,
   };
+}
+
+export async function markAlertDelivery(companyId: string, deliveredAt = new Date().toISOString()) {
+  const response = await supabaseRequest(`notification_preferences?company_id=eq.${encodeURIComponent(companyId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_alert_delivery_at: deliveredAt }) });
+  if (!response.ok) throw new Error(`Could not record alert delivery (${response.status}).`);
+}
+
+export async function markWeeklyDelivery(companyId: string, deliveredAt = new Date().toISOString()) {
+  const response = await supabaseRequest(`notification_preferences?company_id=eq.${encodeURIComponent(companyId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_weekly_delivery_at: deliveredAt }) });
+  if (!response.ok) throw new Error(`Could not record weekly delivery (${response.status}).`);
 }
 
 export async function listEnabledAlertRules(companyId: string) {
