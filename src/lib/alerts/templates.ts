@@ -103,8 +103,8 @@ export function buildWeeklyReportEmail(companyName: string, briefing: BriefingDa
     '<div style="margin-top:24px"><h3 style="margin:0 0 8px;font-size:17px">Risks</h3><ul style="margin:0;padding-left:20px;color:#475569">' + riskHtml + "</ul></div>" +
     '<div style="margin-top:24px"><h3 style="margin:0 0 8px;font-size:17px">Opportunities</h3><ul style="margin:0;padding-left:20px;color:#475569">' + opportunityHtml + "</ul></div>" +
     '<div style="margin-top:24px;padding:18px;border:1px solid #dbeafe;border-radius:12px"><h3 style="margin:0 0 8px;font-size:17px">Recommended action</h3><p style="margin:0 0 8px;color:#475569">' +
-    escapeHtml(briefing.recommendation || "No recommendation was generated.") + "</p><p style=\"margin:0;font-size:14px;font-weight:700\">Impact score: " +
-    (Number.isFinite(briefing.impact) ? briefing.impact : "Unavailable") + "</p></div>" + mtdHtml +
-    '<a href="https://theclearcfo.com" style="display:inline-block;margin-top:26px;padding:12px 18px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700">View your briefing</a>");
+    escapeHtml(briefing.recommendation || "No recommendation was generated.") + '</p><p style="margin:0;font-size:14px;font-weight:700">Impact score: ' +
+    (Number.isFinite(briefing.impact) ? briefing.impact : "Unavailable") + '</p></div>' + mtdHtml +
+    '<a href="https://theclearcfo.com" style="display:inline-block;margin-top:26px;padding:12px 18px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700">View your briefing</a>');
   return { subject, text, html };
 }
