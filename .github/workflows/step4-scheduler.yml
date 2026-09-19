@@ -2,7 +2,7 @@ name: ClearCFO Step 4 Scheduler
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:

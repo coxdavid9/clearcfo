@@ -32,17 +32,24 @@ function sentOnLocalDate(timestamp: string | null | undefined, timeZone: string,
   if (!timestamp) return false;
   return localParts(new Date(timestamp), timeZone).dateStr === dateStr;
 }
+const DISPATCH_INTERVAL_MINUTES = 5;
+
+function isWithinLookahead(localMinutes: number, targetMinutes: number): boolean {
+  const lookaheadStart = Math.max(0, targetMinutes - DISPATCH_INTERVAL_MINUTES);
+  return localMinutes >= lookaheadStart;
+}
+
 export function alertDue(nowUtc: Date, prefs: EmailSchedulePreferences): boolean {
   if (!prefs.alerts_enabled) return false;
   const local = localParts(nowUtc, prefs.timezone);
-  if (local.minutes < parseTime(prefs.alert_delivery_time)) return false;
+  if (!isWithinLookahead(local.minutes, parseTime(prefs.alert_delivery_time))) return false;
   return !sentOnLocalDate(prefs.last_alert_delivery_at, prefs.timezone, local.dateStr);
 }
 export function weeklyDue(nowUtc: Date, prefs: EmailSchedulePreferences): boolean {
   if (!prefs.weekly_report_enabled) return false;
   const local = localParts(nowUtc, prefs.timezone);
   if (local.weekday !== prefs.weekly_report_day) return false;
-  if (local.minutes < parseTime(prefs.weekly_report_time)) return false;
+  if (!isWithinLookahead(local.minutes, parseTime(prefs.weekly_report_time))) return false;
   if (!prefs.last_weekly_delivery_at) return true;
   const sentLocalDate = localParts(new Date(prefs.last_weekly_delivery_at), prefs.timezone).dateStr;
   return sentLocalDate < mondayStart(local.dateStr);
