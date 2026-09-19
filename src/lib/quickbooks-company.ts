@@ -256,13 +256,17 @@ export async function completeQuickBooksCallback(code: string, realmId: string, 
   return { companyName: companyName || activeCompany.name, companyId: activeCompany.id };
 }
 
-async function getConnection(userId: string): Promise<StoredConnection | null> {
-  const company = await getActiveCompany(userId);
-  if (!company) return null;
-  const response = await supabaseRequest(`quickbooks_connections?company_id=eq.${encodeURIComponent(company.id)}&select=*&limit=1`);
+export async function getConnectionForCompany(companyId: string): Promise<StoredConnection | null> {
+  const response = await supabaseRequest(`quickbooks_connections?company_id=eq.${encodeURIComponent(companyId)}&select=*&limit=1`);
   if (!response.ok) throw new Error(`Could not read QuickBooks connection (${response.status}).`);
   const rows = await response.json() as StoredConnection[];
   return rows[0] || null;
+}
+
+async function getConnection(userId: string): Promise<StoredConnection | null> {
+  const company = await getActiveCompany(userId);
+  if (!company) return null;
+  return getConnectionForCompany(company.id);
 }
 
 async function updateTokens(id: string, tokens: Tokens) {
@@ -308,9 +312,9 @@ async function revokeIntuitTokens(refreshToken: string) {
   if (!response.ok) console.error(`[ClearCFO QuickBooks] Token revocation failed (${response.status}).`);
 }
 
-export async function quickBooksReport(userId: string, reportName: string, params: Record<string, string>) {
+export async function quickBooksReportForCompany(companyId: string, reportName: string, params: Record<string, string>) {
   if (!/^[A-Za-z]+$/.test(reportName)) throw new Error("Invalid QuickBooks report.");
-  const connection = await getConnection(userId);
+  const connection = await getConnectionForCompany(companyId);
   if (!connection) throw new Error("QuickBooks is not connected for the selected business.");
   const search = new URLSearchParams(params);
   const url = `${QB_API_BASE}/v3/company/${encodeURIComponent(connection.realm_id)}/reports/${reportName}?${search.toString()}`;
@@ -330,4 +334,10 @@ export async function quickBooksReport(userId: string, reportName: string, param
   }
   if (!response.ok) throw new Error(payload?.Fault?.Error?.[0]?.Message || `QuickBooks ${reportName} report failed.`);
   return payload;
+}
+
+export async function quickBooksReport(userId: string, reportName: string, params: Record<string, string>) {
+  const company = await getActiveCompany(userId);
+  if (!company) throw new Error("QuickBooks is not connected for the selected business.");
+  return quickBooksReportForCompany(company.id, reportName, params);
 }

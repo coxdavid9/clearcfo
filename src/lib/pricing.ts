@@ -15,7 +15,7 @@ export const PLANS = {
     monthlyPrice: 79,
     annualPrice: 790,
     annualSavingsPercent: 17,
-    maxBusinesses: null,
+    maxBusinesses: 5,
   },
 } as const;
 
