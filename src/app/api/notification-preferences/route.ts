@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveCompany, requireCurrentCompanyUser } from "../../../lib/company";
+import { isValidScheduleTime, isValidTimezone } from "../../../lib/jobs/schedule-validation";
 
 export const runtime = "nodejs";
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -68,16 +69,15 @@ export async function PATCH(request: Request) {
       updates.weekly_report_day = day;
     }
     if (body?.alert_delivery_time !== undefined) {
-      if (typeof body.alert_delivery_time !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.alert_delivery_time)) return NextResponse.json({ error: "alert_delivery_time must use HH:MM in 24-hour time." }, { status: 400 });
+      if (!isValidScheduleTime(body.alert_delivery_time)) return NextResponse.json({ error: "alert_delivery_time must use HH:MM in 24-hour time." }, { status: 400 });
       updates.alert_delivery_time = body.alert_delivery_time;
     }
     if (body?.weekly_report_time !== undefined) {
-      if (typeof body.weekly_report_time !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.weekly_report_time)) return NextResponse.json({ error: "weekly_report_time must use HH:MM in 24-hour time." }, { status: 400 });
+      if (!isValidScheduleTime(body.weekly_report_time)) return NextResponse.json({ error: "weekly_report_time must use HH:MM in 24-hour time." }, { status: 400 });
       updates.weekly_report_time = body.weekly_report_time;
     }
     if (body?.timezone !== undefined) {
-      if (typeof body.timezone !== "string" || body.timezone.length < 1 || body.timezone.length > 100) return NextResponse.json({ error: "timezone must be a valid IANA timezone." }, { status: 400 });
-      try { new Intl.DateTimeFormat("en-US", { timeZone: body.timezone }).format(); } catch { return NextResponse.json({ error: "timezone must be a valid IANA timezone." }, { status: 400 }); }
+      if (!isValidTimezone(body.timezone)) return NextResponse.json({ error: "timezone must be a valid IANA timezone." }, { status: 400 });
       updates.timezone = body.timezone;
     }
     if (body?.report_recipient_email !== undefined) {
