@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { buildWeeklyReportEmail } from "../../../../lib/alerts/templates";
-import { sendEmail } from "../../../../lib/email";
 import { authorizeCron } from "../../../../lib/jobs/auth";
-import {
-  chicagoWeekdayNumber,
-  getNotificationPreferences,
-  listConnectedCompanies,
-  pauseBetweenCompanies,
-  resolveReportRecipient,
-  syncCompanyBriefing,
-} from "../../../../lib/jobs/company-sync";
+import { runWeeklyReportDelivery } from "../../../../lib/jobs/delivery";
+import { getNotificationPreferences, listConnectedCompanies, pauseBetweenCompanies, chicagoWeekdayNumber } from "../../../../lib/jobs/company-sync";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const unauthorized = authorizeCron(request);
   if (unauthorized) return unauthorized;
-
   const results: Array<{ companyId: string; sent: boolean; skipped: boolean; briefingPersisted: boolean; error?: string }> = [];
   let first = true;
   try {
@@ -31,11 +22,8 @@ export async function POST(request: Request) {
           results.push({ companyId: company.id, sent: false, skipped: true, briefingPersisted: false });
           continue;
         }
-        const { briefing, briefingPersisted } = await syncCompanyBriefing(company.id);
-        const recipient = await resolveReportRecipient(company.id, preferences.report_recipient_email);
-        const email = buildWeeklyReportEmail(company.name, briefing);
-        await sendEmail({ to: recipient, ...email });
-        results.push({ companyId: company.id, sent: true, skipped: false, briefingPersisted });
+        const result = await runWeeklyReportDelivery(company, preferences);
+        results.push({ companyId: company.id, ...result });
       } catch (error) {
         console.error("[ClearCFO Jobs] Weekly report failed:", company.id, error instanceof Error ? error.message : "Unknown error");
         results.push({ companyId: company.id, sent: false, skipped: false, briefingPersisted: false, error: error instanceof Error ? error.message : "Weekly report failed." });
