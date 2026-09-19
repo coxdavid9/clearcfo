@@ -142,11 +142,37 @@ export async function syncCompanyBriefing(companyId: string) {
   }
 
   const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection.company_name || null, detailReports);
+  const syncedAt = new Date().toISOString();
+  let briefingPersisted = false;
+  try {
+    const persistResponse = await supabaseRequest("synced_briefings?on_conflict=company_id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        company_id: companyId,
+        briefing,
+        synced_at: syncedAt,
+      }),
+    });
+    if (!persistResponse.ok) {
+      console.error("[ClearCFO Jobs] Briefing persistence failed:", companyId, persistResponse.status);
+    } else {
+      briefingPersisted = true;
+    }
+  } catch (error) {
+    console.error(
+      "[ClearCFO Jobs] Briefing persistence failed:",
+      companyId,
+      error instanceof Error ? error.message : "Unknown error",
+    );
+  }
+
   return {
     ok: true,
-    syncedAt: new Date().toISOString(),
+    syncedAt,
     source: "quickbooks" as const,
     companyId,
+    briefingPersisted,
     periods: briefing.periods,
     trendSeries: briefing.trendSeries,
     briefing,
