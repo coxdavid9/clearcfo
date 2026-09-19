@@ -58,17 +58,59 @@ export default function FinancialDashboard() {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>("Revenue");
 
   useEffect(() => {
-    try {
-      const cached = window.localStorage.getItem("clearcfo_qb_briefing_cache");
-      if (!cached) return;
-      const parsed = JSON.parse(cached) as BriefingData;
-      if (parsed?.companyName && Array.isArray(parsed.trend)) {
-        setData(parsed);
+    let cancelled = false;
+
+    async function loadLatestBriefing() {
+      let localBriefing: BriefingData | null = null;
+      let localSyncedAt: string | null = null;
+
+      try {
+        const cached = window.localStorage.getItem("clearcfo_qb_briefing_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached) as BriefingData;
+          if (parsed?.companyName && Array.isArray(parsed.trend)) {
+            localBriefing = parsed;
+            localSyncedAt = window.localStorage.getItem("clearcfo_qb_last_synced_at");
+          }
+        }
+      } catch {
+        // Fall through to the server copy.
+      }
+
+      let serverBriefing: BriefingData | null = null;
+      let serverSyncedAt: string | null = null;
+      try {
+        const response = await fetch("/api/briefing/latest", { cache: "no-store" });
+        if (response.ok) {
+          const payload = await response.json();
+          if (payload?.briefing?.companyName && Array.isArray(payload.briefing.trend)) {
+            serverBriefing = payload.briefing as BriefingData;
+            serverSyncedAt = typeof payload.syncedAt === "string" ? payload.syncedAt : null;
+          }
+        }
+      } catch {
+        // Server storage is optional; preserve the existing local-cache fallback.
+      }
+
+      if (cancelled) return;
+
+      const serverTime = serverSyncedAt ? new Date(serverSyncedAt).getTime() : NaN;
+      const localTime = localSyncedAt ? new Date(localSyncedAt).getTime() : NaN;
+      const useServer = Boolean(serverBriefing) && (
+        !localBriefing ||
+        !Number.isFinite(localTime) ||
+        (Number.isFinite(serverTime) && serverTime > localTime)
+      );
+
+      const latest = useServer ? serverBriefing : localBriefing;
+      if (latest) {
+        setData(latest);
         setSource("quickbooks");
       }
-    } catch {
-      // Keep safe demo data if the cache is unavailable.
     }
+
+    void loadLatestBriefing();
+    return () => { cancelled = true; };
   }, []);
 
   const series = source === "quickbooks" && Array.isArray(data.trendSeries) && data.trendSeries.length >= 4 ? data.trendSeries : demoTrendSeries;
