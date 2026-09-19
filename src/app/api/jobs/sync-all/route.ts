@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   const unauthorized = authorizeCron(request);
   if (unauthorized) return unauthorized;
 
-  const results: Array<{ companyId: string; synced: boolean; alertsSent: number; skipped: number; error?: string }> = [];
+  const results: Array<{ companyId: string; synced: boolean; briefingPersisted: boolean; alertsSent: number; skipped: number; error?: string }> = [];
   let first = true;
   try {
     const companies = await listConnectedCompanies();
@@ -32,13 +32,13 @@ export async function POST(request: Request) {
       try {
         const preferences = await getNotificationPreferences(company.id);
         if (!preferences.auto_sync_enabled) {
-          results.push({ companyId: company.id, synced: false, alertsSent: 0, skipped: 1 });
+          results.push({ companyId: company.id, synced: false, briefingPersisted: false, alertsSent: 0, skipped: 1 });
           continue;
         }
 
-        const { briefing } = await syncCompanyBriefing(company.id);
+        const { briefing, briefingPersisted } = await syncCompanyBriefing(company.id);
         if (!preferences.alerts_enabled) {
-          results.push({ companyId: company.id, synced: true, alertsSent: 0, skipped: 1 });
+          results.push({ companyId: company.id, synced: true, briefingPersisted, alertsSent: 0, skipped: 1 });
           continue;
         }
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         }
 
         if (!freshAlerts.length) {
-          results.push({ companyId: company.id, synced: true, alertsSent: 0, skipped });
+          results.push({ companyId: company.id, synced: true, briefingPersisted, alertsSent: 0, skipped });
           continue;
         }
 
@@ -73,10 +73,10 @@ export async function POST(request: Request) {
         const email = buildAlertEmail(company.name, freshAlerts);
         await sendEmail({ to: recipient, ...email });
         for (const alert of freshAlerts) await recordAlert(company.id, alert);
-        results.push({ companyId: company.id, synced: true, alertsSent: freshAlerts.length, skipped });
+        results.push({ companyId: company.id, synced: true, briefingPersisted, alertsSent: freshAlerts.length, skipped });
       } catch (error) {
         console.error("[ClearCFO Jobs] Company sync failed:", company.id, error instanceof Error ? error.message : "Unknown error");
-        results.push({ companyId: company.id, synced: false, alertsSent: 0, skipped: 0, error: error instanceof Error ? error.message : "Sync failed." });
+        results.push({ companyId: company.id, synced: false, briefingPersisted: false, alertsSent: 0, skipped: 0, error: error instanceof Error ? error.message : "Sync failed." });
       }
     }
     return NextResponse.json({ ok: true, companies: results }, { headers: { "Cache-Control": "no-store" } });
