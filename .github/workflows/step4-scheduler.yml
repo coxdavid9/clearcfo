@@ -1,8 +1,12 @@
-name: ClearCFO Step 4 Scheduler
+name: ClearCFO Step 4 Scheduler (manual backfill only)
+
+# NOTE: The every-5-minutes schedule now lives on Render as a native cron job
+# (see render.yaml -> clearcfo-dispatcher). GitHub Actions throttled the
+# `schedule` trigger to hours-apart firings, which delayed alert/weekly emails.
+# This workflow is kept for MANUAL backfills only (workflow_dispatch).
+# Do NOT re-add a `schedule` trigger here or emails may double-dispatch.
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
