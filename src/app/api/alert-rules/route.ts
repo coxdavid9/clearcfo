@@ -43,9 +43,13 @@ export async function POST(request: Request) {
     const body = JSON.parse(raw);
     const metric = typeof body?.metric === "string" ? body.metric : "";
     const operator = typeof body?.operator === "string" ? body.operator : "";
-    const severity = typeof body?.severity === "string" ? body.severity : "";
+    // Severity is no longer user-selectable (the user picking the alert already
+    // knows its importance). Default custom rules to "medium"; the column is
+    // kept because delivery dedupe/escalation still keys on it.
+    const rawSeverity = typeof body?.severity === "string" ? body.severity : "medium";
+    const severity = SEVERITIES.has(rawSeverity) ? rawSeverity : "medium";
     const value = Number(body?.value);
-    if (!METRICS.has(metric) || !OPERATORS.has(operator) || !SEVERITIES.has(severity)) {
+    if (!METRICS.has(metric) || !OPERATORS.has(operator)) {
       return NextResponse.json({ error: "Invalid alert rule." }, { status: 400 });
     }
     if (!Number.isFinite(value) || value < 0 || value > 1e9 || (metric === "grossMargin" && value > 100)) {
