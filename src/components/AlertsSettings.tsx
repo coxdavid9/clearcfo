@@ -7,7 +7,6 @@ type Rule = {
   metric: "cash" | "grossMargin" | "revenue" | "operatingExpense" | "inventory";
   operator: "below" | "above";
   value: number;
-  severity: "high" | "medium" | "watch";
   enabled: boolean;
 };
 
@@ -50,7 +49,7 @@ export default function AlertsSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [ruleForm, setRuleForm] = useState({ metric: "cash", operator: "below", value: "10000", severity: "high" });
+  const [ruleForm, setRuleForm] = useState({ metric: "cash", operator: "below", value: "10000" });
 
   const load = async () => {
     setLoading(true);
@@ -107,7 +106,6 @@ export default function AlertsSettings() {
           metric: ruleForm.metric,
           operator: ruleForm.operator,
           value: Number(ruleForm.value),
-          severity: ruleForm.severity,
         }),
       });
       const data = await response.json();
@@ -219,10 +217,10 @@ export default function AlertsSettings() {
         <p className="mt-1 text-sm text-slate-500">Set thresholds that matter specifically to your business.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {[["Cash below $10,000", "cash", "below", "10000"], ["Gross margin below 25%", "grossMargin", "below", "25"], ["Revenue above $100,000", "revenue", "above", "100000"]].map(([label, metric, operator, value]) => (
-            <button key={label} type="button" onClick={() => setRuleForm({ metric, operator, value, severity: "medium" })} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">{label}</button>
+            <button key={label} type="button" onClick={() => setRuleForm({ metric, operator, value })} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">{label}</button>
           ))}
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-5">
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             {metrics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -230,9 +228,6 @@ export default function AlertsSettings() {
             <option value="below">Below</option><option value="above">Above</option>
           </select>
           <input type="number" min="0" value={ruleForm.value} onChange={(e) => setRuleForm((f) => ({ ...f, value: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="Threshold" />
-          <select value={ruleForm.severity} onChange={(e) => setRuleForm((f) => ({ ...f, severity: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-            <option value="high">High</option><option value="medium">Medium</option><option value="watch">Watch</option>
-          </select>
           <button type="button" disabled={saving} onClick={() => void addRule()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">Add alert</button>
         </div>
 
@@ -243,7 +238,6 @@ export default function AlertsSettings() {
             <div key={rule.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-semibold text-slate-900">{metrics.find(([value]) => value === rule.metric)?.[1]} {rule.operator} {rule.metric === "grossMargin" ? rule.value + "%" : "$" + Number(rule.value).toLocaleString()}</p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{rule.severity}</p>
               </div>
               <button type="button" disabled={saving} onClick={() => void deleteRule(rule.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:border-red-300 hover:text-red-600 disabled:opacity-50">Delete</button>
             </div>

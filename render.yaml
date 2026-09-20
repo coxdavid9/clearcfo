@@ -1,0 +1,19 @@
+# ClearCFO infrastructure-as-code.
+# Defines ONLY the email dispatcher cron job. The web service itself stays
+# dashboard-managed (it was created manually, not from a blueprint).
+
+services:
+  - type: cron
+    name: clearcfo-dispatcher
+    runtime: node
+    plan: starter # cron jobs have no free plan; billed per-second of actual run time (~$1-2/mo at */5)
+    schedule: "*/5 * * * *" # every 5 minutes, UTC (timezone-agnostic cadence)
+    buildCommand: "echo 'dispatcher cron: nothing to build'"
+    startCommand: >-
+      curl --fail --max-time 600 -X POST
+      -H "Authorization: Bearer $CRON_SECRET"
+      -H "Content-Type: application/json"
+      https://theclearcfo.com/api/jobs/dispatch
+    envVars:
+      - key: CRON_SECRET
+        sync: false # paste the SAME value as the web service's CRON_SECRET in the dashboard
