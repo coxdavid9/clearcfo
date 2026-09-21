@@ -305,7 +305,13 @@ export default function CFOBriefing() {
   }
 
   useEffect(() => {
-    void loadQuickBooksBriefing().finally(() => setIsLoading(false));
+    void loadQuickBooksBriefing().finally(() => {
+      setIsLoading(false);
+      // Signal the trend section that the briefing has finished its initial
+      // state determination, so graphs never render ahead of the briefing.
+      (window as unknown as { __clearcfoBriefingReady?: boolean }).__clearcfoBriefingReady = true;
+      window.dispatchEvent(new CustomEvent("clearcfo:briefing-ready"));
+    });
 
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
@@ -328,6 +334,10 @@ export default function CFOBriefing() {
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setIsLoading(false);
+      // Unblock the trend section if a disconnect lands during the initial
+      // load; its own disconnect listener clears any rendered trends.
+      (window as unknown as { __clearcfoBriefingReady?: boolean }).__clearcfoBriefingReady = true;
+      window.dispatchEvent(new CustomEvent("clearcfo:briefing-ready"));
       setError("");
       setSyncNotice("");
       setLastSyncedLabel("");
