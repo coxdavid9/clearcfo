@@ -16,7 +16,7 @@ export default async function AlertsPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware />
+      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware showMarketingLinks />
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Account settings</p>
