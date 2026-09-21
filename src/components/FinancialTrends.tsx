@@ -87,11 +87,20 @@ export default function FinancialTrends() {
         // The cached briefing belongs to exactly one business; never render
         // another business's trends here.
         const activeCompanyId = await getActiveCompanyId();
-        const cached = window.localStorage.getItem("clearcfo_qb_briefing_cache");
-        if (cached && isQuickBooksCacheUsable(activeCompanyId)) { applyPayload(JSON.parse(cached)); return; }
+
+        // Connection state is authoritative. Never render cached trend data
+        // after QuickBooks has been disconnected.
         const status = await fetch("/api/quickbooks/status", { cache: "no-store" });
         const statusPayload = await status.json();
-        if (!status.ok || !statusPayload?.connection?.connected) return;
+        if (!status.ok || !statusPayload?.connection?.connected) {
+          setSeries([]);
+          setConnected(false);
+          return;
+        }
+
+        const cached = window.localStorage.getItem("clearcfo_qb_briefing_cache");
+        if (cached && isQuickBooksCacheUsable(activeCompanyId)) { applyPayload(JSON.parse(cached)); return; }
+
         const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
         const payload = await response.json();
         if (response.ok && payload?.briefing) applyPayload(payload.briefing);
