@@ -41,6 +41,24 @@ const metrics = [
 ] as const;
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+// Sensible starting threshold per metric. Gross margin is a percentage, so
+// switching to it must not carry over a dollar amount from another metric.
+const metricDefaults: Record<string, string> = {
+  cash: "10000",
+  grossMargin: "25",
+  revenue: "100000",
+  operatingExpense: "25000",
+  inventory: "10000",
+};
+
+// Preloaded dollar suggestions per metric, shown as a dropdown on the
+// threshold field. The field stays a free-type number input.
+const dollarPresets: Record<string, number[]> = {
+  cash: [1000, 5000, 10000, 25000, 50000],
+  revenue: [10000, 50000, 100000, 250000, 500000],
+  operatingExpense: [5000, 10000, 25000, 50000, 100000],
+  inventory: [1000, 5000, 10000, 25000, 50000],
+};
 const timezones = [["America/Chicago", "Central Time"], ["America/New_York", "Eastern Time"], ["America/Denver", "Mountain Time"], ["America/Los_Angeles", "Pacific Time"], ["America/Anchorage", "Alaska Time"], ["Pacific/Honolulu", "Hawaii Time"], ["UTC", "UTC"]];
 
 export default function AlertsSettings() {
@@ -50,6 +68,15 @@ export default function AlertsSettings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [ruleForm, setRuleForm] = useState({ metric: "cash", operator: "below", value: "10000" });
+  // While the threshold field is focused it shows raw digits for easy editing;
+  // on blur, dollar thresholds render with comma grouping (10,000) so the
+  // zeros are easy to count.
+  const [thresholdFocused, setThresholdFocused] = useState(false);
+  const formatThresholdDisplay = (raw: string) => {
+    if (raw === "" || ruleForm.metric === "grossMargin") return raw;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num.toLocaleString("en-US") : raw;
+  };
 
   const load = async () => {
     setLoading(true);
@@ -221,13 +248,29 @@ export default function AlertsSettings() {
           ))}
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
+          <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value, value: metricDefaults[e.target.value] ?? "" }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             {metrics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select value={ruleForm.operator} onChange={(e) => setRuleForm((f) => ({ ...f, operator: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             <option value="below">Below</option><option value="above">Above</option>
           </select>
-          <input type="number" min="0" value={ruleForm.value} onChange={(e) => setRuleForm((f) => ({ ...f, value: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="Threshold" />
+          <div className="relative">
+            <input type="text" inputMode="decimal" list={ruleForm.metric === "grossMargin" ? undefined : "threshold-presets"} value={thresholdFocused ? ruleForm.value : formatThresholdDisplay(ruleForm.value)} onFocus={() => setThresholdFocused(true)} onBlur={() => setThresholdFocused(false)} onChange={(e) => {
+              const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+              const [head, ...rest] = cleaned.split(".");
+              const normalized = rest.length > 0 ? `${head}.${rest.join("")}` : head;
+              const capped = ruleForm.metric === "grossMargin" && normalized !== "" && Number(normalized) > 100 ? "100" : normalized;
+              setRuleForm((f) => ({ ...f, value: capped }));
+            }} className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm ${ruleForm.metric === "grossMargin" ? "pr-8" : "pl-7"}`} placeholder={ruleForm.metric === "grossMargin" ? "e.g. 25" : "Threshold"} />
+            <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 ${ruleForm.metric === "grossMargin" ? "right-3" : "left-3"}`}>{ruleForm.metric === "grossMargin" ? "%" : "$"}</span>
+            {ruleForm.metric !== "grossMargin" && (
+              <datalist id="threshold-presets">
+                {(dollarPresets[ruleForm.metric] ?? []).map((amount) => (
+                  <option key={amount} value={amount}>${amount.toLocaleString()}</option>
+                ))}
+              </datalist>
+            )}
+          </div>
           <button type="button" disabled={saving} onClick={() => void addRule()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">Add alert</button>
         </div>
 
