@@ -22,9 +22,10 @@ type NavbarProps = {
   profileHref?: string;
   sessionAware?: boolean;
   hideProfile?: boolean;
+  showMarketingNav?: boolean;
 };
 
-export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false }: NavbarProps) {
+export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false, showMarketingNav = false }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -76,11 +77,15 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
     </div>
   );
 
-  const authControl = sessionAware && authenticated ? authenticatedAuthControl : unauthenticatedAuthControl;
+  // When showMarketingNav is forced (e.g. the marketing homepage), the header
+  // always renders the full marketing navigation, even for logged-in users.
+  const appNav = sessionAware && authenticated && !showMarketingNav;
 
-  const showMarketingNav = !(sessionAware && authenticated);
+  const authControl = appNav ? authenticatedAuthControl : unauthenticatedAuthControl;
 
-  const mobileAuthControl = sessionAware && authenticated ? (
+  const marketingNavVisible = !appNav;
+
+  const mobileAuthControl = appNav ? (
     <>
       <a href="/customer/briefing" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-blue-600">CFO Briefing</a>
       <a href="/alerts" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-medium text-slate-700 transition-colors hover:text-blue-600">Alerts &amp; reports</a>
@@ -103,7 +108,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
           <a href="/" aria-label="ClearCFO home" className="shrink-0" onClick={() => setMenuOpen(false)}><Image src="/logo.png" alt="ClearCFO" width={224} height={57} className="h-10 w-auto" priority /></a>
         )}
 
-        {showMarketingNav && (
+        {marketingNavVisible && (
         <div className="hidden items-center gap-8 md:flex">
           {navItems.map(([label, href]) => onNavigate ? <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">{label}</button> : <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">{label}</a>)}
         </div>
@@ -118,7 +123,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
         </div>
       </nav>
 
-      {menuOpen && <div className="border-t border-slate-200 bg-white px-5 pb-5 pt-3 shadow-lg md:hidden"><div className="mx-auto flex max-w-7xl flex-col">{showMarketingNav && navItems.map(([label, href]) => onNavigate ? <button key={href} type="button" onClick={() => navigate(href)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</button> : <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</a>)}{mobileAuthControl}</div></div>}
+      {menuOpen && <div className="border-t border-slate-200 bg-white px-5 pb-5 pt-3 shadow-lg md:hidden"><div className="mx-auto flex max-w-7xl flex-col">{marketingNavVisible && navItems.map(([label, href]) => onNavigate ? <button key={href} type="button" onClick={() => navigate(href)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</button> : <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-slate-700 transition-colors hover:text-blue-600">{label}</a>)}{mobileAuthControl}</div></div>}
     </header>
   );
 }
