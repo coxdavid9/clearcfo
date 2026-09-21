@@ -22,14 +22,13 @@ type NavbarProps = {
   profileHref?: string;
   sessionAware?: boolean;
   hideProfile?: boolean;
-  showMarketingNav?: boolean;
   // Show the marketing nav links (Product, How It Works, ...) while keeping
   // the session-aware auth controls. Used on customer pages so the header
   // matches the homepage without losing Account / Log Out.
   showMarketingLinks?: boolean;
 };
 
-export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false, showMarketingNav = false, showMarketingLinks = false }: NavbarProps) {
+export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false, showMarketingLinks = false }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -80,9 +79,10 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
     </div>
   );
 
-  // When showMarketingNav is forced (e.g. the marketing homepage), the header
-  // always renders the full marketing navigation, even for logged-in users.
-  const appNav = sessionAware && authenticated && !showMarketingNav;
+  // The header always reflects the real session: logged-in users see the app
+  // controls, logged-out users see Sign Up / Log In. Marketing links appear
+  // whenever the page opts in via showMarketingLinks.
+  const appNav = sessionAware && authenticated;
 
   const authControl = appNav ? authenticatedAuthControl : unauthenticatedAuthControl;
 
