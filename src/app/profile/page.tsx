@@ -27,7 +27,7 @@ export default async function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware />
+      <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware showMarketingLinks />
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Account settings</p>
@@ -51,6 +51,18 @@ export default async function ProfilePage() {
         <QuickBooksProfileConnection />
 
         <BusinessManager />
+
+        <section className="mb-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Alerts &amp; reports</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Manage your alert rules, delivery schedule, and weekly CFO report.</p>
+            </div>
+            <a href="/alerts" className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-400 hover:text-blue-700">
+              Manage alerts
+            </a>
+          </div>
+        </section>
 
         <section className="mb-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
