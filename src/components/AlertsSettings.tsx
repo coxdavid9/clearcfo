@@ -42,6 +42,13 @@ const metrics = [
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const timezones = [["America/Chicago", "Central Time"], ["America/New_York", "Eastern Time"], ["America/Denver", "Mountain Time"], ["America/Los_Angeles", "Pacific Time"], ["America/Anchorage", "Alaska Time"], ["Pacific/Honolulu", "Hawaii Time"], ["UTC", "UTC"]];
+const metricDefaults: Record<string, string> = {
+  cash: "10000",
+  grossMargin: "25",
+  revenue: "100000",
+  operatingExpense: "",
+  inventory: "",
+};
 
 export default function AlertsSettings() {
   const [preferences, setPreferences] = useState(DEFAULTS);
@@ -221,13 +228,16 @@ export default function AlertsSettings() {
           ))}
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
+          <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value, value: metricDefaults[e.target.value] ?? "" }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             {metrics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select value={ruleForm.operator} onChange={(e) => setRuleForm((f) => ({ ...f, operator: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             <option value="below">Below</option><option value="above">Above</option>
           </select>
-          <input type="number" min="0" value={ruleForm.value} onChange={(e) => setRuleForm((f) => ({ ...f, value: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="Threshold" />
+          <div className="relative">
+            <input type="number" min="0" max={ruleForm.metric === "grossMargin" ? 100 : undefined} value={ruleForm.value} onChange={(e) => setRuleForm((f) => ({ ...f, value: e.target.value }))} className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm ${ruleForm.metric === "grossMargin" ? "pr-8" : ""}`} placeholder={ruleForm.metric === "grossMargin" ? "e.g. 25" : "Threshold"} />
+            {ruleForm.metric === "grossMargin" && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">%</span>}
+          </div>
           <button type="button" disabled={saving} onClick={() => void addRule()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">Add alert</button>
         </div>
 
