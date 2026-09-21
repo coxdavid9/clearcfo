@@ -169,6 +169,44 @@ export async function updateCompany(userId: string, companyId: string, input: { 
   return company;
 }
 
+export async function deleteCompany(userId: string, companyId: string) {
+  const memberships = await listUserCompanies(userId);
+  const membership = memberships.find((item) => item.company_id === companyId);
+  if (!membership) throw new Error("Business not found.");
+  if (membership.role !== "owner") throw new Error("Only the business owner can delete a business.");
+  if (memberships.length <= 1) throw new Error("You can't delete your only business.");
+
+  const scopedTables = [
+    "alert_history",
+    "alert_rules",
+    "notification_preferences",
+    "quickbooks_connections",
+    "synced_briefings",
+  ];
+  for (const table of scopedTables) {
+    const response = await supabaseRequest(`${table}?company_id=eq.${encodeURIComponent(companyId)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) throw new Error(`Could not delete business data (${response.status}).`);
+  }
+  const membershipResponse = await supabaseRequest(`company_memberships?company_id=eq.${encodeURIComponent(companyId)}`, {
+    method: "DELETE",
+  });
+  if (!membershipResponse.ok) throw new Error(`Could not delete business memberships (${membershipResponse.status}).`);
+  const companyResponse = await supabaseRequest(`companies?id=eq.${encodeURIComponent(companyId)}`, {
+    method: "DELETE",
+  });
+  if (!companyResponse.ok) throw new Error(`Could not delete business (${companyResponse.status}).`);
+
+  const cookieStore = await cookies();
+  const requestedId = cookieStore.get(ACTIVE_COMPANY_COOKIE)?.value;
+  const next = memberships.find((item) => item.company_id !== companyId);
+  if (requestedId === companyId && next) {
+    cookieStore.set(ACTIVE_COMPANY_COOKIE, next.company_id, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  }
+  return { deletedCompanyId: companyId };
+}
+
 export async function getCompanyContext() {
   const userId = await requireCurrentCompanyUser();
   const company = await getActiveCompany(userId);

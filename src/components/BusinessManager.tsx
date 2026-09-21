@@ -23,6 +23,9 @@ export default function BusinessManager() {
   const [renameName, setRenameName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState("");
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +105,35 @@ export default function BusinessManager() {
     }
   }
 
+  function startDelete(companyId: string) {
+    setConfirmingDeleteId(companyId);
+    setDeleteError("");
+  }
+
+  function cancelDelete() {
+    setConfirmingDeleteId(null);
+    setDeleteError("");
+  }
+
+  async function confirmDelete(companyId: string) {
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      const response = await fetch("/api/companies", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Unable to delete business.");
+      window.location.reload();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete business.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   async function addBusiness(event: FormEvent) {
     event.preventDefault();
     const trimmedName = name.trim();
@@ -146,10 +178,37 @@ export default function BusinessManager() {
             const isActive = membership.company_id === activeCompanyId;
             const switching = switchingId === membership.company_id;
             const renaming = renamingId === membership.company_id;
+            const confirmingDelete = confirmingDeleteId === membership.company_id;
+            const canDelete = companies.length > 1;
             return (
               <li key={membership.company_id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  {renaming ? (
+                  {confirmingDelete ? (
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Delete {membership.company.name}?</p>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                        Its QuickBooks connection, briefings, alerts, and settings go with it. This can&apos;t be undone.
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void confirmDelete(membership.company_id)}
+                          disabled={deleteBusy}
+                          className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
+                        >
+                          {deleteBusy ? "Deleting…" : "Yes, delete"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelDelete}
+                          disabled={deleteBusy}
+                          className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-400 disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : renaming ? (
                     <form onSubmit={(event) => void saveRename(event, membership.company_id)} className="flex items-center gap-2">
                       <input
                         type="text"
@@ -183,7 +242,7 @@ export default function BusinessManager() {
                     </>
                   )}
                 </div>
-                {!renaming && (
+                {!renaming && !confirmingDelete && (
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
@@ -192,6 +251,15 @@ export default function BusinessManager() {
                     >
                       Rename
                     </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => startDelete(membership.company_id)}
+                        className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 transition hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    )}
                     {isActive ? (
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Active</span>
                     ) : (
@@ -213,6 +281,7 @@ export default function BusinessManager() {
       )}
       {switchError ? <p className="mt-3 text-sm font-medium text-red-600">{switchError}</p> : null}
       {renameError ? <p className="mt-3 text-sm font-medium text-red-600">{renameError}</p> : null}
+      {deleteError ? <p className="mt-3 text-sm font-medium text-red-600">{deleteError}</p> : null}
 
       <form onSubmit={(event) => void addBusiness(event)} className="mt-5 border-t border-slate-100 pt-5">
         <h3 className="text-sm font-semibold text-slate-900">Add another business</h3>

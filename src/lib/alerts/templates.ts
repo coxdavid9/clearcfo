@@ -71,7 +71,7 @@ function driverText(driver: FinancialDriver): string {
 export function buildWeeklyReportEmail(companyName: string, briefing: BriefingData): EmailTemplate {
   const safeCompany = sanitizeHeader(companyName || briefing.companyName || "Your business");
   const biggest = briefing.drivers?.[0];
-  const risks = (briefing.drivers || []).filter((driver) => driver.severity === "High").slice(0, 3);
+  const risks = (briefing.drivers || []).filter((driver) => driver.severity === "High" && driver !== biggest).slice(0, 3);
   const opportunities = (briefing.drivers || []).filter((driver) =>
     (driver.category === "Revenue" || driver.category === "Margin") && driver.direction === "up").slice(0, 2);
   const relationships = (briefing.relationships || []).filter((item) => /up|grew|growth|improv|strong|positive/i.test(item)).slice(0, 2);
