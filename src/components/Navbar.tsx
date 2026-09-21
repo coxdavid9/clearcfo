@@ -22,10 +22,13 @@ type NavbarProps = {
   profileHref?: string;
   sessionAware?: boolean;
   hideProfile?: boolean;
-  showMarketingNav?: boolean;
+  // Show the marketing nav links (Product, How It Works, ...) while keeping
+  // the session-aware auth controls. Used on the homepage and customer pages
+  // so the header is consistent without pretending a logged-in user is logged out.
+  showMarketingLinks?: boolean;
 };
 
-export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false, showMarketingNav = false }: NavbarProps) {
+export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "Log In", signupHref, signupLabel = "Sign Up", profileHref, sessionAware = false, showMarketingLinks = false }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -71,24 +74,23 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
     <div className="hidden items-center gap-3 sm:flex">
       <CompanySwitcher />
       <a href="/customer/briefing" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md sm:px-5">CFO Briefing</a>
-      <a href="/alerts" className="px-1 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">Alerts &amp; reports</a>
       <a href={profileHref ?? "/profile"} className="px-1 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">Account</a>
       <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md sm:px-5">Log Out</a>
     </div>
   );
 
-  // When showMarketingNav is forced (e.g. the marketing homepage), the header
-  // always renders the full marketing navigation, even for logged-in users.
-  const appNav = sessionAware && authenticated && !showMarketingNav;
+  // The header always reflects the real session: logged-in users see the app
+  // controls, logged-out users see Sign Up / Log In. Marketing links appear
+  // whenever the page opts in via showMarketingLinks.
+  const appNav = sessionAware && authenticated;
 
   const authControl = appNav ? authenticatedAuthControl : unauthenticatedAuthControl;
 
-  const marketingNavVisible = !appNav;
+  const marketingNavVisible = !appNav || showMarketingLinks;
 
   const mobileAuthControl = appNav ? (
     <>
       <a href="/customer/briefing" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-semibold text-blue-600">CFO Briefing</a>
-      <a href="/alerts" onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-medium text-slate-700 transition-colors hover:text-blue-600">Alerts &amp; reports</a>
       <a href={profileHref ?? "/profile"} onClick={() => setMenuOpen(false)} className="border-b border-slate-100 px-1 py-4 text-left text-base font-medium text-slate-700 transition-colors hover:text-blue-600">Account</a>
       <a href="/api/auth/logout" onClick={() => setMenuOpen(false)} className="mt-4 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">Log Out</a>
     </>
