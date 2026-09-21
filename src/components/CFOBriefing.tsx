@@ -716,19 +716,25 @@ export default function CFOBriefing() {
             <div className="mt-10">
               <div className="rounded-2xl border border-slate-200 bg-white p-6">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial ratios</p>
-                <p className="mt-1 text-xs text-slate-500">Balance-sheet health for the latest synced period.</p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {data.ratios.map((ratio) => (
-                    <div key={ratio.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ratio.health === "strong" ? "bg-emerald-500" : ratio.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} aria-hidden="true" />
-                        <p className="text-xs font-semibold text-slate-500">{ratio.label}</p>
-                      </div>
-                      <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">{ratio.value}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{ratio.interpretation}</p>
+                {data.ratios.some((ratio) => ratio.health !== "strong") ? (
+                  <>
+                    <p className="mt-1 text-xs text-slate-500">Balance-sheet health for the latest synced period — showing only ratios that need attention.</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {data.ratios.filter((ratio) => ratio.health !== "strong").map((ratio) => (
+                        <div key={ratio.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ratio.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} aria-hidden="true" />
+                            <p className="text-xs font-semibold text-slate-500">{ratio.label}</p>
+                          </div>
+                          <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">{ratio.value}</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">{ratio.interpretation}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-slate-500">All balance-sheet ratios look healthy for the latest synced period — nothing needs attention.</p>
+                )}
               </div>
             </div>
           )}
