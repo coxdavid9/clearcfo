@@ -10,7 +10,8 @@ type FooterProps = {
   onNavigate?: (href: string) => void;
 };
 
-function marketingHref(href: string) {
+function marketingHref(label: string, href: string) {
+  if (label === "Contact") return "/contact";
   return href.startsWith("#") ? `/${href}` : href;
 }
 
@@ -25,7 +26,7 @@ export default function Footer({ onNavigate }: FooterProps) {
                 Clear<span className="text-blue-400">CFO</span>
               </button>
             ) : (
-              <a href={marketingHref("#top")} className="inline-flex rounded-lg text-xl font-bold tracking-tight focus-visible:ring-2 focus-visible:ring-blue-400">
+              <a href={marketingHref("ClearCFO", "#top")} className="inline-flex rounded-lg text-xl font-bold tracking-tight focus-visible:ring-2 focus-visible:ring-blue-400">
                 Clear<span className="text-blue-400">CFO</span>
               </a>
             )}
@@ -36,7 +37,7 @@ export default function Footer({ onNavigate }: FooterProps) {
               onNavigate ? (
                 <button key={href} type="button" onClick={() => onNavigate(href)} className="rounded-md text-left text-slate-300 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-blue-400">{label}</button>
               ) : (
-                <a key={href} href={marketingHref(href)} className="rounded-md text-slate-300 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-blue-400">{label}</a>
+                <a key={href} href={marketingHref(label, href)} className="rounded-md text-slate-300 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-blue-400">{label}</a>
               )
             )}
           </nav>
