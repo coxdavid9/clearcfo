@@ -172,7 +172,7 @@ export default function FinancialTrends() {
   const cards = allCards.filter((card) => card.key !== selectedMetric);
 
   return (
-    <section className="mx-auto mb-10 mt-6 w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <section className="mx-auto mb-20 mt-6 w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-6 py-6 sm:px-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Financial trends</p><h2 className="mt-1 text-xl font-bold text-slate-900">Supporting trend detail</h2><p className="mt-1 text-sm text-slate-500">Supporting views update to show the other financial trends when you select a KPI above.</p></div>
