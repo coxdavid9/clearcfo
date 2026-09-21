@@ -48,6 +48,7 @@ export default function CFOBriefing() {
   const [data, setData] = useState<BriefingData>(demoData);
   const [liveSource, setLiveSource] = useState<"demo" | "upload" | "quickbooks">("demo");
   const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [syncNotice, setSyncNotice] = useState("");
@@ -304,7 +305,7 @@ export default function CFOBriefing() {
   }
 
   useEffect(() => {
-    void loadQuickBooksBriefing();
+    void loadQuickBooksBriefing().finally(() => setIsLoading(false));
 
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
@@ -326,6 +327,7 @@ export default function CFOBriefing() {
       evictQuickBooksCache();
       setLiveSource("demo");
       setHasValidAnalysis(false);
+      setIsLoading(false);
       setError("");
       setSyncNotice("");
       setLastSyncedLabel("");
@@ -541,6 +543,23 @@ export default function CFOBriefing() {
     };
     return [observed, ...base.filter((item) => item.title !== observed.title).slice(0, 2)];
   }, [activeMetricKey, activeMetricDefinition.current, activeMetricDefinition.change, data.drivers]);
+
+  if (isLoading) {
+    return (
+      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+        <div className="mx-auto w-full max-w-6xl animate-pulse" aria-label="Loading your CFO Briefing">
+          <div className="h-8 w-64 rounded-lg bg-slate-200" />
+          <div className="mt-2 h-4 w-96 max-w-full rounded bg-slate-100" />
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-28 rounded-2xl bg-slate-100" />
+            ))}
+          </div>
+          <div className="mt-4 h-64 rounded-2xl bg-slate-100" />
+        </div>
+      </div>
+    );
+  }
 
   if (!hasValidAnalysis) {
     return (
