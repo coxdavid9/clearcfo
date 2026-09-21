@@ -37,7 +37,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: message }, { status });
   }
 }
-\nexport async function DELETE(request: Request) {
+
+export async function DELETE(request: Request) {
   try {
     const userId = await requireCurrentCompanyUser();
     const body = await request.json().catch(() => ({}));
