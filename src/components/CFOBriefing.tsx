@@ -704,8 +704,7 @@ export default function CFOBriefing() {
             </div>
           )}
 
-          {data.detailDrivers && data.detailDrivers.some((item) => item.category) && (
-            <div className="mt-10">
+          <div className="mt-10">
               <div className="rounded-2xl border border-slate-200 bg-white p-6">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">What moved</p>
                 <p className="mt-1 text-xs text-slate-500">The largest period-over-period movers behind the headline numbers.</p>
