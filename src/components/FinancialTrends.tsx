@@ -73,6 +73,10 @@ export default function FinancialTrends() {
   const [series, setSeries] = useState<TrendSeries[]>([]);
   const [connected, setConnected] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>("revenue");
+  // The briefing signals this when its initial state determination finishes.
+  // Trends must not load or render before that, or graphs appear ahead of
+  // the rest of the page.
+  const [briefingReady, setBriefingReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +110,21 @@ export default function FinancialTrends() {
         if (response.ok && payload?.briefing) applyPayload(payload.briefing);
       } catch { /* The CFO Briefing remains usable if trend history is unavailable. */ }
     };
-    const timer = window.setTimeout(() => { void load(); }, 250);
+    // Sequence after the CFO Briefing: wait for its initial state
+    // determination before the first trend load, so graphs never render
+    // ahead of the rest of the page.
+    let readyListener: (() => void) | null = null;
+    const markReadyAndLoad = () => {
+      if (cancelled) return;
+      setBriefingReady(true);
+      void load();
+    };
+    if ((window as unknown as { __clearcfoBriefingReady?: boolean }).__clearcfoBriefingReady === true) {
+      markReadyAndLoad();
+    } else {
+      readyListener = markReadyAndLoad;
+      window.addEventListener("clearcfo:briefing-ready", readyListener);
+    }
     const handleSync = (event: Event) => { const payload = (event as CustomEvent)?.detail; if (payload?.briefing) applyPayload(payload.briefing); };
     // Mirror the briefing: never keep rendered trend data after QuickBooks
     // has been disconnected.
@@ -134,7 +152,7 @@ export default function FinancialTrends() {
     window.addEventListener("clearcfo:metric-change", handleMetricChange);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      if (readyListener) window.removeEventListener("clearcfo:briefing-ready", readyListener);
       observer.disconnect();
       window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
       window.removeEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
@@ -142,6 +160,7 @@ export default function FinancialTrends() {
     };
   }, []);
 
+  if (!briefingReady) return null;
   if (!connected && !series.length) return null;
   const byName = new Map(series.map((item) => [item.name, item]));
   const allCards = [
