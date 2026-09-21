@@ -737,7 +737,6 @@ export default function CFOBriefing() {
                 )}
               </div>
             </div>
-            </div>
           )}
 
           <div className="mt-10">            <div className="rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Financial drivers</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">{activeMetric.name}</span></div><p className="mt-1 text-xs text-slate-500">Business factors that can move {activeMetric.name.toLowerCase()}.</p><div className="mt-4 space-y-3">{financialDrivers.map((driver) => <div key={driver.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{driver.title}</p></div><p className="mt-1 text-sm leading-6 text-slate-600">{driver.observation}</p>{driver.estimatedImpact !== undefined && <p className="mt-2 text-xs font-bold text-blue-700">Est. impact: {currency.format(Math.round(driver.estimatedImpact))}</p>}</div>)}</div></div>
