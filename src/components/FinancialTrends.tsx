@@ -108,6 +108,13 @@ export default function FinancialTrends() {
     };
     const timer = window.setTimeout(() => { void load(); }, 250);
     const handleSync = (event: Event) => { const payload = (event as CustomEvent)?.detail; if (payload?.briefing) applyPayload(payload.briefing); };
+    // Mirror the briefing: never keep rendered trend data after QuickBooks
+    // has been disconnected.
+    const handleDisconnect = () => {
+      if (cancelled) return;
+      setSeries([]);
+      setConnected(false);
+    };
     const handleMetricChange = (event: Event) => {
       const key = (event as CustomEvent<MetricKey>)?.detail;
       if (key && key in metricNames) setSelectedMetric(key);
@@ -123,12 +130,14 @@ export default function FinancialTrends() {
     observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
     detectSelectedMetric();
     window.addEventListener("clearcfo:quickbooks-sync", handleSync);
+    window.addEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
     window.addEventListener("clearcfo:metric-change", handleMetricChange);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
       observer.disconnect();
       window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
+      window.removeEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
       window.removeEventListener("clearcfo:metric-change", handleMetricChange);
     };
   }, []);
