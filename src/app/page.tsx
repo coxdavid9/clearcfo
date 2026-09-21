@@ -15,7 +15,9 @@ export default function Home() {
     const previousScrollRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
 
-    const resetScroll = () => window.scrollTo(0, 0);
+    const resetScroll = () => {
+      if (!window.location.hash) window.scrollTo(0, 0);
+    };
     resetScroll();
     const frame = window.requestAnimationFrame(resetScroll);
 
