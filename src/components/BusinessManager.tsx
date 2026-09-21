@@ -104,7 +104,8 @@ export default function BusinessManager() {
       setRenameBusy(false);
     }
   }
-\n  function startDelete(companyId: string) {
+
+  function startDelete(companyId: string) {
     setConfirmingDeleteId(companyId);
     setDeleteError("");
   }
