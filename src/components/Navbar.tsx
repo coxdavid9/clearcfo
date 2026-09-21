@@ -55,7 +55,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
   const navigate = (href: string) => {
     setMenuOpen(false);
     if (onNavigate) onNavigate(href);
-    else window.location.href = `/${href}`;
+    else window.location.href = href === "#contact" ? "/contact" : `/${href}`;
   };
 
   const login = () => {
@@ -112,7 +112,7 @@ export default function Navbar({ onNavigate, onLogin, loginHref, loginLabel = "L
 
         {marketingNavVisible && (
         <div className="hidden items-center gap-8 md:flex">
-          {navItems.map(([label, href]) => onNavigate ? <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">{label}</button> : <a key={href} href={`/${href}`} onClick={() => setMenuOpen(false)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">{label}</a>)}
+          {navItems.map(([label, href]) => onNavigate ? <button key={href} type="button" onClick={() => navigate(href)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-4">{label}</button> : <a key={href} href={href === "#contact" ? "/contact" : `/${href}`} onClick={() => setMenuOpen(false)} className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600">{label}</a>)}
         </div>
         )}
 
