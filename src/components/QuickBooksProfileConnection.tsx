@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { evictQuickBooksCache } from "../lib/company-scoped-cache";
 
 type Connection = {
   connected: boolean;
@@ -41,8 +42,7 @@ export default function QuickBooksProfileConnection() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to disconnect QuickBooks.");
       setConnection(null);
-      window.localStorage.removeItem("clearcfo_qb_initial_sync");
-      window.localStorage.removeItem("clearcfo_qb_last_synced_at");
+      evictQuickBooksCache();
       window.dispatchEvent(new Event("clearcfo:quickbooks-disconnected"));
       setMessage("QuickBooks disconnected.");
     } catch (disconnectError) {
