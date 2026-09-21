@@ -243,6 +243,19 @@ export default function CFOBriefing() {
         if (serverSyncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", serverSyncedAt);
       }
       if (!statusOk || !statusPayload?.connection?.connected) {
+        if (statusOk) {
+          // The status check succeeded and QuickBooks is definitively
+          // disconnected: never render a stale cached briefing. (When the
+          // status check itself fails we keep the offline stale-cache
+          // fallback below.)
+          evictQuickBooksCache();
+          setLiveSource("demo");
+          setHasValidAnalysis(false);
+          setError("");
+          setSyncNotice("");
+          setLastSyncedLabel("");
+          return;
+        }
         if (cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
           setLiveSource("quickbooks");
