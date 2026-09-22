@@ -159,7 +159,7 @@ function buildClassificationReview(profitAndLossRows: ReportNode[], revenue: num
   return {
     driver: {
       id: "account-classification-review",
-      category: "Data Quality",
+      category: "Unusual Spend",
       title: "Gross margin may be affected by account classification",
       observation: candidates.length
         ? "QuickBooks reports no COGS while " + candidates.join(", ") + " appear as expense accounts. If any are direct costs of delivering revenue, confirm their classification before relying on gross margin."
