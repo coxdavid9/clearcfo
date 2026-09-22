@@ -184,13 +184,6 @@ function buildAlerts(revenueChange: number, cashChange: number, inventoryChange:
 
 type ManagementQuestion = { category: string; question: string };
 
-function latestNonZeroValue(values: number[]): number {
-  for (let index = values.length - 1; index >= 0; index -= 1) {
-    if (Number.isFinite(values[index]) && values[index] !== 0) return values[index];
-  }
-  return 0;
-}
-
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function sumDailyMetric(rows: ReportNode[], groupPatterns: RegExp[], labelPatterns: RegExp[], dayCount: number, fallbackPatterns?: RegExp[]): number {
@@ -266,9 +259,10 @@ function topReportRows(report: any, limit = 3): Array<{ label: string; value: nu
   if (!report) return [];
   const periods = reportPeriods(report);
   if (!periods.length) return [];
+  const latestIndex = periods.length - 1;
   return collectRows(report?.Rows, periods.length)
     .filter((row) => row.type !== "Section")
-    .map((row) => ({ label: row.label, value: latestNonZeroValue(row.values) }))
+    .map((row) => ({ label: row.label, value: row.values[latestIndex] || 0 }))
     .filter((row) => row.label && Number.isFinite(row.value) && row.value !== 0 && !/^total|^net income|^gross profit|^operating income/i.test(row.label))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, limit);
