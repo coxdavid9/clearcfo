@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { getAuthCookieNames, getSupabaseUser } from "./supabase-auth";
+import { getAuthCookieNames, getSupabaseUser, refreshSession } from "./supabase-auth";
 import { getActiveCompany } from "./company";
 
 const QB_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
@@ -180,9 +180,37 @@ function verifyState(value: string) {
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
-  const { AUTH_COOKIE } = getAuthCookieNames();
+  const { AUTH_COOKIE, REFRESH_COOKIE } = getAuthCookieNames();
   const token = cookieStore.get(AUTH_COOKIE)?.value;
-  return token ? getSupabaseUser(token) : null;
+
+  if (token) {
+    const user = await getSupabaseUser(token);
+    if (user) return user;
+  }
+
+  const refreshToken = cookieStore.get(REFRESH_COOKIE)?.value;
+  if (!refreshToken) return null;
+
+  const result = await refreshSession(decodeURIComponent(refreshToken));
+  if (!result.ok || !result.user) return null;
+
+  const secure = process.env.NODE_ENV === "production";
+  cookieStore.set(AUTH_COOKIE, result.accessToken, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: result.expiresIn,
+  });
+  cookieStore.set(REFRESH_COOKIE, result.refreshToken, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  return result.user;
 }
 
 async function exchangeCode(code: string): Promise<Tokens> {
