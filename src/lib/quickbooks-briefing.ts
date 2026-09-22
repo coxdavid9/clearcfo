@@ -129,6 +129,47 @@ function buildDrivers(revenueChange: number, marginChange: number, cashChange: n
   return drivers;
 }
 
+function buildClassificationReview(profitAndLossRows: ReportNode[], revenue: number, cogs: number, operatingExpense: number): { driver: FinancialDriver | null; unknown: string | null } {
+  // QuickBooks can legally contain direct-cost accounts under ordinary Expense
+  // categories. Do not silently reclassify them: surface the accounting
+  // classification as a review item so the customer can confirm the mapping.
+  if (revenue <= 0 || operatingExpense <= 0 || cogs > 0 || (cogs / revenue) > 0.001) {
+    return { driver: null, unknown: null };
+  }
+
+  const directCostPatterns = [
+    /contract labor/i, /subcontract/i, /job materials?/i, /materials?/i,
+    /parts?/i, /equipment rental/i, /job supplies?/i, /direct labor/i,
+  ];
+  const candidates = profitAndLossRows
+    .filter((row) => row.type !== "Section" && directCostPatterns.some((pattern) => pattern.test(row.label)))
+    .filter((row) => row.values.some((value) => Math.abs(value) > 0))
+    .map((row) => row.label)
+    .filter((label, index, labels) => labels.indexOf(label) === index)
+    .slice(0, 5);
+
+  const margin = (revenue - cogs) / revenue * 100;
+  const evidence = [
+    "QuickBooks-reported COGS: $" + Math.round(cogs).toLocaleString(),
+    "QuickBooks-reported operating expenses: $" + Math.round(operatingExpense).toLocaleString(),
+    "Reported gross margin: " + margin.toFixed(1) + "%",
+    ...(candidates.length ? ["Expense accounts worth reviewing for direct-cost treatment: " + candidates.join(", ")] : []),
+  ];
+
+  return {
+    driver: {
+      id: "account-classification-review",
+      category: "Data Quality",
+      title: "Gross margin may be affected by account classification",
+      observation: candidates.length
+        ? "QuickBooks reports no COGS while " + candidates.join(", ") + " appear as expense accounts. If any are direct costs of delivering revenue, confirm their classification before relying on gross margin."
+        : "QuickBooks reports no COGS while operating expenses are present. Confirm that direct costs of delivering revenue are classified consistently before relying on gross margin.",
+      evidence, direction: "watch", severity: "Watch", impact: 4, confidence: 0.96,
+      managementQuestion: "Which expense accounts are direct costs of delivering revenue, and should any be mapped to Cost of Revenue?",
+    },
+    unknown: "Gross margin is based on QuickBooks account classifications. ClearCFO detected operating expenses but no COGS, so direct-cost classification should be reviewed before treating the reported gross margin as economically representative.",
+  };
+}
 function buildAlerts(revenueChange: number, cashChange: number, inventoryChange: number, expenseChange: number): string[] {
   // Exception-driven, mirroring the upload path: only genuinely notable
   // movements become alerts. Calm periods produce no alerts, and the
@@ -670,6 +711,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
   const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory, currentRevenue, previousRevenue);
+  const classificationReview = buildClassificationReview(pnlRows, currentRevenue, currentCogsValue, currentExpense);
   const ratioResult = buildRatios({
     balanceRows,
     balancePeriods,
@@ -693,7 +735,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   });
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
-  const mergedDrivers = [...detailed.drivers, ...drivers].sort((a, b) => b.impact - a.impact);
+  const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : [])].sort((a, b) => b.impact - a.impact);
 
   const trendSeries: Series[] = [
     { name: "Revenue", values: activeRevenue.slice(-12), periods: activePeriods.slice(-12) },
@@ -740,6 +782,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
       ...ratioResult.unknowns,
       ...(cashSeries ? [] : ["QuickBooks did not return a cash balance series for the requested periods."]),
       ...(inventory ? [] : ["QuickBooks did not return an inventory balance series for the requested periods."]),
+      ...(classificationReview.unknown ? [classificationReview.unknown] : []),
       ...detailed.unknowns,
     ],
   };
