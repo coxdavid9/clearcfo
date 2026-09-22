@@ -649,7 +649,7 @@ export default function CFOBriefing() {
                       <span className="text-sm font-semibold text-slate-400">{isExpanded ? "Selected" : "View detail"}</span>
                     </div>
                     <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{displayChange(metric.change, metric.key, metric.key === "inventory" ? data.inventory : undefined)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{displayChange(metric.change, metric.key, metric.key === "inventory" ? data.inventory : undefined)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>{metric.key === "margin" && marginBaseline && <p className="mt-2 text-[10px] leading-4 text-amber-700">No COGS recorded in QuickBooks — 100% is a reported accounting margin, not necessarily economic gross margin.</p>}
                   </button>
                   {isExpanded && <div className="mt-4 md:hidden">{renderMetricDetail(metric)}</div>}
                 </div>
