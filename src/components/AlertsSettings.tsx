@@ -50,19 +50,14 @@ const metricDefaults: Record<string, string> = {
   inventory: "10000",
 };
 
-// Tap-to-apply threshold presets per metric, rendered as chips under the
-// threshold field. (A <datalist> was used first, but browsers filter its
-// suggestions against the input's current value, so with the prefilled
-// defaults cash only ever offered $10,000 and revenue only $100,000.
-// Chips always show every option, and they work on mobile Safari where
-// datalist support is unreliable.) The field stays a free-type input.
+// Preloaded dollar suggestions per metric, shown as a dropdown on the
+// threshold field. The field stays a free-type number input.
 const dollarPresets: Record<string, number[]> = {
   cash: [1000, 5000, 10000, 25000, 50000],
   revenue: [10000, 50000, 100000, 250000, 500000],
   operatingExpense: [5000, 10000, 25000, 50000, 100000],
   inventory: [1000, 5000, 10000, 25000, 50000],
 };
-const percentPresets: number[] = [10, 15, 20, 25, 30];
 
 export default function AlertsSettings() {
   const [preferences, setPreferences] = useState(DEFAULTS);
@@ -250,7 +245,7 @@ export default function AlertsSettings() {
             <button key={label} type="button" onClick={() => setRuleForm({ metric, operator, value })} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">{label}</button>
           ))}
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_1.6fr_auto]">
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value, value: metricDefaults[e.target.value] ?? "" }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             {metrics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -258,7 +253,7 @@ export default function AlertsSettings() {
             <option value="below">Below</option><option value="above">Above</option>
           </select>
           <div className="relative">
-            <input type="text" inputMode="decimal" value={thresholdFocused ? ruleForm.value : formatThresholdDisplay(ruleForm.value)} onFocus={() => setThresholdFocused(true)} onBlur={() => setThresholdFocused(false)} onChange={(e) => {
+            <input type="text" inputMode="decimal" list={ruleForm.metric === "grossMargin" ? undefined : "threshold-presets"} value={thresholdFocused ? ruleForm.value : formatThresholdDisplay(ruleForm.value)} onFocus={() => setThresholdFocused(true)} onBlur={() => setThresholdFocused(false)} onChange={(e) => {
               const cleaned = e.target.value.replace(/[^0-9.]/g, "");
               const [head, ...rest] = cleaned.split(".");
               const normalized = rest.length > 0 ? `${head}.${rest.join("")}` : head;
@@ -266,13 +261,13 @@ export default function AlertsSettings() {
               setRuleForm((f) => ({ ...f, value: capped }));
             }} className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm ${ruleForm.metric === "grossMargin" ? "pr-8" : "pl-7"}`} placeholder={ruleForm.metric === "grossMargin" ? "e.g. 25" : "Threshold"} />
             <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 ${ruleForm.metric === "grossMargin" ? "right-3" : "left-3"}`}>{ruleForm.metric === "grossMargin" ? "%" : "$"}</span>
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {(ruleForm.metric === "grossMargin" ? percentPresets : dollarPresets[ruleForm.metric] ?? []).map((amount) => (
-                <button key={amount} type="button" onClick={() => setRuleForm((f) => ({ ...f, value: String(amount) }))} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                  {ruleForm.metric === "grossMargin" ? amount + "%" : "$" + amount.toLocaleString()}
-                </button>
-              ))}
-            </div>
+            {ruleForm.metric !== "grossMargin" && (
+              <datalist id="threshold-presets">
+                {(dollarPresets[ruleForm.metric] ?? []).map((amount) => (
+                  <option key={amount} value={amount}>${amount.toLocaleString()}</option>
+                ))}
+              </datalist>
+            )}
           </div>
           <button type="button" disabled={saving} onClick={() => void addRule()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">Add alert</button>
         </div>
