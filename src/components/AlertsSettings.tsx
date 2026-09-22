@@ -46,8 +46,8 @@ const metricDefaults: Record<string, string> = {
   cash: "10000",
   grossMargin: "25",
   revenue: "100000",
-  operatingExpense: "",
-  inventory: "",
+  operatingExpense: "25000",
+  inventory: "10000",
 };
 
 // Preloaded dollar suggestions per metric, shown as a dropdown on the

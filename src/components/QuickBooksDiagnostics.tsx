@@ -22,6 +22,8 @@ function compactRows(report: any) {
 }
 
 export default function QuickBooksDiagnostics() {
+  if (process.env.NODE_ENV === "production") return null;
+
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [open, setOpen] = useState(false);
 
