@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getAuthCookieNames, refreshSession } from "./src/lib/supabase-auth";
 
 const AUTH_COOKIE = "clearcfo_access_token";
 const REFRESH_COOKIE = "clearcfo_refresh_token";
@@ -82,10 +83,40 @@ function buildContentSecurityPolicy(): string {
 }
 
 function refreshRedirect(request: NextRequest) {
-  const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const next = request.nextUrl.pathname + request.nextUrl.search;
   const refreshUrl = new URL("/api/auth/refresh", request.url);
   refreshUrl.searchParams.set("next", next);
   return addSecurityHeaders(NextResponse.redirect(refreshUrl));
+}
+
+async function refreshApiResponse(refreshToken: string) {
+  try {
+    const result = await refreshSession(decodeURIComponent(refreshToken));
+    if (!result.ok) return null;
+
+    const { AUTH_COOKIE, REFRESH_COOKIE } = getAuthCookieNames();
+    const response = NextResponse.next();
+    const secure = process.env.NODE_ENV === "production";
+
+    response.cookies.set(AUTH_COOKIE, result.accessToken, {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: result.expiresIn,
+    });
+    response.cookies.set(REFRESH_COOKIE, result.refreshToken, {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+
+    return addSecurityHeaders(response);
+  } catch {
+    return null;
+  }
 }
 
 export async function proxy(request: NextRequest) {
@@ -95,22 +126,44 @@ export async function proxy(request: NextRequest) {
   const customerRoute = pathname.startsWith("/customer");
 
   if (!accessToken) {
-    return addSecurityHeaders(
-      customerRoute
-        ? hasRefreshToken
+    if (customerRoute) {
+      return addSecurityHeaders(
+        hasRefreshToken
           ? refreshRedirect(request)
           : NextResponse.redirect(new URL("/login", request.url))
-        : NextResponse.json({ error: "Authentication required." }, { status: 401 })
+      );
+    }
+
+    if (hasRefreshToken) {
+      const refreshed = await refreshApiResponse(
+        request.cookies.get(REFRESH_COOKIE)!.value
+      );
+      if (refreshed) return refreshed;
+    }
+
+    return addSecurityHeaders(
+      NextResponse.json({ error: "Authentication required." }, { status: 401 })
     );
   }
 
   if (!(await isAuthenticated(accessToken))) {
-    return addSecurityHeaders(
-      customerRoute
-        ? hasRefreshToken
+    if (customerRoute) {
+      return addSecurityHeaders(
+        hasRefreshToken
           ? refreshRedirect(request)
           : NextResponse.redirect(new URL("/login", request.url))
-        : NextResponse.json({ error: "Authentication required." }, { status: 401 })
+      );
+    }
+
+    if (hasRefreshToken) {
+      const refreshed = await refreshApiResponse(
+        request.cookies.get(REFRESH_COOKIE)!.value
+      );
+      if (refreshed) return refreshed;
+    }
+
+    return addSecurityHeaders(
+      NextResponse.json({ error: "Authentication required." }, { status: 401 })
     );
   }
 
