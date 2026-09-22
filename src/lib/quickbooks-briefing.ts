@@ -678,18 +678,23 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
 
   const balancePeriods = reportPeriods(balanceSheet);
   const balanceRows = collectRows(balanceSheet?.Rows, balancePeriods.length);
-  // Prefer an explicit QuickBooks total when one is present. Otherwise,
-  // aggregate the individual bank/cash rows so an account named "Cash"
-  // cannot mask a second liquid account such as "Cash on hand".
-  const cashTotal = balancePeriods.length
-    ? findAnyByLabel(balanceRows, [/^total bank accounts$/, /^total cash and cash equivalents$/, /^total cash and bank$/, /^total cash$/])
-    : null;
+  // Use account-level liquid cash first. QuickBooks can expose a "Total Bank
+  // Accounts" row whose value does not reliably equal the sum of the account
+  // rows returned underneath it. ClearCFO should therefore calculate Cash
+  // Position from the actual accounts and only use a total as a fallback.
   const cashAccounts = balancePeriods.length
     ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^cash$/, /^cash on hand$/, /^undeposited funds$/], balancePeriods.length)
     : [];
-  const cash = cashTotal?.values?.some((value) => Number.isFinite(value) && value !== 0) ? cashTotal.values.slice(0, balancePeriods.length) : null;
+  const cashTotal = balancePeriods.length
+    ? findAnyByLabel(balanceRows, [/^total bank accounts$/, /^total cash and cash equivalents$/, /^total cash and bank$/, /^total cash$/])
+    : null;
+  const cash = cashAccounts.some((value) => Number.isFinite(value) && value !== 0)
+    ? cashAccounts
+    : cashTotal?.values?.some((value) => Number.isFinite(value) && value !== 0)
+      ? cashTotal.values.slice(0, balancePeriods.length)
+      : null;
   const inventory = balancePeriods.length ? pickSeries(balanceRows, [/^inventoryasset$/, /^inventory$/], [/^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/], balancePeriods.length) : null;
-  const cashSeries = cash || (cashAccounts.some((value) => value !== 0) ? cashAccounts : null);
+  const cashSeries = cash;
 
   // Align balance-sheet values to P&L periods by period LABEL, not position.
   // A shorter (or differently ordered) balance series must never fabricate
