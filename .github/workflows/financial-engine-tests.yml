@@ -31,6 +31,9 @@ jobs:
       - name: Run deterministic financial engine regression tests
         run: node scripts/financial-engine-scenarios.mjs
 
+      - name: Run HVAC golden-case regression tests
+        run: node scripts/hvac-golden-scenarios.mjs
+
       - name: Run reasoning scenarios
         run: npm run test:reasoning
 
