@@ -255,6 +255,17 @@ function buildDayMatchedComparison(mtdCurrent: any, mtdPrevious: any): MtdCompar
   };
 }
 
+function isUsableDetailLabel(label: string): boolean {
+  const normalized = label.trim();
+  if (!normalized) return false;
+  // QuickBooks detail reports can surface transaction dates as row labels.
+  // Those are not expense accounts and should never become management-question subjects.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(normalized)) return false;
+  if (/^\d+$/.test(normalized)) return false;
+  return true;
+}
+
 function topReportRows(report: any, limit = 3): Array<{ label: string; value: number }> {
   if (!report) return [];
   const periods = reportPeriods(report);
@@ -263,7 +274,7 @@ function topReportRows(report: any, limit = 3): Array<{ label: string; value: nu
   return collectRows(report?.Rows, periods.length)
     .filter((row) => row.type !== "Section")
     .map((row) => ({ label: row.label, value: row.values[latestIndex] || 0 }))
-    .filter((row) => row.label && Number.isFinite(row.value) && row.value !== 0 && !/^total|^net income|^gross profit|^operating income/i.test(row.label))
+    .filter((row) => row.label && isUsableDetailLabel(row.label) && Number.isFinite(row.value) && row.value !== 0 && !/^total|^net income|^gross profit|^operating income/i.test(row.label))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, limit);
 }
