@@ -678,10 +678,18 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
 
   const balancePeriods = reportPeriods(balanceSheet);
   const balanceRows = collectRows(balanceSheet?.Rows, balancePeriods.length);
-  const cash = balancePeriods.length ? pickSeries(balanceRows, [/^bankaccounts$/, /^cashandbank$/, /^cashandcashequivalents$/, /^cash$/], [/^total bank accounts$/, /^total cash and cash equivalents$/, /^cash and cash equivalents$/, /^total cash$/], balancePeriods.length) : null;
+  // Prefer an explicit QuickBooks total when one is present. Otherwise,
+  // aggregate the individual bank/cash rows so an account named "Cash"
+  // cannot mask a second liquid account such as "Cash on hand".
+  const cashTotal = balancePeriods.length
+    ? findAnyByLabel(balanceRows, [/^total bank accounts$/, /^total cash and cash equivalents$/, /^total cash and bank$/, /^total cash$/])
+    : null;
+  const cashAccounts = balancePeriods.length
+    ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^cash$/, /^cash on hand$/, /^undeposited funds$/], balancePeriods.length)
+    : [];
+  const cash = cashTotal?.values?.some((value) => Number.isFinite(value) && value !== 0) ? cashTotal.values.slice(0, balancePeriods.length) : null;
   const inventory = balancePeriods.length ? pickSeries(balanceRows, [/^inventoryasset$/, /^inventory$/], [/^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/], balancePeriods.length) : null;
-  const checkingSavings = balancePeriods.length ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^undeposited funds$/, /^cash on hand$/], balancePeriods.length) : [];
-  const cashSeries = cash || (checkingSavings.some((value) => value !== 0) ? checkingSavings : null);
+  const cashSeries = cash || (cashAccounts.some((value) => value !== 0) ? cashAccounts : null);
 
   // Align balance-sheet values to P&L periods by period LABEL, not position.
   // A shorter (or differently ordered) balance series must never fabricate
