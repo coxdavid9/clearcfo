@@ -680,7 +680,14 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const balanceRows = collectRows(balanceSheet?.Rows, balancePeriods.length);
   const cash = balancePeriods.length ? pickSeries(balanceRows, [/^cashandcashequivalents$/, /^cash$/, /^cashandbank$/, /^bankaccounts$/], [/^total cash and cash equivalents$/, /^cash and cash equivalents$/, /^total cash$/, /^total bank accounts$/], balancePeriods.length) : null;
   const inventory = balancePeriods.length ? pickSeries(balanceRows, [/^inventoryasset$/, /^inventory$/], [/^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/], balancePeriods.length) : null;
-  const checkingSavings = balancePeriods.length ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^undeposited funds$/, /^cash on hand$/], balancePeriods.length) : [];
+  // QuickBooks may return multiple cash/bank accounts (for example a bank
+  // account named "Cash" plus "Cash on hand"). For the customer-facing Cash
+  // Position, aggregate account-level cash balances rather than selecting the
+  // first matching section. The row-level fallback avoids double-counting a
+  // section total such as "Total bank accounts".
+  const checkingSavings = balancePeriods.length
+    ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^cash$/, /^undeposited funds$/, /^cash on hand$/], balancePeriods.length)
+    : [];
   const cashSeries = cash || (checkingSavings.some((value) => value !== 0) ? checkingSavings : null);
 
   // Align balance-sheet values to P&L periods by period LABEL, not position.
