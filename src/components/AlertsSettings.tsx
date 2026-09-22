@@ -50,8 +50,10 @@ const metricDefaults: Record<string, string> = {
   inventory: "10000",
 };
 
-// Preloaded dollar suggestions per metric, shown as a dropdown on the
-// threshold field. The field stays a free-type number input and remains editable.
+// Preloaded dollar suggestions per metric, shown as a native preset dropdown
+// under the threshold field. (A <datalist> was tried here, but mobile Safari
+// does not render its suggestions, so a real <select> is used.) The field
+// stays a free-type number input and remains editable.
 const dollarPresets: Record<string, number[]> = {
   cash: [1000, 5000, 10000, 25000, 50000],
   revenue: [10000, 50000, 100000, 250000, 500000],
@@ -252,8 +254,9 @@ export default function AlertsSettings() {
           <select value={ruleForm.operator} onChange={(e) => setRuleForm((f) => ({ ...f, operator: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             <option value="below">Below</option><option value="above">Above</option>
           </select>
-          <div className="relative">
-            <input type="text" inputMode="decimal" list={ruleForm.metric === "grossMargin" ? undefined : "threshold-presets"} value={thresholdFocused ? ruleForm.value : formatThresholdDisplay(ruleForm.value)} onFocus={() => setThresholdFocused(true)} onBlur={() => setThresholdFocused(false)} onChange={(e) => {
+          <div>
+            <div className="relative">
+            <input type="text" inputMode="decimal" value={thresholdFocused ? ruleForm.value : formatThresholdDisplay(ruleForm.value)} onFocus={() => setThresholdFocused(true)} onBlur={() => setThresholdFocused(false)} onChange={(e) => {
               const cleaned = e.target.value.replace(/[^0-9.]/g, "");
               const [head, ...rest] = cleaned.split(".");
               const normalized = rest.length > 0 ? `${head}.${rest.join("")}` : head;
@@ -261,12 +264,14 @@ export default function AlertsSettings() {
               setRuleForm((f) => ({ ...f, value: capped }));
             }} className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm ${ruleForm.metric === "grossMargin" ? "pr-8" : "pl-7"}`} placeholder={ruleForm.metric === "grossMargin" ? "e.g. 25" : "Threshold"} />
             <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 ${ruleForm.metric === "grossMargin" ? "right-3" : "left-3"}`}>{ruleForm.metric === "grossMargin" ? "%" : "$"}</span>
+            </div>
             {ruleForm.metric !== "grossMargin" && (
-              <datalist id="threshold-presets">
+              <select value="" onChange={(e) => { const v = e.target.value; if (v) setRuleForm((f) => ({ ...f, value: v })); }} aria-label="Preset threshold amounts" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">
+                <option value="">Preset amounts&hellip;</option>
                 {(dollarPresets[ruleForm.metric] ?? []).map((amount) => (
                   <option key={amount} value={amount}>${amount.toLocaleString()}</option>
                 ))}
-              </datalist>
+              </select>
             )}
           </div>
           <button type="button" disabled={saving} onClick={() => void addRule()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">Add alert</button>
