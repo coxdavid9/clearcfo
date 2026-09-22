@@ -291,7 +291,7 @@ function reportRowsWithPeriods(report: any): Array<{ label: string; current: num
       current: row.values[periods.length - 1] || 0,
       previous: periods.length > 1 ? row.values[periods.length - 2] || 0 : 0,
     }))
-    .filter((row) => row.label && Number.isFinite(row.current) && row.current !== 0)
+    .filter((row) => row.label && isUsableDetailLabel(row.label) && Number.isFinite(row.current) && row.current !== 0)
     .filter((row) => !/^total|^net income|^gross profit|^operating income/i.test(row.label));
 }
 
@@ -678,7 +678,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
 
   const balancePeriods = reportPeriods(balanceSheet);
   const balanceRows = collectRows(balanceSheet?.Rows, balancePeriods.length);
-  const cash = balancePeriods.length ? pickSeries(balanceRows, [/^cashandcashequivalents$/, /^cash$/, /^cashandbank$/, /^bankaccounts$/], [/^total cash and cash equivalents$/, /^cash and cash equivalents$/, /^total cash$/, /^total bank accounts$/], balancePeriods.length) : null;
+  const cash = balancePeriods.length ? pickSeries(balanceRows, [/^bankaccounts$/, /^cashandbank$/, /^cashandcashequivalents$/, /^cash$/], [/^total bank accounts$/, /^total cash and cash equivalents$/, /^cash and cash equivalents$/, /^total cash$/], balancePeriods.length) : null;
   const inventory = balancePeriods.length ? pickSeries(balanceRows, [/^inventoryasset$/, /^inventory$/], [/^total inventory asset$/, /^total inventory$/, /^inventory asset$/, /^inventory$/], balancePeriods.length) : null;
   const checkingSavings = balancePeriods.length ? sumDataRows(balanceRows, [/^checking$/, /^savings$/, /^undeposited funds$/, /^cash on hand$/], balancePeriods.length) : [];
   const cashSeries = cash || (checkingSavings.some((value) => value !== 0) ? checkingSavings : null);
