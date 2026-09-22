@@ -51,7 +51,7 @@ const metricDefaults: Record<string, string> = {
 };
 
 // Preloaded dollar suggestions per metric, shown as a dropdown on the
-// threshold field. The field stays a free-type number input.
+// threshold field. The field stays a free-type number input and remains editable.
 const dollarPresets: Record<string, number[]> = {
   cash: [1000, 5000, 10000, 25000, 50000],
   revenue: [10000, 50000, 100000, 250000, 500000],
