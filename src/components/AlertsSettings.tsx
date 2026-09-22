@@ -250,7 +250,7 @@ export default function AlertsSettings() {
             <button key={label} type="button" onClick={() => setRuleForm({ metric, operator, value })} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">{label}</button>
           ))}
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_1.6fr_auto]">
           <select value={ruleForm.metric} onChange={(e) => setRuleForm((f) => ({ ...f, metric: e.target.value, value: metricDefaults[e.target.value] ?? "" }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             {metrics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -266,9 +266,9 @@ export default function AlertsSettings() {
               setRuleForm((f) => ({ ...f, value: capped }));
             }} className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm ${ruleForm.metric === "grossMargin" ? "pr-8" : "pl-7"}`} placeholder={ruleForm.metric === "grossMargin" ? "e.g. 25" : "Threshold"} />
             <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 ${ruleForm.metric === "grossMargin" ? "right-3" : "left-3"}`}>{ruleForm.metric === "grossMargin" ? "%" : "$"}</span>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {(ruleForm.metric === "grossMargin" ? percentPresets : dollarPresets[ruleForm.metric] ?? []).map((amount) => (
-                <button key={amount} type="button" onClick={() => setRuleForm((f) => ({ ...f, value: String(amount) }))} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                <button key={amount} type="button" onClick={() => setRuleForm((f) => ({ ...f, value: String(amount) }))} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
                   {ruleForm.metric === "grossMargin" ? amount + "%" : "$" + amount.toLocaleString()}
                 </button>
               ))}
