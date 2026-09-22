@@ -29,9 +29,9 @@ const analysisSchema = {
           rationale: { type: "string" },
           priority: { type: "string", enum: ["High", "Medium", "Watch"] },
           score: { type: "number" },
-          estimatedImpact: { type: "number" },
+          estimatedImpact: { type: ["number", "null"] },
         },
-        required: ["title", "rationale", "priority", "score"],
+        required: ["title", "rationale", "priority", "score", "estimatedImpact"],
       },
     },
   },
@@ -53,7 +53,7 @@ const instructions = [
   "If operating expenses spike and subsequently recover, identify that spike/recovery pattern separately from any revenue movement and investigate whether the expense was truly non-recurring.",
   "Return 1 to 4 practical management actions and 0 to 4 material unknowns. Every action should relate to supplied financial evidence.",
   "When financialRatios, monthToDate, varianceMovers, or cashFlowBridge are supplied, use them as evidence: name weak ratios, day-matched month-to-date movements, the largest account/customer/vendor movers, and the cash-flow bridge lines where they support the analysis.",
-  "For each action, include estimatedImpact as a dollar estimate of the amount at stake when the supplied evidence supports one; omit it when it cannot be estimated from the evidence. Never invent the estimate.",
+  "For each action, include estimatedImpact as a dollar estimate of the amount at stake when the supplied evidence supports one; otherwise return null. Never invent the estimate.",
   "Return only the requested structured analysis.",
 ].join(" ");
 
