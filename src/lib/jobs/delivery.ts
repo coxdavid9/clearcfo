@@ -14,16 +14,17 @@ export async function runAlertDelivery(company: Company, preferences?: Notificat
   const rules: AlertRule[] = rows.map((row: any) => ({ id: String(row.id), metric: row.metric, operator: row.operator, value: Number(row.value), severity: row.severity, enabled: row.enabled === true }));
   const alerts = evaluateAlerts(briefing, rules);
   const freshAlerts = [];
+  const stillActive = [];
   let skipped = 0;
   for (const alert of alerts) {
     const dedupeKey = alert.ruleId.startsWith("builtin:") ? alert.ruleId : alert.key;
     const prior = await recentAlertHistory(company.id, dedupeKey);
-    if (prior && severityRank[alert.severity] >= severityRank[prior.severity]) { skipped += 1; continue; }
+    if (prior && severityRank[alert.severity] >= severityRank[prior.severity]) { skipped += 1; stillActive.push(alert); continue; }
     freshAlerts.push({ ...alert, key: dedupeKey });
   }
   if (!freshAlerts.length) return { synced: true, briefingPersisted, alertsSent: 0, skipped };
   const recipient = await resolveReportRecipient(company.id, prefs.report_recipient_email);
-  await sendEmail({ to: recipient, ...buildAlertEmail(company.name, freshAlerts) });
+  await sendEmail({ to: recipient, ...buildAlertEmail(company.name, freshAlerts, stillActive) });
   for (const alert of freshAlerts) await recordAlert(company.id, alert);
   return { synced: true, briefingPersisted, alertsSent: freshAlerts.length, skipped };
 }

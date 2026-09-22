@@ -50,17 +50,29 @@ function alertCard(alert: Alert): string {
     '<p style="margin:0 0 10px;color:#475569">' + escapeHtml(alert.detail) + '</p>' +
     '<p style="margin:0;font-size:14px;font-weight:700">Estimated impact: ' + money(alert.estimatedImpact) + '</p></div>';
 }
-export function buildAlertEmail(companyName: string, alerts: Alert[]): EmailTemplate {
+export function buildAlertEmail(companyName: string, alerts: Alert[], stillActive: Alert[] = []): EmailTemplate {
   const top = alerts[0];
   const safeCompany = sanitizeHeader(companyName || "Your business");
   const subject = '[ClearCFO] ' + (top?.title || "Financial alert") + ' — ' + safeCompany;
   const text = ['ClearCFO alerts — ' + (companyName || "Your business"), "",
     ...alerts.flatMap((alert) => [severityLabel(alert.severity) + ": " + alert.title, alert.detail, "Estimated impact: " + money(alert.estimatedImpact), ""]),
+    ...(stillActive.length
+      ? ["Still active (flagged in an earlier email — the condition hasn't cleared):",
+        ...stillActive.map((alert) => "• " + severityLabel(alert.severity) + ": " + alert.title), ""]
+      : []),
     "View your briefing: https://theclearcfo.com", "", footerText(companyName)].join("\n");
   const html = shell(safeCompany,
     '<h2 style="margin:0 0 10px;font-size:24px;line-height:1.3">Your ClearCFO alerts</h2>' +
     '<p style="margin:0 0 24px;color:#64748b">A few financial items deserve your attention.</p>' +
     alerts.map(alertCard).join("") +
+    (stillActive.length
+      ? '<div style="margin:0 0 14px;padding:14px 18px;background:#ffffff;border:1px dashed #cbd5e1;border-radius:12px">' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#64748b">STILL ACTIVE</div>' +
+        '<p style="margin:6px 0 0;color:#475569;font-size:14px">Flagged in an earlier email — the condition hasn\'t cleared:</p>' +
+        '<ul style="margin:8px 0 0;padding-left:18px;color:#475569;font-size:14px">' +
+        stillActive.map((alert) => '<li>' + escapeHtml(alert.title) + '</li>').join("") +
+        '</ul></div>'
+      : "") +
     '<a href="https://theclearcfo.com" style="display:inline-block;margin-top:8px;padding:12px 18px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700">View your briefing</a>');
   return { subject, text, html };
 }
