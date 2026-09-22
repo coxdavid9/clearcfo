@@ -257,7 +257,8 @@ export default function AlertsSettings() {
           <select value={ruleForm.operator} onChange={(e) => setRuleForm((f) => ({ ...f, operator: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             <option value="below">Below</option><option value="above">Above</option>
           </select>
-          <div className="relative">
+          <div>
+            <div className="relative">
             <input type="text" inputMode="decimal" value={thresholdFocused ? ruleForm.value : formatThresholdDisplay(ruleForm.value)} onFocus={() => setThresholdFocused(true)} onBlur={() => setThresholdFocused(false)} onChange={(e) => {
               const cleaned = e.target.value.replace(/[^0-9.]/g, "");
               const [head, ...rest] = cleaned.split(".");
@@ -266,6 +267,7 @@ export default function AlertsSettings() {
               setRuleForm((f) => ({ ...f, value: capped }));
             }} className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm ${ruleForm.metric === "grossMargin" ? "pr-8" : "pl-7"}`} placeholder={ruleForm.metric === "grossMargin" ? "e.g. 25" : "Threshold"} />
             <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 ${ruleForm.metric === "grossMargin" ? "right-3" : "left-3"}`}>{ruleForm.metric === "grossMargin" ? "%" : "$"}</span>
+            </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {(ruleForm.metric === "grossMargin" ? percentPresets : dollarPresets[ruleForm.metric] ?? []).map((amount) => (
                 <button key={amount} type="button" onClick={() => setRuleForm((f) => ({ ...f, value: String(amount) }))} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
