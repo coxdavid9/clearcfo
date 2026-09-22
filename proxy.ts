@@ -126,12 +126,23 @@ export async function proxy(request: NextRequest) {
   const customerRoute = pathname.startsWith("/customer");
 
   if (!accessToken) {
-    return addSecurityHeaders(
-      customerRoute
-        ? hasRefreshToken
+    if (customerRoute) {
+      return addSecurityHeaders(
+        hasRefreshToken
           ? refreshRedirect(request)
           : NextResponse.redirect(new URL("/login", request.url))
-        : NextResponse.json({ error: "Authentication required." }, { status: 401 })
+      );
+    }
+
+    if (hasRefreshToken) {
+      const refreshed = await refreshApiResponse(
+        request.cookies.get(REFRESH_COOKIE)!.value
+      );
+      if (refreshed) return refreshed;
+    }
+
+    return addSecurityHeaders(
+      NextResponse.json({ error: "Authentication required." }, { status: 401 })
     );
   }
 
