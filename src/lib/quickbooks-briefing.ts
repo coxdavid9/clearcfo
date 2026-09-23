@@ -766,8 +766,16 @@ function buildManagementQuestions(
     const cogsSectionIndex = pnlRows.findIndex((row, index) =>
       index > incomeSectionIndex && /^(cost of goods sold|cost of sales|cost of revenue)$/.test(clean(row.label))
     );
+    // With no COGS section (e.g. a services business), the slice below used to run
+    // to the end of the report and sweep expense accounts into the revenue rows.
+    // Stop at the next section boundary instead so expenses can never be presented
+    // as a revenue stream.
+    const nextSectionIndex = pnlRows.findIndex(
+      (row, index) => index > incomeSectionIndex && row.type === "Section"
+    );
+    const revenueSectionEnd = [cogsSectionIndex, nextSectionIndex].find((index) => index > incomeSectionIndex);
     const revenueAccountRows = incomeSectionIndex >= 0
-      ? pnlRows.slice(incomeSectionIndex + 1, cogsSectionIndex > incomeSectionIndex ? cogsSectionIndex : undefined)
+      ? pnlRows.slice(incomeSectionIndex + 1, revenueSectionEnd)
           .filter((row) =>
             row.type !== "Section" &&
             row.label &&
