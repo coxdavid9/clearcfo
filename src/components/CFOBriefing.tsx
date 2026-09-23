@@ -426,6 +426,31 @@ export default function CFOBriefing() {
   const visibleAttention = showAllAttention ? attentionCandidates : shownAttention;
   const attentionCountLabel = showAllAttention ? attentionCandidates.length : Math.min(3, attentionCandidates.length);
 
+  if (isLoading) {
+    return (
+      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+        <div className="mx-auto w-full max-w-6xl animate-pulse" aria-label="Loading your CFO Briefing">
+          <div className="h-8 w-64 rounded-lg bg-slate-200" />
+          <div className="mt-2 h-4 w-96 max-w-full rounded bg-slate-100" />
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((index) => <div key={index} className="h-28 rounded-2xl bg-slate-100" />)}
+          </div>
+          <div className="mt-4 h-64 rounded-2xl bg-slate-100" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasValidAnalysis) {
+    return (
+      <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
+        <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
