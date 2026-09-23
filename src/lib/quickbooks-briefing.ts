@@ -773,18 +773,21 @@ function buildManagementQuestions(
     });
   }
 
-  const expenses = topReportRows(detailReports.profitAndLossDetail, 5)
-    .filter((row) => !/income|revenue|sales|cost of goods|gross profit/i.test(row.label));
-  if (expenses.length) {
-    const top = expenses[0];
+  const expenseChanges = reportRowsWithPeriods(detailReports.profitAndLossDetail)
+    .filter((row) => !/income|revenue|sales|cost of goods|gross profit|net income/i.test(row.label))
+    .map((row) => ({ ...row, change: row.current - row.previous }))
+    .filter((row) => row.change !== 0)
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+  if (expenseChanges.length) {
+    const top = expenseChanges[0];
     questions.push({
       category: "Profitability",
-      question: `What is driving the expense line ${top.label}? QuickBooks shows ${currency.format(Math.abs(top.value))} in the latest reported period; compare it with the prior period before deciding whether the movement is structural or temporary.${!detailReports.expenseByVendor ? " ClearCFO could not access vendor-level QuickBooks detail, so we cannot identify which vendors make up this change." : ""}`,
+      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}), driven primarily by ${top.label} changing ${currency.format(top.change)} versus the prior period. Is this a recurring cost, a one-time expense, or something that needs to be reviewed?`,
     });
   } else if (Number.isFinite(context.expenseChange)) {
     questions.push({
       category: "Expenses",
-      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). Which expense accounts make up the ${currency.format(Math.abs(context.currentExpense - context.previousExpense))} change, and which items are recurring?${!detailReports.expenseByVendor ? " ClearCFO could not access vendor-level QuickBooks detail, so we cannot identify which vendors make up this change." : ""}`,
+      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). What accounts or costs should management review to understand the change?`,
     });
   }
 
