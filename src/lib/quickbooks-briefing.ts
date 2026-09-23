@@ -944,7 +944,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
   const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory, currentRevenue, previousRevenue);
-  const classificationReview = buildClassificationReview(pnlRows, currentRevenue, currentCogsValue, currentExpense);\n  const pnlReconciliation = findPnlReconciliationIssue(pnlRows, activePeriods, activeRevenue, activeCogs, activeExpenses, netIncome);
+  const classificationReview = buildClassificationReview(pnlRows, currentRevenue, currentCogsValue, currentExpense);
+  const pnlReconciliation = findPnlReconciliationIssue(pnlRows, activePeriods, activeRevenue, activeCogs, activeExpenses, netIncome);
   const ratioResult = buildRatios({
     balanceRows,
     balancePeriods,
