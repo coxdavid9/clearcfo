@@ -385,7 +385,7 @@ export default function CFOBriefing() {
         <a href="/api/quickbooks/connect" className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">Connect QuickBooks</a>
         <button type="button" onClick={() => fileRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Financial Data"}</button>
       </div>
-      <p className="mt-3 text-xs text-slate-400">Your real customer dashboard will start here — no fake numbers.</p>
+      <p className="mt-3 text-xs text-slate-400">Connect QuickBooks or upload a spreadsheet and ClearCFO will turn it into a plain-English briefing.</p>
     </div>
   );
 
