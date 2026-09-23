@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import OnboardingFlow from "./OnboardingFlow";
 import {
   type BriefingData,
   demoData,
@@ -85,7 +86,22 @@ export default function CFOBriefing() {
   const [error, setError] = useState("");
   const [syncNotice, setSyncNotice] = useState("");
   const [lastSyncedLabel, setLastSyncedLabel] = useState("");
+  const [onboardingStep, setOnboardingStep] = useState<"welcome" | "connect" | "building">("welcome");
+  const [onboardingSource, setOnboardingSource] = useState<"quickbooks" | "excel">("quickbooks");
+  const [readyBanner, setReadyBanner] = useState(false);
 
+  const onboardingSyncing = () => {
+    try { return sessionStorage.getItem("clearcfo_onboarding_syncing") === "1"; } catch { return false; }
+  };
+  const markBriefingReady = () => {
+    const wasSyncing = onboardingSyncing();
+    try { sessionStorage.removeItem("clearcfo_onboarding_syncing"); } catch {}
+    if (wasSyncing) {
+      try {
+        if (localStorage.getItem("clearcfo_briefing_ready_seen") !== "1") setReadyBanner(true);
+      } catch {}
+    }
+  };
   const marginBaseline = data.drivers.some((driver) => driver.id === "margin-baseline");
   const zeroCogsNote = data.drivers.some((driver) => driver.id === "account-classification-review");
   const [activeMetricKey, setActiveMetricKey] = useState<"revenue" | "margin" | "cash" | "inventory">("revenue");
@@ -317,6 +333,7 @@ export default function CFOBriefing() {
         saveQuickBooksBriefingCache(briefing, payload.companyId);
         if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
         cacheAnalysisInput(briefing);
+        markBriefingReady();
       } catch (syncErr) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
@@ -332,11 +349,23 @@ export default function CFOBriefing() {
       }
     } catch (err) {
       setHasValidAnalysis(false);
+      try { sessionStorage.removeItem("clearcfo_onboarding_syncing"); } catch {}
+      setOnboardingStep("connect");
       setError(err instanceof Error ? err.message : "ClearCFO could not load your QuickBooks financial data.");
     }
   }
 
   useEffect(() => {
+    try {
+      const syncing = sessionStorage.getItem("clearcfo_onboarding_syncing") === "1";
+      const seen = localStorage.getItem("clearcfo_onboarding_seen") === "1";
+      if (syncing) setOnboardingStep("building");
+      else setOnboardingStep(seen ? "connect" : "welcome");
+    } catch {}
+    const handleOnboardingConnect = () => setOnboardingStep("connect");
+    const handleOnboardingWelcome = () => setOnboardingStep("welcome");
+    window.addEventListener("clearcfo:onboarding-connect", handleOnboardingConnect);
+    window.addEventListener("clearcfo:onboarding-welcome", handleOnboardingWelcome);
     void loadQuickBooksBriefing().finally(() => {
       setIsLoading(false);
       // Signal the trend section that the briefing has finished its initial
@@ -356,6 +385,7 @@ export default function CFOBriefing() {
         setSyncNotice("");
         setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
         cacheAnalysisInput(briefing);
+        markBriefingReady();
         return;
       }
       void loadQuickBooksBriefing();
@@ -380,6 +410,8 @@ export default function CFOBriefing() {
     return () => {
       window.removeEventListener("clearcfo:quickbooks-sync", handleSync);
       window.removeEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
+      window.removeEventListener("clearcfo:onboarding-connect", handleOnboardingConnect);
+      window.removeEventListener("clearcfo:onboarding-welcome", handleOnboardingWelcome);
     };
   }, []);
 
@@ -389,6 +421,9 @@ export default function CFOBriefing() {
     setUploading(true);
     setHasValidAnalysis(false);
     setError("");
+    setOnboardingSource("excel");
+    setOnboardingStep("building");
+    try { sessionStorage.setItem("clearcfo_onboarding_syncing", "1"); } catch {}
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { cellDates: true });
@@ -399,8 +434,11 @@ export default function CFOBriefing() {
       setSyncNotice("");
       setLastSyncedLabel("");
       cacheAnalysisInput(analyzed);
+      markBriefingReady();
     } catch (err) {
       setHasValidAnalysis(false);
+      try { sessionStorage.removeItem("clearcfo_onboarding_syncing"); } catch {}
+      setOnboardingStep("connect");
       setError(err instanceof Error ? err.message : "We couldn't read that workbook. Please check the file format and sheet names.");
     } finally {
       setUploading(false);
@@ -409,17 +447,16 @@ export default function CFOBriefing() {
   }
 
   const emptyState = (
-    <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm sm:p-12">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-xl text-blue-600">✦</div>
-      <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
-      <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Your CFO Briefing starts with your data.</h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">Connect QuickBooks or upload a financial workbook to generate KPIs, trends, exceptions, and prioritized recommendations.</p>
-      <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-        <a href="/api/quickbooks/connect" className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">Connect QuickBooks</a>
-        <button type="button" onClick={() => fileRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Financial Data"}</button>
-      </div>
-      <p className="mt-3 text-xs text-slate-400">Connect QuickBooks or upload a spreadsheet and ClearCFO will turn it into a plain-English briefing.</p>
-    </div>
+    <OnboardingFlow
+      step={onboardingStep}
+      source={onboardingSource}
+      error={error}
+      onUpload={() => fileRef.current?.click()}
+      onBack={onboardingStep === "connect" && localStorage.getItem("clearcfo_onboarding_seen") === "1" ? () => {
+        localStorage.removeItem("clearcfo_onboarding_seen");
+        setOnboardingStep("welcome");
+      } : undefined}
+    />
   );
 
   const metrics = [
