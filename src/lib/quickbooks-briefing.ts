@@ -771,11 +771,6 @@ function buildManagementQuestions(
       category: "Expenses",
       question: `Which vendor relationships are driving spending? ${top.label} is the largest reported vendor at ${currency.format(Math.abs(top.value))}; review whether the spend is recurring, necessary, or unusual versus prior periods.`,
     });
-  } else if (!detailReports.expenseByVendor && Number.isFinite(context.expenseChange)) {
-    questions.push({
-      category: "Expenses",
-      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). Which expense accounts make up the ${currency.format(Math.abs(context.currentExpense - context.previousExpense))} change, and which items are recurring? ClearCFO could not access vendor-level QuickBooks detail, so we cannot identify which vendors make up that increase.`,
-    });
   }
 
   const expenses = topReportRows(detailReports.profitAndLossDetail, 5)
@@ -784,12 +779,12 @@ function buildManagementQuestions(
     const top = expenses[0];
     questions.push({
       category: "Profitability",
-      question: `What is driving the expense line ${top.label}? QuickBooks shows ${currency.format(Math.abs(top.value))} in the latest reported period; compare it with the prior period before deciding whether the movement is structural or temporary.`,
+      question: `What is driving the expense line ${top.label}? QuickBooks shows ${currency.format(Math.abs(top.value))} in the latest reported period; compare it with the prior period before deciding whether the movement is structural or temporary.${!detailReports.expenseByVendor ? " ClearCFO could not access vendor-level QuickBooks detail, so we cannot identify which vendors make up this change." : ""}`,
     });
   } else if (Number.isFinite(context.expenseChange)) {
     questions.push({
       category: "Expenses",
-      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). Which expense accounts make up the ${currency.format(Math.abs(context.currentExpense - context.previousExpense))} change, and which items are recurring?`,
+      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). Which expense accounts make up the ${currency.format(Math.abs(context.currentExpense - context.previousExpense))} change, and which items are recurring?${!detailReports.expenseByVendor ? " ClearCFO could not access vendor-level QuickBooks detail, so we cannot identify which vendors make up this change." : ""}`,
     });
   }
 
