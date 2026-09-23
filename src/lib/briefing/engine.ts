@@ -33,6 +33,7 @@ export type BriefingData = {
   mtdComparison?: MtdComparison | null;
   ratios?: FinancialRatio[];
   cashFlow?: CashFlowBridge | null;
+  kpiBreakdowns?: KpiBreakdowns;
 };
 
 // Balance-sheet health ratios for the latest synced period. All values are
@@ -53,6 +54,21 @@ export type CashFlowBridge = {
   lines: CashFlowLine[];
   operatingCashFlow: number;
   cashChange: number | null;
+};
+
+export type KpiBreakdownRow = { label: string; current: number; previous: number };
+export type KpiBreakdown = {
+  title: string;
+  periodLabel: string;
+  variant: "bars" | "walk";
+  rows: KpiBreakdownRow[];
+  insight: string;
+};
+export type KpiBreakdowns = {
+  revenue?: KpiBreakdown;
+  margin?: KpiBreakdown;
+  cash?: KpiBreakdown;
+  inventory?: KpiBreakdown;
 };
 
 // Day-matched month-to-date comparison (e.g. Sep 1–18 vs Aug 1–18). Built
