@@ -141,6 +141,7 @@ export async function syncCompanyBriefing(companyId: string) {
     throw new Error("QuickBooks is connected, but no financial activity was returned for the selected period.");
   }
 
+  detailReports.arAsOfDate = reportParams.end_date;
   const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection.company_name || null, detailReports);
   const syncedAt = new Date().toISOString();
   let briefingPersisted = false;
