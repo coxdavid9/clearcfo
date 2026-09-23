@@ -786,9 +786,10 @@ function buildManagementQuestions(
 
     if (revenueChanges.length) {
       const top = revenueChanges[0];
+      const accountValue = top.current;
       questions.push({
         category: "Revenue",
-        question: `Revenue moved from ${currency.format(context.previousRevenue)} to ${currency.format(context.revenue)} (${formatPercent(context.revenueChange)}), driven primarily by ${top.label} changing ${currency.format(top.change)} versus the prior period. What changed in this revenue stream, and is the movement expected to continue?`,
+        question: `Revenue moved from ${currency.format(context.previousRevenue)} to ${currency.format(context.revenue)} (${formatPercent(context.revenueChange)}). ${top.label} is the largest current-period revenue stream at ${currency.format(accountValue)}. What changed in this revenue stream, and is the movement expected to continue?`,
       });
     } else {
       questions.push({
@@ -835,7 +836,7 @@ function buildManagementQuestions(
     const top = expenseChanges[0];
     questions.push({
       category: "Profitability",
-      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}), driven primarily by ${top.label} changing ${currency.format(top.change)} versus the prior period. Is this a recurring cost, a one-time expense, or something that needs to be reviewed?`,
+      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). ${top.label} is the largest current-period expense at ${currency.format(Math.abs(top.current))}. Is this a recurring cost, a one-time expense, or something that needs to be reviewed?`,
     });
   } else if (Number.isFinite(context.expenseChange)) {
     questions.push({
