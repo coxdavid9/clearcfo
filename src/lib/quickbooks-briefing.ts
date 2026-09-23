@@ -1048,7 +1048,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "quickbooks",
     drivers: mergedDrivers,
-    managementQuestions: buildManagementQuestions(detailReports, pnlRows, pnlPeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousRevenue, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
+    managementQuestions: buildManagementQuestions(detailReports, pnlRows, pnlPeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
     relationships: mergedDrivers.map((driver) => driver.observation),
     detailDrivers: detailed.details,
     trendInsights: [],
