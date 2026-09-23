@@ -48,6 +48,170 @@ function collectRows(node: any, periodCount: number, output: ReportNode[] = []):
   return output;
 }
 
+
+type ARAgingCustomer = {
+  customer: string;
+  total: number;
+  current: number;
+  buckets: { "1-30": number; "31-60": number; "61-90": number; "91+": number };
+};
+
+type ARAgingSummary = {
+  customers: ARAgingCustomer[];
+  totalReceivables: number;
+  totalOverdue: number;
+  bucketTotals: { Current: number; "1-30": number; "31-60": number; "61-90": number; "91+": number };
+};
+
+function parseARCellValue(row: any, name: string): number {
+  const cell = (row?.cells || row?.ColData || []).find((item: any) => String(item?.name || item?.id || "").toLowerCase() === name.toLowerCase());
+  return toNumber(cell?.value);
+}
+
+function parseARCellText(row: any, name: string): string {
+  const cell = (row?.cells || row?.ColData || []).find((item: any) => String(item?.name || "").toLowerCase() === name.toLowerCase());
+  return String(cell?.value || "").trim();
+}
+
+function ageBucket(daysOverdue: number): "1-30" | "31-60" | "61-90" | "91+" {
+  if (daysOverdue >= 91) return "91+";
+  if (daysOverdue >= 61) return "61-90";
+  if (daysOverdue >= 31) return "31-60";
+  return "1-30";
+}
+
+function parseARAgingSummary(report: any, asOfDate: string): ARAgingSummary | null {
+  if (!report) return null;
+
+  // Some report adapters expose a normalized reportData.rows shape; support it
+  // directly so this parser remains useful in deterministic tests as well as
+  // with raw QuickBooks report payloads.
+  const normalizedRows = report?.reportData?.rows;
+  if (Array.isArray(normalizedRows) && normalizedRows.length) {
+    const customers = normalizedRows.map((row: any) => {
+      const customer = parseARCellText(row, "Customer");
+      const total = parseARCellValue(row, "Total");
+      const current = parseARCellValue(row, "Current");
+      return {
+        customer,
+        total,
+        current,
+        buckets: {
+          "1-30": parseARCellValue(row, "1-30"),
+          "31-60": parseARCellValue(row, "31-60"),
+          "61-90": parseARCellValue(row, "61-90"),
+          "91+": parseARCellValue(row, "91+"),
+        },
+      };
+    }).filter((row: ARAgingCustomer) => row.customer && (row.total !== 0 || row.current !== 0 || Object.values(row.buckets).some(Boolean)));
+
+    if (customers.length) {
+      return {
+        customers,
+        totalReceivables: customers.reduce((sum: number, row: ARAgingCustomer) => sum + row.total, 0),
+        totalOverdue: customers.reduce((sum: number, row: ARAgingCustomer) => sum + Object.values(row.buckets).reduce((a, b) => a + b, 0), 0),
+        bucketTotals: {
+          Current: customers.reduce((sum: number, row: ARAgingCustomer) => sum + row.current, 0),
+          "1-30": customers.reduce((sum: number, row: ARAgingCustomer) => sum + row.buckets["1-30"], 0),
+          "31-60": customers.reduce((sum: number, row: ARAgingCustomer) => sum + row.buckets["31-60"], 0),
+          "61-90": customers.reduce((sum: number, row: ARAgingCustomer) => sum + row.buckets["61-90"], 0),
+          "91+": customers.reduce((sum: number, row: ARAgingCustomer) => sum + row.buckets["91+"], 0),
+        },
+      };
+    }
+  }
+
+  // Raw QBO AgedReceivableDetail is transaction-oriented rather than
+  // period-oriented. Never run it through reportRowsWithPeriods(): the columns
+  // are Date, Transaction Type, Customer, Due Date, Open Balance, etc.
+  const rows = collectRows(report?.Rows, 7)
+    .filter((row) => row.type !== "Section" && row.label)
+    .map((row) => row);
+
+  if (!rows.length) return null;
+
+  const customerMap = new Map<string, ARAgingCustomer>();
+  const asOf = new Date(asOfDate + "T00:00:00Z");
+  if (!Number.isFinite(asOf.getTime())) return null;
+
+  for (const row of rows) {
+    // collectRows flattens ColData and loses column names, so only use this
+    // path when the report exposes a normalized rows shape. Raw QBO detail
+    // parsing is handled by parseRawARAgingDetail below.
+  }
+
+  return parseRawARAgingDetail(report, asOf);
+}
+
+function parseRawARAgingDetail(report: any, asOf: Date): ARAgingSummary | null {
+  const rawRows: any[] = [];
+  const walk = (node: any) => {
+    if (!node) return;
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (typeof node !== "object") return;
+    if (Array.isArray(node.ColData)) rawRows.push(node);
+    if (node.Rows) walk(node.Rows);
+    if (Array.isArray(node.Row)) node.Row.forEach(walk);
+  };
+  walk(report?.Rows);
+
+  const customerMap = new Map<string, ARAgingCustomer>();
+  for (const row of rawRows) {
+    const cells = row.ColData || [];
+    const get = (namePattern: RegExp) => {
+      const cell = cells.find((cell: any) => namePattern.test(String(cell?.value ?? "").trim()) && false);
+      return cell;
+    };
+    const byIndex = (index: number) => cells[index]?.value;
+    // QBO's AgedReceivableDetail columns are Date, Transaction Type,
+    // Transaction#, Customer, Due Date, Amount, Open Balance in this fixture.
+    const transactionType = String(byIndex(1) || "").trim().toUpperCase();
+    const customer = String(byIndex(3) || "").trim();
+    const dueDateText = String(byIndex(4) || "").trim();
+    const openBalance = toNumber(byIndex(6));
+    if (!customer || !Number.isFinite(openBalance) || openBalance === 0) continue;
+
+    const existing = customerMap.get(customer) || {
+      customer,
+      total: 0,
+      current: 0,
+      buckets: { "1-30": 0, "31-60": 0, "61-90": 0, "91+": 0 },
+    };
+    existing.total += openBalance;
+
+    const dueDate = new Date(dueDateText + "T00:00:00Z");
+    const daysOverdue = Number.isFinite(dueDate.getTime())
+      ? Math.floor((asOf.getTime() - dueDate.getTime()) / 86400000)
+      : 0;
+
+    // Positive invoice/open-balance rows are the receivable exposure. Negative
+    // payments/credits remain in total/current reconciliation but are not
+    // treated as positive overdue exposure.
+    if (openBalance > 0) {
+      if (daysOverdue <= 0) existing.current += openBalance;
+      else existing.buckets[ageBucket(daysOverdue)] += openBalance;
+    }
+
+    customerMap.set(customer, existing);
+  }
+
+  const customers = Array.from(customerMap.values()).filter((row) => row.total !== 0 || row.current !== 0 || Object.values(row.buckets).some(Boolean));
+  if (!customers.length) return null;
+
+  return {
+    customers,
+    totalReceivables: customers.reduce((sum, row) => sum + row.total, 0),
+    totalOverdue: customers.reduce((sum, row) => sum + Object.values(row.buckets).reduce((a, b) => a + b, 0), 0),
+    bucketTotals: {
+      Current: customers.reduce((sum, row) => sum + row.current, 0),
+      "1-30": customers.reduce((sum, row) => sum + row.buckets["1-30"], 0),
+      "31-60": customers.reduce((sum, row) => sum + row.buckets["31-60"], 0),
+      "61-90": customers.reduce((sum, row) => sum + row.buckets["61-90"], 0),
+      "91+": customers.reduce((sum, row) => sum + row.buckets["91+"], 0),
+    },
+  };
+}
+
 function reportPeriods(report: any): string[] {
   return (report?.Columns?.Column || []).slice(1)
     .map((column: any) => String(column?.ColTitle || "").trim())
@@ -394,24 +558,39 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
     });
   }
 
-  const receivables = reportRowsWithPeriods(detailReports.agedReceivables).sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
-  if (receivables.length) {
-    const top = receivables[0];
+  const arAging = parseARAgingSummary(detailReports.agedReceivables, detailReports.arAsOfDate || new Date().toISOString().slice(0, 10));
+  if (arAging) {
+    const customers = [...arAging.customers].sort((a, b) => Math.max(...Object.values(b.buckets)) - Math.max(...Object.values(a.buckets)));
+    const top = customers[0];
+    const overdue = arAging.totalOverdue;
+    const oldestBucket = arAging.bucketTotals["91+"] > 0 ? "91+"
+      : arAging.bucketTotals["61-90"] > 0 ? "61-90"
+      : arAging.bucketTotals["31-60"] > 0 ? "31-60"
+      : arAging.bucketTotals["1-30"] > 0 ? "1-30"
+      : null;
     drivers.push({
-      id: "receivables-concentration",
+      id: "receivables-aging",
       category: "Cash",
-      title: "Receivables are concentrated",
-      observation: `${top.label} has the largest reported receivables balance at ${currency.format(Math.abs(top.current))}.`,
-      evidence: receivables.slice(0, 3).map((row) => `${row.label}: ${currency.format(Math.abs(row.current))}`),
-      direction: "watch",
-      severity: "Medium",
-      impact: Math.min(10, Math.max(1, Math.round(Math.abs(top.current) / 10000))),
-      confidence: 0.9,
-      managementQuestion: `How old is ${top.label}'s ${currency.format(Math.abs(top.current))} receivables balance, and when is it expected to convert to cash?`,
+      title: "Receivables include aged balances",
+      observation: overdue > 0
+        ? `QuickBooks reports ${currency.format(overdue)} of gross overdue receivables, concentrated in ${top?.customer || "specific customers"}.`
+        : "QuickBooks reports no positive overdue receivable exposure.",
+      evidence: [
+        `Net receivables: ${currency.format(arAging.totalReceivables)}`,
+        `Gross overdue: ${currency.format(overdue)}`,
+        oldestBucket ? `Oldest populated bucket: ${oldestBucket}` : "No overdue aging bucket populated",
+      ],
+      direction: overdue > 0 ? "watch" : "flat",
+      severity: overdue > 0 ? (arAging.bucketTotals["91+"] > 0 ? "High" : "Medium") : "Watch",
+      impact: Math.min(10, Math.max(1, Math.round(overdue / 10000))),
+      confidence: 0.94,
+      managementQuestion: overdue > 0
+        ? `Which overdue receivables are collectible on schedule, and what follow-up is needed for the oldest balances?`
+        : "Are current receivables expected to convert to cash on their normal payment terms?",
     });
-    relationships.push(`The largest reported receivables balance is ${top.label} at ${currency.format(Math.abs(top.current))}.`);
+    relationships.push(`A/R aging shows ${currency.format(overdue)} of gross overdue exposure; the net receivables balance is ${currency.format(arAging.totalReceivables)}.`);
   } else {
-    unknowns.push("Accounts-receivable detail was not available, so ClearCFO cannot attribute cash pressure to specific customers.");
+    unknowns.push("Accounts-receivable aging detail was not available, so ClearCFO cannot reliably attribute receivable exposure by customer or aging bucket.");
   }
 
   const inventory = reportRowsWithPeriods(detailReports.inventoryValuation).sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
