@@ -1,4 +1,4 @@
-import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison } from "./briefing/engine";
+import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison, KpiBreakdowns } from "./briefing/engine";
 import { currency } from "./briefing/engine";
 
 type Series = { name: string; values: number[]; periods: string[] };
@@ -727,6 +727,129 @@ function buildRatios(args: {
   return { ratios, unknowns };
 }
 
+function pnlRevenueAccountRows(pnlRows: ReportNode[], incomeSectionIndex: number): ReportNode[] {
+  const cogsSectionIndex = pnlRows.findIndex((row, index) =>
+    index > incomeSectionIndex && /^(cost of goods sold|cost of sales|cost of revenue)$/.test(clean(row.label))
+  );
+  const nextSectionIndex = pnlRows.findIndex((row, index) => index > incomeSectionIndex && row.type === "Section");
+  const revenueSectionEnd = [cogsSectionIndex, nextSectionIndex].filter((index) => index > incomeSectionIndex).sort((a, b) => a - b)[0];
+  return incomeSectionIndex >= 0
+    ? pnlRows.slice(incomeSectionIndex + 1, revenueSectionEnd).filter((row) =>
+        row.type !== "Section" &&
+        row.label &&
+        isUsableDetailLabel(row.label) &&
+        !/^total|^net income|^net operating income|^gross profit|^income$/i.test(row.label)
+      )
+    : [];
+}
+
+function buildKpiBreakdowns(args: {
+  pnlRows: ReportNode[];
+  activePeriods: string[];
+  activeRevenue: number[];
+  activeCogs: number[];
+  activeGrossProfit: number[];
+  balanceRows: ReportNode[];
+  balancePeriods: string[];
+  cashByPeriod: Map<string, number>;
+  inventoryByPeriod: Map<string, number>;
+  netIncome: number[] | null;
+}): KpiBreakdowns {
+  const { pnlRows, activePeriods, activeRevenue, activeCogs, activeGrossProfit, balanceRows, balancePeriods, cashByPeriod, netIncome } = args;
+  const currentIndex = activePeriods.length - 1;
+  const previousIndex = currentIndex - 1;
+  if (currentIndex < 0) return {};
+  const periodLabel = activePeriods[currentIndex];
+  const previousPeriodLabel = previousIndex >= 0 ? activePeriods[previousIndex] : null;
+  const currentRevenue = activeRevenue[currentIndex] || 0;
+  const previousRevenue = previousIndex >= 0 ? activeRevenue[previousIndex] || 0 : 0;
+
+  const incomeSectionIndex = pnlRows.findIndex((row) =>
+    row.type === "Section" &&
+    (/^(income|revenue)$/.test(clean(row.label)) || /^income$|^revenue$/.test(clean(row.group)))
+  );
+  const revenueRows = pnlRevenueAccountRows(pnlRows, incomeSectionIndex)
+    .map((row) => ({
+      label: row.label,
+      current: row.values[currentIndex] || 0,
+      previous: previousIndex >= 0 ? row.values[previousIndex] || 0 : 0,
+    }))
+    .filter((row) => row.current !== 0 || row.previous !== 0)
+    .sort((a, b) => b.current - a.current);
+
+  const revenueInsight = revenueRows.length === 1
+    ? "Revenue " + (currentRevenue >= previousRevenue ? "grew " : "slipped ") + currency.format(Math.abs(currentRevenue - previousRevenue)) + " from " + (previousPeriodLabel || "the prior period") + " on " + revenueRows[0].label + " — with a single revenue stream, every dollar of the change is explained here."
+    : revenueRows.length
+      ? revenueRows[0].label + " is the largest reported revenue stream at " + currency.format(revenueRows[0].current) + "; the breakdown shows the complete-month mix."
+      : "No revenue streams were reported for the latest complete month.";
+
+  const currentCogs = activeCogs[currentIndex] || 0;
+  const previousCogs = previousIndex >= 0 ? activeCogs[previousIndex] || 0 : 0;
+  const currentGrossProfit = activeGrossProfit[currentIndex] || 0;
+  const previousGrossProfit = previousIndex >= 0 ? activeGrossProfit[previousIndex] || 0 : 0;
+  const currentMargin = currentRevenue ? (currentGrossProfit / currentRevenue) * 100 : 0;
+  const marginInsight = currentCogs === 0
+    ? "Gross margin is " + formatPercent(currentMargin) + " because no COGS is recorded in " + periodLabel + "."
+    : "Gross margin is " + formatPercent(currentMargin) + " based on reported revenue of " + currency.format(currentRevenue) + " and COGS of " + currency.format(currentCogs) + ".";
+
+  const liquidCashPattern = [/^checking$/, /^savings$/, /^cash$/, /^cash on hand$/, /^undeposited funds$/];
+  const currentBalanceIndex = balancePeriods.indexOf(periodLabel);
+  const previousBalanceIndex = previousPeriodLabel ? balancePeriods.indexOf(previousPeriodLabel) : -1;
+  const cashRows = balanceRows
+    .filter((row) => row.type !== "Section" && liquidCashPattern.some((pattern) => pattern.test(clean(row.label))))
+    .map((row) => ({
+      label: row.label,
+      current: currentBalanceIndex >= 0 ? row.values[currentBalanceIndex] || 0 : 0,
+      previous: previousBalanceIndex >= 0 ? row.values[previousBalanceIndex] || 0 : 0,
+    }))
+    .filter((row) => isUsableDetailLabel(row.label) && (row.current !== 0 || row.previous !== 0))
+    .sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
+
+  const inventoryPattern = [/^inventory asset$/, /^inventory$/, /^total inventory asset$/, /^total inventory$/];
+  const inventoryRows = balanceRows
+    .filter((row) => row.type !== "Section" && inventoryPattern.some((pattern) => pattern.test(clean(row.label))))
+    .map((row) => ({
+      label: row.label,
+      current: currentBalanceIndex >= 0 ? row.values[currentBalanceIndex] || 0 : 0,
+      previous: previousBalanceIndex >= 0 ? row.values[previousBalanceIndex] || 0 : 0,
+    }))
+    .filter((row) => isUsableDetailLabel(row.label) && (row.current !== 0 || row.previous !== 0))
+    .sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
+
+  const currentCash = cashByPeriod.get(periodLabel) ?? 0;
+  const previousCash = previousPeriodLabel ? cashByPeriod.get(previousPeriodLabel) ?? 0 : 0;
+  const cashDelta = currentCash - previousCash;
+  const currentNetIncome = netIncome?.[currentIndex];
+  const cashInsight = Number.isFinite(currentNetIncome) && Math.abs(cashDelta - (currentNetIncome as number)) < 1
+    ? "Cash grew " + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + " — every dollar of reported profit landed in the bank."
+    : "Cash " + (cashDelta >= 0 ? "grew " : "declined ") + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + ". The account breakdown shows where the reported cash position sits.";
+
+  return {
+    revenue: { title: "By revenue stream", periodLabel, variant: "bars", rows: revenueRows, insight: revenueInsight },
+    margin: {
+      title: "Margin walk",
+      periodLabel,
+      variant: "walk",
+      rows: [
+        { label: "Revenue", current: currentRevenue, previous: previousRevenue },
+        { label: "Less: COGS", current: currentCogs, previous: previousCogs },
+        { label: "= Gross profit", current: currentGrossProfit, previous: previousGrossProfit },
+      ],
+      insight: marginInsight,
+    },
+    cash: { title: "By account", periodLabel, variant: "bars", rows: cashRows, insight: cashInsight },
+    inventory: {
+      title: "By account",
+      periodLabel,
+      variant: "bars",
+      rows: inventoryRows,
+      insight: inventoryRows.length
+        ? "Inventory reported across " + inventoryRows.length + " account" + (inventoryRows.length === 1 ? "" : "s") + " for " + periodLabel + "."
+        : "No inventory balances reported for " + periodLabel + ".",
+    },
+  };
+}
+
 function buildManagementQuestions(
   detailReports: Record<string, any>,
   pnlRows: ReportNode[],
@@ -763,25 +886,7 @@ function buildManagementQuestions(
       row.type === "Section" &&
       (/^(income|revenue)$/.test(clean(row.label)) || /^income$|^revenue$/.test(clean(row.group)))
     );
-    const cogsSectionIndex = pnlRows.findIndex((row, index) =>
-      index > incomeSectionIndex && /^(cost of goods sold|cost of sales|cost of revenue)$/.test(clean(row.label))
-    );
-    // With no COGS section (e.g. a services business), the slice below used to run
-    // to the end of the report and sweep expense accounts into the revenue rows.
-    // Stop at the next section boundary instead so expenses can never be presented
-    // as a revenue stream.
-    const nextSectionIndex = pnlRows.findIndex(
-      (row, index) => index > incomeSectionIndex && row.type === "Section"
-    );
-    const revenueSectionEnd = [cogsSectionIndex, nextSectionIndex].find((index) => index > incomeSectionIndex);
-    const revenueAccountRows = incomeSectionIndex >= 0
-      ? pnlRows.slice(incomeSectionIndex + 1, revenueSectionEnd)
-          .filter((row) =>
-            row.type !== "Section" &&
-            row.label &&
-            !/^total|^net income|^net operating income|^gross profit|^income$/i.test(row.label)
-          )
-      : [];
+    const revenueAccountRows = pnlRevenueAccountRows(pnlRows, incomeSectionIndex);
     const revenueChanges = revenueAccountRows
       .map((row) => ({
         label: row.label,
@@ -1055,6 +1160,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
         estimatedImpact: Math.abs(pnlReconciliation.variance),
       }
     : null;
+  const kpiBreakdowns = buildKpiBreakdowns({ pnlRows, activePeriods, activeRevenue, activeCogs, activeGrossProfit, balanceRows, balancePeriods, cashByPeriod, inventoryByPeriod, netIncome });
+
   const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : []), ...(reconciliationDriver ? [reconciliationDriver] : [])].sort((a, b) => b.impact - a.impact);
 
   const trendSeries: Series[] = [
@@ -1100,6 +1207,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     mtdComparison: buildDayMatchedComparison(detailReports.mtdCurrent, detailReports.mtdPrevious),
     ratios: ratioResult.ratios,
     cashFlow: cashFlowResult.bridge,
+    kpiBreakdowns,
     unknowns: [
       ...cashFlowResult.unknowns,
       ...ratioResult.unknowns,
