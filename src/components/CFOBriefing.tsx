@@ -498,7 +498,7 @@ export default function CFOBriefing() {
           <section className="mt-8" aria-labelledby="kpi-heading">
             <p id="kpi-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">KEY PERFORMANCE INDICATORS</p>
             <p className="mt-1 text-xs text-slate-500">Tap a card to view its trend.</p>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {metrics.map((metric) => {
                 const isSelected = activeMetricKey === metric.key;
                 return (
