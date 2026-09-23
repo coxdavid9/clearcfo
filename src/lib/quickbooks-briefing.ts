@@ -759,11 +759,43 @@ function buildManagementQuestions(
       question: `Which customers are driving the current revenue mix? ${top.label} is the largest reported customer at ${currency.format(top.value)}, representing about ${share.toFixed(0)}% of the top customers returned by QuickBooks.`,
     });
   } else if (Number.isFinite(context.revenueChange)) {
-    const revenueDetailUnavailable = !detailReports.incomeByCustomer;
-    questions.push({
-      category: "Revenue",
-      question: `Revenue moved from ${currency.format(context.previousRevenue)} to ${currency.format(context.revenue)} (${formatPercent(context.revenueChange)}). What changed in customer volume, pricing, or mix to produce that movement?${revenueDetailUnavailable ? " ClearCFO could not access customer-level QuickBooks detail, so we cannot identify which customers drove the change." : ""}`,
-    });
+    const incomeSectionIndex = pnlRows.findIndex((row) =>
+      row.type === "Section" &&
+      (/^(income|revenue)$/.test(clean(row.label)) || /^income$|^revenue$/.test(clean(row.group)))
+    );
+    const cogsSectionIndex = pnlRows.findIndex((row, index) =>
+      index > incomeSectionIndex && /^(cost of goods sold|cost of sales|cost of revenue)$/.test(clean(row.label))
+    );
+    const revenueAccountRows = incomeSectionIndex >= 0
+      ? pnlRows.slice(incomeSectionIndex + 1, cogsSectionIndex > incomeSectionIndex ? cogsSectionIndex : undefined)
+          .filter((row) =>
+            row.type !== "Section" &&
+            row.label &&
+            !/^total|^net income|^net operating income|^gross profit|^income$/i.test(row.label)
+          )
+      : [];
+    const revenueChanges = revenueAccountRows
+      .map((row) => ({
+        label: row.label,
+        current: row.values[pnlPeriods.length - 1] || 0,
+        previous: pnlPeriods.length > 1 ? row.values[pnlPeriods.length - 2] || 0 : 0,
+      }))
+      .map((row) => ({ ...row, change: row.current - row.previous }))
+      .filter((row) => row.change !== 0)
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+
+    if (revenueChanges.length) {
+      const top = revenueChanges[0];
+      questions.push({
+        category: "Revenue",
+        question: `Revenue moved from ${currency.format(context.previousRevenue)} to ${currency.format(context.revenue)} (${formatPercent(context.revenueChange)}), driven primarily by ${top.label} changing ${currency.format(top.change)} versus the prior period. What changed in this revenue stream, and is the movement expected to continue?`,
+      });
+    } else {
+      questions.push({
+        category: "Revenue",
+        question: `Revenue moved from ${currency.format(context.previousRevenue)} to ${currency.format(context.revenue)} (${formatPercent(context.revenueChange)}). What changed in customer volume, pricing, or mix to produce that movement?${!detailReports.incomeByCustomer ? " ClearCFO could not access customer-level QuickBooks detail, so we cannot identify which customers drove the change." : ""}`,
+      });
+    }
   }
 
   const vendors = topReportRows(detailReports.expenseByVendor, 3);
