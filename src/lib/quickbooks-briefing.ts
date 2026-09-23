@@ -972,7 +972,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const reconciliationDriver: FinancialDriver | null = pnlReconciliation
     ? {
         id: "pnl-reconciliation",
-        category: "Data Quality",
+        category: "Unusual Spend",
         title: "P&L totals need reconciliation",
         observation: `QuickBooks reported net income of ${currency.format(pnlReconciliation.reportedNetIncome)} for ${pnlReconciliation.period}, while the reported revenue, COGS, expenses, and other income/expense imply ${currency.format(pnlReconciliation.expectedNetIncome)}. ClearCFO is not changing the source value.`,
         evidence: [
