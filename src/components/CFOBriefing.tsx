@@ -396,7 +396,8 @@ export default function CFOBriefing() {
     { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: !Number.isFinite(data.inventoryChange) ? "text-slate-500" : data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
   ];
   const mtd = data.mtdComparison;
-  // Global attention queue: independent of the KPI selected below.\n  const attentionCandidates = useMemo(() => {
+  // Global attention queue: independent of the KPI selected below.
+  const attentionCandidates = useMemo(() => {
     const driverCandidates = data.drivers.map((driver) => ({
       id: driver.id,
       title: driver.title,
