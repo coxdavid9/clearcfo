@@ -729,6 +729,8 @@ function buildRatios(args: {
 
 function buildManagementQuestions(
   detailReports: Record<string, any>,
+  pnlRows: ReportNode[],
+  pnlPeriods: string[],
   context: {
     revenue: number;
     previousRevenue: number;
@@ -773,8 +775,27 @@ function buildManagementQuestions(
     });
   }
 
-  const expenseChanges = reportRowsWithPeriods(detailReports.profitAndLossDetail)
-    .filter((row) => !/income|revenue|sales|cost of goods|gross profit|net income/i.test(row.label))
+  const expenseSectionIndex = pnlRows.findIndex((row) =>
+    row.type === "Section" &&
+    (/^expenses?$|^operating expenses?$/.test(clean(row.label)) || /^expenses?$|^operatingexpenses?$/.test(clean(row.group)))
+  );
+  const netIncomeIndex = pnlRows.findIndex((row, index) =>
+    index > expenseSectionIndex && /^(net income|net operating income)$/.test(clean(row.label))
+  );
+  const expenseAccountRows = expenseSectionIndex >= 0
+    ? pnlRows.slice(expenseSectionIndex + 1, netIncomeIndex > expenseSectionIndex ? netIncomeIndex : undefined)
+        .filter((row) =>
+          row.type !== "Section" &&
+          row.label &&
+          !/^total|^net income|^net operating income|^gross profit|^operating income|^payroll expenses?$|^expenses?$/i.test(row.label)
+        )
+    : [];
+  const expenseChanges = expenseAccountRows
+    .map((row) => ({
+      label: row.label,
+      current: row.values[pnlPeriods.length - 1] || 0,
+      previous: pnlPeriods.length > 1 ? row.values[pnlPeriods.length - 2] || 0 : 0,
+    }))
     .map((row) => ({ ...row, change: row.current - row.previous }))
     .filter((row) => row.change !== 0)
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
@@ -1027,7 +1048,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "quickbooks",
     drivers: mergedDrivers,
-    managementQuestions: buildManagementQuestions(detailReports, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
+    managementQuestions: buildManagementQuestions(detailReports, pnlRows, pnlPeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
     relationships: mergedDrivers.map((driver) => driver.observation),
     detailDrivers: detailed.details,
     trendInsights: [],
