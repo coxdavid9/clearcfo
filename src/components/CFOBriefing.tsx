@@ -538,6 +538,20 @@ export default function CFOBriefing() {
         </div>
 
         <div className="p-7 sm:p-10">
+          {readyBanner && (
+            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-slate-900">Your CFO Briefing is ready.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">Start with the takeaway — if you read one paragraph, read that one.</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" onClick={() => document.getElementById("takeaway-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">Show me the takeaway</button>
+                  <button type="button" onClick={() => { localStorage.setItem("clearcfo_briefing_ready_seen", "1"); localStorage.setItem("clearcfo_onboarding_done", "1"); setReadyBanner(false); }} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Got it</button>
+                </div>
+              </div>
+            </div>
+          )}
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           {syncNotice && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{syncNotice}</div>}
 
