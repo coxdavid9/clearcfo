@@ -745,6 +745,7 @@ function buildManagementQuestions(
     previousInventory: number;
     inventoryChange: number;
     marginChange: number;
+    currentPeriodIndex: number;
   },
 ): ManagementQuestion[] {
   const questions: ManagementQuestion[] = [];
@@ -777,8 +778,8 @@ function buildManagementQuestions(
     const revenueChanges = revenueAccountRows
       .map((row) => ({
         label: row.label,
-        current: row.values[pnlPeriods.length - 1] || 0,
-        previous: pnlPeriods.length > 1 ? row.values[pnlPeriods.length - 2] || 0 : 0,
+        current: row.values[context.currentPeriodIndex] || 0,
+        previous: context.currentPeriodIndex > 0 ? row.values[context.currentPeriodIndex - 1] || 0 : 0,
       }))
       .map((row) => ({ ...row, change: row.current - row.previous }))
       .filter((row) => row.change !== 0)
@@ -1080,7 +1081,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "quickbooks",
     drivers: mergedDrivers,
-    managementQuestions: buildManagementQuestions(detailReports, pnlRows, pnlPeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
+    managementQuestions: buildManagementQuestions(detailReports, pnlRows, pnlPeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange, currentPeriodIndex: dataIndex }),
     relationships: mergedDrivers.map((driver) => driver.observation),
     detailDrivers: detailed.details,
     trendInsights: [],
