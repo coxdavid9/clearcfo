@@ -826,8 +826,8 @@ function buildManagementQuestions(
   const expenseChanges = expenseAccountRows
     .map((row) => ({
       label: row.label,
-      current: row.values[pnlPeriods.length - 1] || 0,
-      previous: pnlPeriods.length > 1 ? row.values[pnlPeriods.length - 2] || 0 : 0,
+      current: row.values[context.currentPeriodIndex] || 0,
+      previous: context.currentPeriodIndex > 0 ? row.values[context.currentPeriodIndex - 1] || 0 : 0,
     }))
     .map((row) => ({ ...row, change: row.current - row.previous }))
     .filter((row) => row.change !== 0)
