@@ -42,6 +42,39 @@ function formatTrendValue(metricKey: string, value: number): string {
   return metricKey === "margin" ? `${value.toFixed(1)}%` : currency.format(value);
 }
 
+function KpiDrilldown({ breakdown }: { breakdown?: NonNullable<BriefingData["kpiBreakdowns"]>[keyof NonNullable<BriefingData["kpiBreakdowns"]>] }) {
+  if (!breakdown) return null;
+  const total = breakdown.rows.reduce((sum, row) => sum + Math.max(0, row.current), 0);
+  return (
+    <div className="mt-5 min-h-[220px] border-t border-slate-200 pt-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{breakdown.title}</p>
+        <p className="text-xs font-medium text-slate-400">{breakdown.periodLabel}</p>
+      </div>
+      {breakdown.variant === "bars" ? (
+        breakdown.rows.length ? (
+          <div className="mt-4 space-y-4">
+            {breakdown.rows.map((row) => {
+              const share = total > 0 ? Math.round((Math.max(0, row.current) / total) * 100) : 0;
+              return (
+                <div key={row.label}>
+                  <div className="flex items-center justify-between gap-3 text-sm"><p className="font-medium text-slate-800">{row.label}</p><p className="font-semibold tabular-nums text-slate-900">{currency.format(row.current)}</p></div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${share}%` }} /></div>
+                  <p className="mt-1 text-[10px] font-medium text-slate-400">{share}% of breakdown</p>
+                </div>
+              );
+            })}
+          </div>
+        ) : null
+      ) : (
+        <div className="mt-4 space-y-2">
+          {breakdown.rows.map((row) => <div key={row.label} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-0"><p className="text-sm font-medium text-slate-700">{row.label}</p><p className="text-sm font-semibold tabular-nums text-slate-900">{currency.format(row.current)}</p></div>)}
+        </div>
+      )}
+      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-3"><p className="text-sm leading-6 text-slate-700">{breakdown.insight}</p></div>
+    </div>
+  );
+}
 export default function CFOBriefing() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<BriefingData>(demoData);
@@ -497,7 +530,7 @@ export default function CFOBriefing() {
 
           <section className="mt-8" aria-labelledby="kpi-heading">
             <p id="kpi-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">KEY PERFORMANCE INDICATORS</p>
-            <p className="mt-1 text-xs text-slate-500">Tap a card to view its trend.</p>
+            <p className="mt-1 text-xs text-slate-500">Tap a card to view its trend and breakdown.</p>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {metrics.map((metric) => {
                 const isSelected = activeMetricKey === metric.key;
@@ -528,6 +561,7 @@ export default function CFOBriefing() {
               </svg>
             </div>
             <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${trendPeriods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{trendPeriods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
+            <KpiDrilldown breakdown={data.kpiBreakdowns?.[activeMetricKey]} />
           </section>
 
           {mtd && <section className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-4" aria-label="Month to date">
