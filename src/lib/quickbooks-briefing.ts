@@ -268,6 +268,42 @@ function latestPopulatedIndex(series: number[][]): number {
   return -1;
 }
 
+type PnlReconciliationIssue = {
+  period: string;
+  reportedNetIncome: number;
+  expectedNetIncome: number;
+  variance: number;
+};
+
+function findOtherSeries(rows: ReportNode[], periods: number, income: boolean): number[] | null {
+  return pickSeries(
+    rows,
+    income ? [/^otherincome$/] : [/^otherexpenses?$/],
+    income ? [/^total other income$/, /^other income$/] : [/^total other expenses$/, /^other expenses?$/],
+    periods,
+  );
+}
+
+function findPnlReconciliationIssue(rows: ReportNode[], periods: string[], revenue: number[], cogs: number[], expenses: number[], netIncome: number[] | null): PnlReconciliationIssue | null {
+  if (!netIncome || !periods.length) return null;
+  const otherIncome = findOtherSeries(rows, periods.length, true);
+  const otherExpense = findOtherSeries(rows, periods.length, false);
+  let largest: PnlReconciliationIssue | null = null;
+
+  for (let index = 0; index < periods.length; index += 1) {
+    const reported = netIncome[index];
+    if (!Number.isFinite(reported)) continue;
+    const expected = (revenue[index] || 0) - (cogs[index] || 0) - (expenses[index] || 0) + (otherIncome?.[index] || 0) - (otherExpense?.[index] || 0);
+    const variance = reported - expected;
+    const threshold = Math.max(1000, Math.abs(expected) * 0.01, Math.abs(revenue[index] || 0) * 0.005);
+    if (Math.abs(variance) <= threshold) continue;
+    if (!largest || Math.abs(variance) > Math.abs(largest.variance)) {
+      largest = { period: periods[index], reportedNetIncome: reported, expectedNetIncome: expected, variance };
+    }
+  }
+  return largest;
+}
+
 function buildDrivers(revenueChange: number, marginChange: number, cashChange: number, inventoryChange: number, expenseChange: number, previousCogs: number, currentCogs: number, previousExpense: number, currentExpense: number, previousCash: number, currentCash: number, previousInventory: number, currentInventory: number, currentRevenue: number, previousRevenue: number): FinancialDriver[] {
   const drivers: FinancialDriver[] = [];
   // Dollar-materiality floors: a percentage move on a tiny base is noise, not a
@@ -908,7 +944,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
   const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory, currentRevenue, previousRevenue);
-  const classificationReview = buildClassificationReview(pnlRows, currentRevenue, currentCogsValue, currentExpense);
+  const classificationReview = buildClassificationReview(pnlRows, currentRevenue, currentCogsValue, currentExpense);\n  const pnlReconciliation = findPnlReconciliationIssue(pnlRows, activePeriods, activeRevenue, activeCogs, activeExpenses, netIncome);
   const ratioResult = buildRatios({
     balanceRows,
     balancePeriods,
@@ -932,7 +968,27 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   });
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const detailed = buildDetailedDrivers(detailReports);
-  const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : [])].sort((a, b) => b.impact - a.impact);
+  const reconciliationDriver: FinancialDriver | null = pnlReconciliation
+    ? {
+        id: "pnl-reconciliation",
+        category: "Data Quality",
+        title: "P&L totals need reconciliation",
+        observation: `QuickBooks reported net income of ${currency.format(pnlReconciliation.reportedNetIncome)} for ${pnlReconciliation.period}, while the reported revenue, COGS, expenses, and other income/expense imply ${currency.format(pnlReconciliation.expectedNetIncome)}. ClearCFO is not changing the source value.`,
+        evidence: [
+          `Period: ${pnlReconciliation.period}`,
+          `Reported net income: ${currency.format(pnlReconciliation.reportedNetIncome)}`,
+          `Calculated net income: ${currency.format(pnlReconciliation.expectedNetIncome)}`,
+          `Unexplained variance: ${currency.format(Math.abs(pnlReconciliation.variance))}`,
+        ],
+        direction: "watch",
+        severity: Math.abs(pnlReconciliation.variance) >= 5000 ? "High" : "Medium",
+        impact: Math.min(10, Math.max(2, Math.round(Math.abs(pnlReconciliation.variance) / 5000))),
+        confidence: 0.98,
+        managementQuestion: "Why does the QuickBooks P&L not reconcile for this period, and which source line should be used before relying on the result?",
+        estimatedImpact: Math.abs(pnlReconciliation.variance),
+      }
+    : null;
+  const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : []), ...(reconciliationDriver ? [reconciliationDriver] : [])].sort((a, b) => b.impact - a.impact);
 
   const trendSeries: Series[] = [
     { name: "Revenue", values: activeRevenue.slice(-12), periods: activePeriods.slice(-12) },
