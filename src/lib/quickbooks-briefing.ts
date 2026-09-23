@@ -580,7 +580,7 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
         `Gross overdue: ${currency.format(overdue)}`,
         oldestBucket ? `Oldest populated bucket: ${oldestBucket}` : "No overdue aging bucket populated",
       ],
-      direction: overdue > 0 ? "watch" : "flat",
+      direction: "watch",
       severity: overdue > 0 ? (arAging.bucketTotals["91+"] > 0 ? "High" : "Medium") : "Watch",
       impact: Math.min(10, Math.max(1, Math.round(overdue / 10000))),
       confidence: 0.94,
