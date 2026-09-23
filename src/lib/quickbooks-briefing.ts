@@ -1081,7 +1081,10 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
     source: "quickbooks",
     drivers: mergedDrivers,
-    managementQuestions: buildManagementQuestions(detailReports, pnlRows, pnlPeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
+    // Driver "current period" must be the latest COMPLETE month. activePeriods excludes
+    // the partial current month; the full pnlPeriods made drivers read the empty
+    // partial month ($0) as current, e.g. "largest current-period revenue stream at $0".
+    managementQuestions: buildManagementQuestions(detailReports, pnlRows, activePeriods, { revenue: currentRevenue, previousRevenue, revenueChange, currentExpense, previousExpense, expenseChange, currentCash, previousCash, cashChange, currentInventory, previousInventory, inventoryChange, marginChange }),
     relationships: mergedDrivers.map((driver) => driver.observation),
     detailDrivers: detailed.details,
     trendInsights: [],
