@@ -456,58 +456,13 @@ export default function CFOBriefing() {
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
         <div className="border-b border-slate-200 bg-white px-6 py-6 sm:px-8 sm:py-7">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs text-white">✦</span>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">ClearCFO Intelligence</p>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Financial briefing</span>
-                </div>
-                <p className="mt-0.5 text-xs text-slate-500">{liveSource === "quickbooks" ? "QuickBooks financial data" : liveSource === "upload" ? `Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo financial data"}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">{uploading ? "Analyzing…" : "Upload Excel"}</button>
-              <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${data.health === "strong" ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : data.health === "watch" ? "border border-amber-100 bg-amber-50 text-amber-700" : "border border-red-100 bg-red-50 text-red-700"}`}>
-                <span className={`h-2 w-2 rounded-full ${data.health === "strong" ? "bg-emerald-500" : data.health === "watch" ? "bg-amber-500" : "bg-red-500"}`} />Business health: {data.health}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-7 sm:p-10">
-          <div className="mb-8">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Today&apos;s CFO Briefing</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.7rem]">Here&apos;s what deserves your attention today.</h2>
-            <p className="mt-1 text-sm text-slate-500">{liveSource !== "demo" ? data.companyName : "Your financial data"}{liveSo  return (
-    <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
-      <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
-
-        <div className="border-b border-slate-200 bg-white px-6 py-6 sm:px-8 sm:py-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">TODAY&apos;S CFO BRIEFING</p>
-              <p className="mt-1 text-sm text-slate-500">
-                {liveSource === "quickbooks"
-                  ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}`
-                  : liveSource === "upload"
-                    ? `${data.companyName} · Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                    : "Demo data"}
-              </p>
+              <p className="mt-1 text-sm text-slate-500">{liveSource === "quickbooks" ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}` : liveSource === "upload" ? `${data.companyName} · Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo data"}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                id="quickbooks-sync-target-placeholder"
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className={liveSource === "quickbooks"
-                  ? "text-sm font-semibold text-slate-500 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"
-                  : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-blue-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"}
-              >
-                {uploading ? "Analyzing…" : "Upload Excel"}
-              </button>
+              <button type="button" onClick={() => fileRef.current?.click()} className={liveSource === "quickbooks" ? "text-sm font-semibold text-slate-500 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30" : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"}>{uploading ? "Analyzing…" : "Upload Excel"}</button>
             </div>
           </div>
         </div>
@@ -518,40 +473,22 @@ export default function CFOBriefing() {
 
           <section aria-labelledby="takeaway-heading">
             <p id="takeaway-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">THE TAKEAWAY</p>
-            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm sm:p-7">
-              <p className="text-base leading-7 text-slate-800 sm:text-lg">{deterministicAnalysis}</p>
-            </div>
+            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm sm:p-7"><p className="text-base leading-7 text-slate-800 sm:text-lg">{deterministicAnalysis}</p></div>
           </section>
 
           <section className="mt-8" aria-labelledby="attention-heading">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p id="attention-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">NEEDS YOUR ATTENTION</p>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{attentionCountLabel} of {attentionCandidates.length}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">Ranked by estimated dollar impact, then severity.</p>
-              </div>
-            </div>
+            <div className="flex items-center gap-2"><p id="attention-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">NEEDS YOUR ATTENTION</p><span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">{attentionCountLabel} of {attentionCandidates.length}</span></div>
+            <p className="mt-1 text-xs text-slate-500">Ranked by estimated dollar impact, then severity.</p>
             {attentionCandidates.length > 0 ? (
               <div className="mt-4 space-y-3">
                 {visibleAttention.map((item) => (
                   <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <p className="font-semibold text-slate-900">{item.title}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide $
-                        item.severity === "High" ? "bg-red-50 text-red-600" : item.severity === "Medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"
-                      `}>{item.severity}</span>
-                    </div>
+                    <div className="flex flex-wrap items-start justify-between gap-2"><p className="font-semibold text-slate-900">{item.title}</p><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${item.severity === "High" ? "bg-red-50 text-red-600" : item.severity === "Medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>{item.severity}</span></div>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{item.observation}</p>
                     {item.estimatedImpact !== undefined && <p className="mt-2 text-xs font-bold text-blue-700">Est. impact: {currency.format(Math.round(item.estimatedImpact))} / month</p>}
                   </div>
                 ))}
-                {attentionCandidates.length > 3 && (
-                  <button type="button" onClick={() => setShowAllAttention((value) => !value)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">
-                    {showAllAttention ? "Show top 3" : `Show all ${attentionCandidates.length}`}
-                  </button>
-                )}
+                {attentionCandidates.length > 3 && <button type="button" onClick={() => setShowAllAttention((value) => !value)} className="text-sm font-semibold text-blue-600 hover:text-blue-700">{showAllAttention ? "Show top 3" : `Show all ${attentionCandidates.length}`}</button>}
               </div>
             ) : (
               <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">Balance-sheet ratios all look healthy for the latest synced period.</p>
@@ -559,19 +496,14 @@ export default function CFOBriefing() {
           </section>
 
           <section className="mt-8" aria-labelledby="kpi-heading">
-            <div className="mb-4">
-              <p id="kpi-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">KEY PERFORMANCE INDICATORS</p>
-              <p className="mt-1 text-xs text-slate-500">Tap a card to view its trend.</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <p id="kpi-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">KEY PERFORMANCE INDICATORS</p>
+            <p className="mt-1 text-xs text-slate-500">Tap a card to view its trend.</p>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {metrics.map((metric) => {
                 const isSelected = activeMetricKey === metric.key;
                 return (
                   <button key={metric.key} type="button" onClick={() => setActiveMetricKey(metric.key)} aria-pressed={isSelected} className={`relative min-h-[132px] w-full rounded-2xl border p-5 text-left shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 ${isSelected ? "border-blue-400 bg-blue-50/70 shadow-md shadow-blue-900/10" : "border-slate-200 bg-white opacity-70 hover:opacity-100 hover:border-blue-200 hover:shadow-md"}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${metric.signal}`} aria-hidden="true" /><p className="text-xs font-medium text-slate-500 sm:text-sm">{metric.label}</p></div>
-                      {isSelected && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">Selected</span>}
-                    </div>
+                    <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${metric.signal}`} /><p className="text-xs font-medium text-slate-500 sm:text-sm">{metric.label}</p></div>{isSelected && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">Selected</span>}</div>
                     <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm"><span className={metric.tone}>{displayChange(metric.change, metric.key, metric.key === "inventory" ? data.inventory : undefined)}</span><span className="font-normal text-slate-400">vs. prior period</span></div>
                     {metric.key === "margin" && (marginBaseline || zeroCogsNote) && <p className="mt-2 text-[10px] leading-4 text-amber-700">No COGS recorded in QuickBooks — 100% is a reported accounting margin, not necessarily economic gross margin.</p>}
@@ -584,10 +516,10 @@ export default function CFOBriefing() {
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7" aria-labelledby="trend-heading">
             <div className="flex items-start justify-between gap-4"><div><p id="trend-heading" className="text-sm font-semibold text-slate-900">{activeMetric.name} trend</p><p className="mt-1 text-xs text-slate-500">Trailing {trendValues.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange, activeMetricKey, activeMetricDefinition.current)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
             <div className="relative mt-5 h-60 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60 pl-14">
-              <div className="pointer-events-none absolute left-2 top-0 bottom-8 flex flex-col justify-between py-1 text-[10px] font-medium text-slate-400">
-                <span>{formatTrendValue(activeMetricKey, Math.max(...trendValues.map(Number).filter(Number.isFinite), 0))}</span>
-                <span>{formatTrendValue(activeMetricKey, (() => { const values = trendValues.map(Number).filter(Number.isFinite); return values.length ? (Math.min(...values) + Math.max(...values)) / 2 : 0; })())}</span>
-                <span>{formatTrendValue(activeMetricKey, Math.min(...trendValues.map(Number).filter(Number.isFinite), 0))}</span>
+              <div className="pointer-events-none absolute left-2 top-2 bottom-8 flex flex-col justify-between text-[10px] font-medium text-slate-400">
+                <span>{formatTrendValue(activeMetricKey, trendValues.length ? Math.max(...trendValues) : 0)}</span>
+                <span>{formatTrendValue(activeMetricKey, trendValues.length ? (Math.min(...trendValues) + Math.max(...trendValues)) / 2 : 0)}</span>
+                <span>{formatTrendValue(activeMetricKey, trendValues.length ? Math.min(...trendValues) : 0)}</span>
               </div>
               <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label={`${activeMetric.name} trend over available periods`} preserveAspectRatio="none">
                 <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
@@ -598,29 +530,20 @@ export default function CFOBriefing() {
             <div className="mt-2 grid grid-cols-4 text-[10px] font-medium text-slate-400">{trendLabelIndices.map((index) => <span key={`${trendPeriods[index] || index}-${index}`} className={index === trendLabelIndices[trendLabelIndices.length - 1] ? "text-right" : index === 0 ? "text-left" : "text-center"}>{trendPeriods[index] || (index === 0 ? "Prior" : "Current")}</span>)}</div>
           </section>
 
-          {mtd && (
-            <section className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-4" aria-label="Month to date">
-              <p className="text-sm font-semibold text-slate-800">{mtd.currentLabel} so far — revenue {currency.format(mtd.revenue.current)}, expenses {currency.format(mtd.operatingExpense.current)}, net income {currency.format(mtd.netIncome.current)}.</p>
-              {mtd.revenue.current === 0 && mtd.operatingExpense.current === 0 && mtd.netIncome.current === 0 && <p className="mt-1 text-xs text-slate-500">{new Date().getDate()} days in, nothing posted yet — {data.periods[data.periods.length - 1] || "the latest complete month"} is the latest complete month above.</p>}
-            </section>
-          )}
+          {mtd && <section className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-4" aria-label="Month to date">
+            <p className="text-sm font-semibold text-slate-800">{mtd.currentLabel} so far — revenue {currency.format(mtd.revenue.current)}, expenses {currency.format(mtd.operatingExpense.current)}, net income {currency.format(mtd.netIncome.current)}.</p>
+            {mtd.revenue.current === 0 && mtd.operatingExpense.current === 0 && mtd.netIncome.current === 0 && <p className="mt-1 text-xs text-slate-500">{new Date().getDate()} days in, nothing posted yet — {data.periods[data.periods.length - 1] || "the latest complete month"} is the latest complete month above.</p>}
+          </section>}
 
-          {data.cashFlow && (
-            <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="cash-flow-heading">
-              <p id="cash-flow-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">CASH FLOW</p>
-              <p className="mt-1 text-xs text-slate-500">From net income to cash: working-capital changes for the latest period.</p>
-              <div className="mt-4 space-y-2">
-                {[...data.cashFlow.lines].sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 5).map((line) => (
-                  <div key={line.label} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                    <p className="text-sm font-medium text-slate-800">{line.label}</p>
-                    <p className={line.value >= 0 ? "text-sm font-bold text-emerald-600" : "text-sm font-bold text-red-600"}>{line.value >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(line.value)))}</p>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-600 px-3 py-2.5"><p className="text-sm font-bold text-white">Net cash from operations</p><p className="text-sm font-bold text-white">{data.cashFlow.operatingCashFlow >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.operatingCashFlow)))}</p></div>
-              </div>
-              {data.cashFlow.cashChange !== null && <p className="mt-3 text-xs text-slate-500">Reported change in cash: {data.cashFlow.cashChange >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.cashChange)))}.</p>}
-            </section>
-          )}
+          {data.cashFlow && <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="cash-flow-heading">
+            <p id="cash-flow-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">CASH FLOW</p>
+            <p className="mt-1 text-xs text-slate-500">From net income to cash: working-capital changes for the latest period.</p>
+            <div className="mt-4 space-y-2">
+              {[...data.cashFlow.lines].sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 5).map((line) => <div key={line.label} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"><p className="text-sm font-medium text-slate-800">{line.label}</p><p className={line.value >= 0 ? "text-sm font-bold text-emerald-600" : "text-sm font-bold text-red-600"}>{line.value >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(line.value)))}</p></div>)}
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-600 px-3 py-2.5"><p className="text-sm font-bold text-white">Net cash from operations</p><p className="text-sm font-bold text-white">{data.cashFlow.operatingCashFlow >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.operatingCashFlow)))}</p></div>
+            </div>
+            {data.cashFlow.cashChange !== null && <p className="mt-3 text-xs text-slate-500">Reported change in cash: {data.cashFlow.cashChange >= 0 ? "+" : "−"}{currency.format(Math.abs(Math.round(data.cashFlow.cashChange)))}.</p>}
+          </section>}
 
           <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6" aria-labelledby="questions-heading">
             <p id="questions-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">MANAGEMENT QUESTIONS</p>
