@@ -101,9 +101,9 @@ export default function QuickBooksSyncAction() {
         onClick={syncNow}
         disabled={syncing}
         title={error || "Refresh your connected QuickBooks data"}
-        className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-sm disabled:cursor-wait disabled:opacity-60"
+        className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md disabled:cursor-wait disabled:opacity-60"
       >
-        {syncing ? "Syncing…" : "Sync now"}
+        {syncing ? "Syncing…" : "Sync Now"}
       </button>
       {error && <span className="basis-full text-xs font-medium text-red-600">{error}</span>}
     </>,
