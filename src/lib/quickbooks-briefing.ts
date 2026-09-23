@@ -565,7 +565,7 @@ function buildDetailedDrivers(detailReports: Record<string, any>): { drivers: Fi
       severity: "Medium",
       impact: Math.min(10, Math.max(1, Math.round(expenseUps[0].change / 10000))),
       confidence: 0.95,
-      managementQuestion: `What caused ${expenseUps[0].label} to increase by ${currency.format(expenseUps[0].change)} versus the prior period?`,
+      managementQuestion: `Operating expenses changed versus the prior period, driven primarily by ${expenseUps[0].label} increasing ${currency.format(expenseUps[0].change)}. Is this a recurring cost, a one-time expense, or something that needs to be reviewed?`,
     });
     relationships.push(`${expenseUps[0].label} is the largest reported expense increase at ${currency.format(expenseUps[0].change)}.`);
   } else if (detailReports.profitAndLossDetail) {
