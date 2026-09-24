@@ -1236,7 +1236,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     liveCashChange,
     liveCashChangePct,
     cashAsOfDate: formatCashAsOfDate(liveCashLabel, hasNewerLiveCashColumn).replace(/^as of /, ""),
-    cashDeltaLabel: `vs ${periodLabel === liveCashLabel ? liveCashLabel : formatCashAsOfDate(periodLabel, false).replace(/^as of /, "")}`,
+    cashDeltaLabel: `vs ${activePeriods[current] === liveCashLabel ? liveCashLabel : formatCashAsOfDate(activePeriods[current], false).replace(/^as of /, "")}`,
     inventory: currentInventory,
     inventoryChange,
     operatingExpense: currentExpense,
