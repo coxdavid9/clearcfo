@@ -522,7 +522,7 @@ export default function CFOBriefing() {
   if (billingLoading) {
     return <main className="min-h-screen bg-slate-50 px-5 py-10"><div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"><p className="text-sm font-semibold text-slate-500">Checking your ClearCFO plan…</p></div></main>;
   }
-  if (billingLocked) return <PlanSelection cancelled={billingCancelled} />;
+  if (billingLocked) return <PlanSelection cancelled={billingCancelled} locked status={billingInfo.status} />;
 
   if (isLoading) {
     return (
