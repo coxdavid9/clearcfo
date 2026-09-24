@@ -227,7 +227,8 @@ export async function POST(request: Request) {
       : {};
     const currentExpense = asFiniteNumber(snapshot.operatingExpense);
     const previousExpense = asFiniteNumber(snapshot.previousOperatingExpense);
-    const liveCashNote = typeof snapshot.liveCashNote === "string" && snapshot.liveCashNote.trim() ? snapshot.liveCashNote.trim() : null;
+    const liveCash = asFiniteNumber(snapshot.liveCash);
+    const liveCashAsOf = typeof snapshot.liveCashAsOf === "string" && snapshot.liveCashAsOf.trim() ? snapshot.liveCashAsOf.trim() : null;
     const expenseDelta = currentExpense !== null && previousExpense !== null ? currentExpense - previousExpense : null;
     const priorFromChange = (current: number | null, change: number | null): number | null => {
       if (current === null || change === null || change === -100) return null;
@@ -261,21 +262,22 @@ export async function POST(request: Request) {
     if (currentExpense !== null && previousExpense !== null && expenseDelta !== null) {
       materialityDirectives.push(`For operating expense, the observed dollar movement is ${expenseDelta >= 0 ? "+" : ""}${Math.round(expenseDelta).toLocaleString("en-US")} from ${Math.round(previousExpense).toLocaleString("en-US")} to ${Math.round(currentExpense).toLocaleString("en-US")}. Treat this dollar movement as more informative than the percentage when the baseline is small.`);
     }
-    if (liveCashNote) {
-      materialityDirectives.push(`The cash position has a live balance note: "${liveCashNote}". Treat the live figure as the current cash position. The month-end cash balance (${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}) and its change (${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}%) remain the period anchor for change math only. Do not present the month-end balance as the current cash position.`);
-    }
     const scenarioDirectives = [
       scenarioSignals.inventoryBuildup ? "Inventory buildup is a confirmed deterministic signal. Explicitly name inventory as the primary working-capital pattern; do not replace it with a generic margin or revenue statement." : "",
       scenarioSignals.expenseSpikeRecovery ? "Operating expenses spiked and then recovered. Explicitly name the OPEX spike/recovery pattern and keep it distinct from any revenue spike." : "",
       scenarioSignals.revenueVolatility ? `Revenue volatility is a deterministic signal: revenue spans ${Math.round(scenarioSignals.revenueVolatility.min).toLocaleString("en-US")} to ${Math.round(scenarioSignals.revenueVolatility.max).toLocaleString("en-US")} (${scenarioSignals.revenueVolatility.maxMinRatio.toFixed(1)}x). Discuss volatility explicitly; seasonality is only a hypothesis.` : "",
-      scenarioSignals.revenueVolatility ? `Revenue volatility spans ${scenarioSignals.revenueVolatility.periods} displayed periods — use this count when describing the volatility window; do not recount periods from the trend series.` : "",
+      scenarioSignals.revenueVolatility ? `When describing the revenue volatility window, write exactly "${scenarioSignals.revenueVolatility.periods} displayed periods". Do not recount periods from the trend series.` : "",
     ...materialityDirectives,
     ].filter(Boolean).join(" ");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, store: false, instructions: `${instructions} ${scenarioDirectives}`.trim(), input: JSON.stringify(bodyObject), text: { format: { type: "json_schema", name: "clearcfo_cfo_analysis", strict: true, schema: analysisSchema } } }),
+      body: JSON.stringify({ model, store: false, instructions: [
+        ...(liveCash !== null && liveCashAsOf ? [`CASH POSITION: The business's current cash position is ${Math.round(liveCash).toLocaleString("en-US")} as of ${liveCashAsOf}. The financialSnapshot cash figure (${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}, ${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}%) is the last complete month-end balance — use it only for period change math. In the executive summary, state cash exactly as: "Cash is ${Math.round(liveCash).toLocaleString("en-US")} as of ${liveCashAsOf} (month-end ${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}, ${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}% vs prior period)." Never present the month-end balance as the current cash position.`] : []),
+        ...instructions,
+        ...scenarioDirectives.split(" ").filter(Boolean),
+      ].filter(Boolean).join("\n\n"), input: JSON.stringify(bodyObject), text: { format: { type: "json_schema", name: "clearcfo_cfo_analysis", strict: true, schema: analysisSchema } } }),
     });
 
     const rawResponse = await response.text();
