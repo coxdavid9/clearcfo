@@ -6,12 +6,12 @@ import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scop
 
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
 const AI_CACHE_KEY = "clearcfo_qb_ai_analysis_cache";
-const ANALYSIS_VERSION = 2;
+const ANALYSIS_VERSION = 3;
 
 type Props = { enabled?: boolean };
 
 function briefingSignature(briefing: BriefingData): string {
-  return JSON.stringify({ analysisVersion: ANALYSIS_VERSION, revenue: briefing.revenue, revenueChange: briefing.revenueChange, margin: briefing.grossMargin, marginChange: briefing.marginChange, cash: briefing.cash, cashChange: briefing.cashChange, inventory: briefing.inventory, inventoryChange: briefing.inventoryChange, operatingExpense: briefing.operatingExpense, previousOperatingExpense: briefing.previousOperatingExpense, drivers: briefing.drivers, detailDrivers: briefing.detailDrivers, relationships: briefing.relationships, unknowns: briefing.unknowns, trend: briefing.trend, periods: briefing.periods });
+  return JSON.stringify({ analysisVersion: ANALYSIS_VERSION, revenue: briefing.revenue, revenueChange: briefing.revenueChange, margin: briefing.grossMargin, marginChange: briefing.marginChange, cash: briefing.cash, cashChange: briefing.cashChange, liveCash: briefing.liveCash ?? null, liveCashAsOf: briefing.liveCashAsOf ?? null, inventory: briefing.inventory, inventoryChange: briefing.inventoryChange, operatingExpense: briefing.operatingExpense, previousOperatingExpense: briefing.previousOperatingExpense, drivers: briefing.drivers, detailDrivers: briefing.detailDrivers, relationships: briefing.relationships, unknowns: briefing.unknowns, trend: briefing.trend, periods: briefing.periods });
 }
 
 function normalizePercentageText(value: string): string {
@@ -97,6 +97,8 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         cash: briefing.cash,
         cashChange: briefing.cashChange,
         liveCashNote: briefing.liveCashNote ?? null,
+        liveCash: briefing.liveCash ?? null,
+        liveCashAsOf: briefing.liveCashAsOf ?? null,
         inventory: briefing.inventory,
         inventoryChange: briefing.inventoryChange,
         operatingExpense: briefing.operatingExpense,
