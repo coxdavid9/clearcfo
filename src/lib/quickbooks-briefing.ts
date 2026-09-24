@@ -1206,6 +1206,12 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
       }
     : null;
   const kpiBreakdowns = buildKpiBreakdowns({ pnlRows, activePeriods, activeRevenue, activeCogs, activeGrossProfit, balanceRows, balancePeriods, cashByPeriod, inventoryByPeriod, netIncome });
+  const latestBalanceLabel = balancePeriods[balancePeriods.length - 1] || activePeriods[current];
+  const hasNewerLiveCashColumn = latestBalanceLabel !== activePeriods[current] && cashByPeriod.has(latestBalanceLabel);
+  const liveCashLabel = hasNewerLiveCashColumn ? latestBalanceLabel : activePeriods[current];
+  const liveCash = cashByPeriod.get(liveCashLabel) ?? currentCash;
+  const liveCashChange = liveCash - currentCash;
+  const liveCashChangePct = currentCash === 0 ? Number.NaN : (liveCashChange / Math.abs(currentCash)) * 100;
 
   const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : []), ...(reconciliationDriver ? [reconciliationDriver] : [])].sort((a, b) => b.impact - a.impact);
 
