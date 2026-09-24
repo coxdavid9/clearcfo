@@ -67,6 +67,7 @@ export type KpiBreakdown = {
   title: string;
   periodLabel: string;
   asOfLabel?: string;
+  liveCashNote?: string;
   variant: "bars" | "walk";
   rows: KpiBreakdownRow[];
   insight: string;
