@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import OnboardingFlow from "./OnboardingFlow";
+import PlanSelection from "./PlanSelection";
 import {
   type BriefingData,
   demoData,
@@ -89,6 +90,10 @@ export default function CFOBriefing() {
   const [onboardingStep, setOnboardingStep] = useState<"welcome" | "connect" | "building">("welcome");
   const [onboardingSource, setOnboardingSource] = useState<"quickbooks" | "excel">("quickbooks");
   const [readyBanner, setReadyBanner] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingLocked, setBillingLocked] = useState(false);
+  const [billingCancelled, setBillingCancelled] = useState(false);
+  const [billingInfo, setBillingInfo] = useState<{plan:"core"|"pro"|null;interval:"month"|"year"|null;status:string|null;trialEndsAt:string|null}>({plan:null,interval:null,status:null,trialEndsAt:null});
 
   const onboardingSyncing = () => {
     try { return sessionStorage.getItem("clearcfo_onboarding_syncing") === "1"; } catch { return false; }
@@ -356,6 +361,31 @@ export default function CFOBriefing() {
   }
 
   useEffect(() => {
+    let cancelled = false;
+    if (new URLSearchParams(window.location.search).get("billing") === "cancelled") setBillingCancelled(true);
+    void fetch("/api/billing/status", { cache: "no-store" }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Unable to check billing status.");
+      if (cancelled) return;
+      setBillingInfo({
+        plan: payload?.plan === "core" || payload?.plan === "pro" ? payload.plan : null,
+        interval: payload?.interval === "month" || payload?.interval === "year" ? payload.interval : null,
+        status: typeof payload?.status === "string" ? payload.status : null,
+        trialEndsAt: typeof payload?.trialEndsAt === "string" ? payload.trialEndsAt : null,
+      });
+      setBillingLocked(payload?.hasAccess !== true);
+      setBillingLoading(false);
+    }).catch((error) => {
+      if (cancelled) return;
+      setBillingLocked(true);
+      setBillingLoading(false);
+      setError(error instanceof Error ? error.message : "Unable to check billing status.");
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (billingLoading || billingLocked) return;
     try {
       const syncing = sessionStorage.getItem("clearcfo_onboarding_syncing") === "1";
       const seen = localStorage.getItem("clearcfo_onboarding_seen") === "1";
@@ -368,12 +398,9 @@ export default function CFOBriefing() {
     window.addEventListener("clearcfo:onboarding-welcome", handleOnboardingWelcome);
     void loadQuickBooksBriefing().finally(() => {
       setIsLoading(false);
-      // Signal the trend section that the briefing has finished its initial
-      // state determination, so graphs never render ahead of the briefing.
       (window as unknown as { __clearcfoBriefingReady?: boolean }).__clearcfoBriefingReady = true;
       window.dispatchEvent(new CustomEvent("clearcfo:briefing-ready"));
     });
-
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
       if (payload?.briefing) {
@@ -390,21 +417,17 @@ export default function CFOBriefing() {
       }
       void loadQuickBooksBriefing();
     };
-
     const handleDisconnect = () => {
       evictQuickBooksCache();
       setLiveSource("demo");
       setHasValidAnalysis(false);
       setIsLoading(false);
-      // Unblock the trend section if a disconnect lands during the initial
-      // load; its own disconnect listener clears any rendered trends.
       (window as unknown as { __clearcfoBriefingReady?: boolean }).__clearcfoBriefingReady = true;
       window.dispatchEvent(new CustomEvent("clearcfo:briefing-ready"));
       setError("");
       setSyncNotice("");
       setLastSyncedLabel("");
     };
-
     window.addEventListener("clearcfo:quickbooks-sync", handleSync);
     window.addEventListener("clearcfo:quickbooks-disconnected", handleDisconnect);
     return () => {
@@ -413,7 +436,7 @@ export default function CFOBriefing() {
       window.removeEventListener("clearcfo:onboarding-connect", handleOnboardingConnect);
       window.removeEventListener("clearcfo:onboarding-welcome", handleOnboardingWelcome);
     };
-  }, []);
+  }, [billingLoading, billingLocked]);
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -521,6 +544,11 @@ export default function CFOBriefing() {
     );
   }
 
+  if (billingLoading) {
+    return <main className="min-h-screen bg-slate-50 px-5 py-10"><div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"><p className="text-sm font-semibold text-slate-500">Checking your ClearCFO plan…</p></div></main>;
+  }
+  if (billingLocked) return <PlanSelection cancelled={billingCancelled} />;
+
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
@@ -555,6 +583,14 @@ export default function CFOBriefing() {
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           {syncNotice && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{syncNotice}</div>}
 
+          {billingInfo.status === "trialing" && billingInfo.trialEndsAt ? (
+            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/60 px-5 py-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold text-slate-800">Trial ends in {Math.max(0, Math.ceil((new Date(billingInfo.trialEndsAt).getTime() - Date.now()) / 86400000))} days — {billingInfo.plan === "pro" ? "Pro" : "Core"} {billingInfo.interval === "year" ? (billingInfo.plan === "pro" ? "$790/year" : "$390/year") : (billingInfo.plan === "pro" ? "$79/mo" : "$39/mo")} starts {new Date(billingInfo.trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.</p>
+                <button type="button" onClick={async()=>{const r=await fetch("/api/billing/portal",{method:"POST"});const d=await r.json().catch(()=>({}));if(d?.url)window.location.href=d.url;}} className="shrink-0 text-sm font-semibold text-blue-700 hover:text-blue-800">Manage billing</button>
+              </div>
+            </div>
+          ) : null}
           <section aria-labelledby="takeaway-heading">
             <p id="takeaway-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">THE TAKEAWAY</p>
             <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm sm:p-7"><p className="text-base leading-7 text-slate-800 sm:text-lg">{deterministicAnalysis}</p></div>
