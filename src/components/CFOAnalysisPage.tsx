@@ -54,8 +54,6 @@ function analysisFingerprint(input: BriefingData) {
     unknowns: input.unknowns,
     liveCash: input.liveCash ?? null,
     liveCashAsOf: input.liveCashAsOf ?? null,
-    liveCash: input.liveCash ?? null,
-    liveCashAsOf: input.liveCashAsOf ?? null,
   });
 }
 
