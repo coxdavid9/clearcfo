@@ -9,6 +9,11 @@ export type BriefingData = {
   marginChange: number;
   cash: number;
   cashChange: number;
+  liveCash?: number;
+  liveCashChange?: number;
+  liveCashChangePct?: number;
+  cashAsOfDate?: string;
+
   inventory: number;
   inventoryChange: number;
   operatingExpense?: number;
