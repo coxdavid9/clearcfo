@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { type AIAnalysis, type BriefingData, demoData } from "../lib/briefing/engine";
 import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
 
-const ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v2";
+const ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v3";
+const LEGACY_ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v2";
 
 function normalizePercentageText(value: string) {
   return value.replace(/(-?\d+(?:\.\d+)?)%%/g, "$1%").replace(/(-?\d+)\.0%\b/g, "$1%");
@@ -51,6 +52,8 @@ function analysisFingerprint(input: BriefingData) {
     detailDrivers: input.detailDrivers,
     relationships: input.relationships,
     unknowns: input.unknowns,
+    liveCash: input.liveCash ?? null,
+    liveCashAsOf: input.liveCashAsOf ?? null,
   });
 }
 
@@ -90,6 +93,7 @@ export default function CFOAnalysisPage() {
           return;
         }
         const input = briefing;
+        window.localStorage.removeItem(LEGACY_ANALYSIS_CACHE_KEY);
         const fingerprint = analysisFingerprint(input);
         if (!cancelled) { setData(input); setHasValidBriefing(true); }
 
@@ -106,7 +110,7 @@ export default function CFOAnalysisPage() {
 
         const response = await fetch("/api/cfo-analysis", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ companyName: input.companyName, financialSnapshot: { revenue: input.revenue, revenueChange: input.revenueChange, grossMargin: input.grossMargin, marginChange: input.marginChange, cash: input.cash, cashChange: input.cashChange, inventory: input.inventory, inventoryChange: input.inventoryChange }, detectedIssues: input.alerts, financialDrivers: input.drivers, driverRelationships: input.relationships, detailDrivers: input.detailDrivers, financialRatios: input.ratios ?? [], monthToDate: input.mtdComparison ?? null, varianceMovers: (input.detailDrivers ?? []).slice(0, 10), cashFlowBridge: input.cashFlow ?? null, currentRecommendation: input.recommendation, businessHealth: input.health, analysisConfidence: input.confidence, recentRevenueTrend: input.trend.slice(-12), periods: input.periods.slice(-12), multiPeriodInsights: input.trendInsights, knownUnknowns: input.unknowns }),
+          body: JSON.stringify({ companyName: input.companyName, financialSnapshot: { revenue: input.revenue, revenueChange: input.revenueChange, grossMargin: input.grossMargin, marginChange: input.marginChange, cash: input.cash, cashChange: input.cashChange, liveCash: input.liveCash ?? null, liveCashAsOf: input.liveCashAsOf ?? null, inventory: input.inventory, inventoryChange: input.inventoryChange }, detectedIssues: input.alerts, financialDrivers: input.drivers, driverRelationships: input.relationships, detailDrivers: input.detailDrivers, financialRatios: input.ratios ?? [], monthToDate: input.mtdComparison ?? null, varianceMovers: (input.detailDrivers ?? []).slice(0, 10), cashFlowBridge: input.cashFlow ?? null, currentRecommendation: input.recommendation, businessHealth: input.health, analysisConfidence: input.confidence, recentRevenueTrend: input.trend.slice(-12), periods: input.periods.slice(-12), multiPeriodInsights: input.trendInsights, knownUnknowns: input.unknowns }),
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error || "ClearCFO could not generate the AI analysis.");
