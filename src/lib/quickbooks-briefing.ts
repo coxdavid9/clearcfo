@@ -743,6 +743,18 @@ function pnlRevenueAccountRows(pnlRows: ReportNode[], incomeSectionIndex: number
     : [];
 }
 
+function formatCashAsOfDate(periodLabel: string, live: boolean): string {
+  if (live) {
+    const now = new Date();
+    return `as of ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+  }
+  const match = periodLabel.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{4})$/i);
+  if (!match) return `as of ${periodLabel}`;
+  const monthIndex = SHORT_MONTHS.findIndex((month) => month.toLowerCase() === match[1].toLowerCase());
+  if (monthIndex < 0) return `as of ${periodLabel}`;
+  return `as of ${SHORT_MONTHS[monthIndex]} ${new Date(Number(match[2]), monthIndex + 1, 0).getDate()}, ${match[2]}`;
+}
+
 function buildKpiBreakdowns(args: {
   pnlRows: ReportNode[];
   activePeriods: string[];
@@ -852,6 +864,7 @@ function buildKpiBreakdowns(args: {
     cash: {
       title: "By account",
       periodLabel: liveCashLabel,
+      asOfLabel: formatCashAsOfDate(liveCashLabel, hasNewerLiveCashColumn),
       variant: "bars",
       rows: (() => {
         const liveBalanceIndex = balancePeriods.indexOf(liveCashLabel);
@@ -1216,18 +1229,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     liveCash,
     liveCashChange,
     liveCashChangePct,
-    cashAsOfDate: hasNewerLiveCashColumn
-      ? (() => {
-          const now = new Date();
-          return `${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
-        })()
-      : (() => {
-          const match = periodLabel.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})$/i);
-          if (!match) return periodLabel;
-          const monthIndex = SHORT_MONTHS.findIndex((month) => month.toLowerCase() === match[1].toLowerCase());
-          if (monthIndex < 0) return periodLabel;
-          return `${SHORT_MONTHS[monthIndex]} ${new Date(Number(match[2]), monthIndex + 1, 0).getDate()}, ${match[2]}`;
-        })(),
+    cashAsOfDate: formatCashAsOfDate(liveCashLabel, hasNewerLiveCashColumn).replace(/^as of /, ""),
     inventory: currentInventory,
     inventoryChange,
     operatingExpense: currentExpense,
