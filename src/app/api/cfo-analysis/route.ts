@@ -268,7 +268,7 @@ export async function POST(request: Request) {
       scenarioSignals.revenueVolatility ? `Revenue volatility is a deterministic signal: revenue spans ${Math.round(scenarioSignals.revenueVolatility.min).toLocaleString("en-US")} to ${Math.round(scenarioSignals.revenueVolatility.max).toLocaleString("en-US")} (${scenarioSignals.revenueVolatility.maxMinRatio.toFixed(1)}x). Discuss volatility explicitly; seasonality is only a hypothesis.` : "",
       scenarioSignals.revenueVolatility ? `When describing the revenue volatility window, write exactly "${scenarioSignals.revenueVolatility.periods} displayed periods". Do not recount periods from the trend series.` : "",
     ...materialityDirectives,
-    ].filter(Boolean).join(" ");
+    ].filter(Boolean);
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -276,7 +276,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({ model, store: false, instructions: [
         ...(liveCash !== null && liveCashAsOf ? [`CASH POSITION: The business's current cash position is ${Math.round(liveCash).toLocaleString("en-US")} as of ${liveCashAsOf}. The financialSnapshot cash figure (${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}, ${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}%) is the last complete month-end balance — use it only for period change math. In the executive summary, state cash exactly as: "Cash is ${Math.round(liveCash).toLocaleString("en-US")} as of ${liveCashAsOf} (month-end ${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}, ${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}% vs prior period)." Never present the month-end balance as the current cash position.`] : []),
         ...instructions,
-        ...scenarioDirectives.split(" ").filter(Boolean),
+        ...scenarioDirectives,
       ].filter(Boolean).join("\n\n"), input: JSON.stringify(bodyObject), text: { format: { type: "json_schema", name: "clearcfo_cfo_analysis", strict: true, schema: analysisSchema } } }),
     });
 
