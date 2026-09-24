@@ -869,7 +869,7 @@ function buildKpiBreakdowns(args: {
       periodLabel,
       variant: "bars",
       rows: (() => {
-        const liveBalanceIndex = balancePeriods.indexOf(liveCashLabel);
+        const liveBalanceIndex = currentBalanceIndex;
         return cashRows.map((row) => {
           const source = balanceRows.find(
             (candidate) => candidate.type !== "Section" &&
