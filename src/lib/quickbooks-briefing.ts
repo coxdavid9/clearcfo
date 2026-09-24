@@ -743,6 +743,18 @@ function pnlRevenueAccountRows(pnlRows: ReportNode[], incomeSectionIndex: number
     : [];
 }
 
+function formatCashAsOfDate(periodLabel: string, live: boolean): string {
+  if (live) {
+    const now = new Date();
+    return `as of ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+  }
+  const match = periodLabel.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})$/i);
+  if (!match) return `as of ${periodLabel}`;
+  const monthIndex = SHORT_MONTHS.findIndex((month) => month.toLowerCase() === match[1].toLowerCase());
+  if (monthIndex < 0) return `as of ${periodLabel}`;
+  return `as of ${SHORT_MONTHS[monthIndex]} ${new Date(Number(match[2]), monthIndex + 1, 0).getDate()}, ${match[2]}`;
+}
+
 function buildKpiBreakdowns(args: {
   pnlRows: ReportNode[];
   activePeriods: string[];
@@ -819,6 +831,18 @@ function buildKpiBreakdowns(args: {
   const currentCash = cashByPeriod.get(periodLabel) ?? 0;
   const previousCash = previousPeriodLabel ? cashByPeriod.get(previousPeriodLabel) ?? 0 : 0;
   const cashDelta = currentCash - previousCash;
+
+  // Cash is a point-in-time balance-sheet value, so the displayed KPI may use
+  // the latest balance-sheet column even when the current P&L month is partial.
+  // The alert engine and period-based cash insight continue to use the latest
+  // complete month above.
+  const latestBalanceLabel = balancePeriods[balancePeriods.length - 1] || periodLabel;
+  const hasNewerLiveCashColumn =
+    latestBalanceLabel !== periodLabel && cashByPeriod.has(latestBalanceLabel);
+  const liveCashLabel = hasNewerLiveCashColumn ? latestBalanceLabel : periodLabel;
+  const liveCash = cashByPeriod.get(liveCashLabel) ?? currentCash;
+  const liveCashChange = liveCash - currentCash;
+  const liveCashChangePct = currentCash === 0 ? Number.NaN : (liveCashChange / Math.abs(currentCash)) * 100;
   const currentNetIncome = netIncome?.[currentIndex];
   const cashInsight = Number.isFinite(currentNetIncome) && Math.abs(cashDelta - (currentNetIncome as number)) < 1
     ? "Cash grew " + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + " — every dollar of reported profit landed in the bank."
@@ -837,7 +861,28 @@ function buildKpiBreakdowns(args: {
       ],
       insight: marginInsight,
     },
-    cash: { title: "By account", periodLabel, variant: "bars", rows: cashRows, insight: cashInsight },
+    cash: {
+      title: "By account",
+      periodLabel: liveCashLabel,
+      asOfLabel: formatCashAsOfDate(liveCashLabel, hasNewerLiveCashColumn),
+      variant: "bars",
+      rows: (() => {
+        const liveBalanceIndex = balancePeriods.indexOf(liveCashLabel);
+        return cashRows.map((row) => {
+          const source = balanceRows.find(
+            (candidate) => candidate.type !== "Section" &&
+              candidate.label === row.label &&
+              liquidCashPattern.some((pattern) => pattern.test(clean(candidate.label))),
+          );
+          return {
+            label: row.label,
+            current: source && liveBalanceIndex >= 0 ? source.values[liveBalanceIndex] || 0 : row.current,
+            previous: row.previous,
+          };
+        }).filter((row) => isUsableDetailLabel(row.label) && row.current !== 0);
+      })(),
+      insight: cashInsight,
+    },
     inventory: {
       title: "By account",
       periodLabel,
@@ -1161,6 +1206,12 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
       }
     : null;
   const kpiBreakdowns = buildKpiBreakdowns({ pnlRows, activePeriods, activeRevenue, activeCogs, activeGrossProfit, balanceRows, balancePeriods, cashByPeriod, inventoryByPeriod, netIncome });
+  const latestBalanceLabel = balancePeriods[balancePeriods.length - 1] || activePeriods[current];
+  const hasNewerLiveCashColumn = latestBalanceLabel !== activePeriods[current] && cashByPeriod.has(latestBalanceLabel);
+  const liveCashLabel = hasNewerLiveCashColumn ? latestBalanceLabel : activePeriods[current];
+  const liveCash = cashByPeriod.get(liveCashLabel) ?? currentCash;
+  const liveCashChange = liveCash - currentCash;
+  const liveCashChangePct = currentCash === 0 ? Number.NaN : (liveCashChange / Math.abs(currentCash)) * 100;
 
   const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : []), ...(reconciliationDriver ? [reconciliationDriver] : [])].sort((a, b) => b.impact - a.impact);
 
@@ -1181,6 +1232,11 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     marginChange,
     cash: currentCash,
     cashChange,
+    liveCash,
+    liveCashChange,
+    liveCashChangePct,
+    cashAsOfDate: formatCashAsOfDate(liveCashLabel, hasNewerLiveCashColumn).replace(/^as of /, ""),
+    cashDeltaLabel: `vs ${activePeriods[current] === liveCashLabel ? liveCashLabel : formatCashAsOfDate(activePeriods[current], false).replace(/^as of /, "")}`,
     inventory: currentInventory,
     inventoryChange,
     operatingExpense: currentExpense,
