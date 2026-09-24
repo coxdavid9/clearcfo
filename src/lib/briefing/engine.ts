@@ -65,6 +65,7 @@ export type KpiBreakdownRow = { label: string; current: number; previous: number
 export type KpiBreakdown = {
   title: string;
   periodLabel: string;
+  asOfLabel?: string;
   variant: "bars" | "walk";
   rows: KpiBreakdownRow[];
   insight: string;
