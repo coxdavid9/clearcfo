@@ -67,6 +67,7 @@ export default function AlertsSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [billingLocked, setBillingLocked] = useState(false);
   const [ruleForm, setRuleForm] = useState({ metric: "cash", operator: "below", value: "10000" });
   // While the threshold field is focused it shows raw digits for easy editing;
   // on blur, dollar thresholds render with comma grouping (10,000) so the
@@ -98,7 +99,14 @@ export default function AlertsSettings() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void fetch("/api/billing/status", { cache: "no-store" }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Could not load billing status.");
+      if (data?.plan === "core" || !data?.hasAccess) setBillingLocked(true);
+      else void load();
+    }).catch((error) => setMessage(error instanceof Error ? error.message : "Could not load billing status."));
+  }, []);
 
   const save = async (patch: Partial<Preferences>) => {
     setSaving(true);
@@ -159,6 +167,8 @@ export default function AlertsSettings() {
       setSaving(false);
     }
   };
+
+  if (billingLocked) return <div className="rounded-2xl border border-blue-100 bg-white p-8 shadow-sm"><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Pro feature</p><h2 className="mt-2 text-2xl font-bold text-slate-900">Alerts & reports are part of Pro.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Upgrade to create custom alerts, receive proactive alerts, and get the weekly CFO report.</p><button type="button" onClick={async()=>{const r=await fetch("/api/billing/portal",{method:"POST"});const d=await r.json().catch(()=>({}));if(d?.url)window.location.href=d.url;else window.location.href="/customer/briefing";}} className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">Upgrade to Pro</button></div>;
 
   if (loading) return <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm text-sm text-slate-500">Loading alert settings…</div>;
 

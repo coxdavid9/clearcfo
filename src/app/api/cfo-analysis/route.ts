@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";
 import { detectExpenseSpikeRecovery, inventoryOutpacesRevenue } from "../../../lib/scenario-detection";
+import { getSubscription, hasAccess } from "../../../lib/billing/entitlements";
 
 export const runtime = "nodejs";
 
@@ -200,6 +201,12 @@ function normalizeScenarioAnalysis(analysis: Record<string, any>, signals: Scena
 export async function POST(request: Request) {
   const limited = checkRateLimit(request, aiRateLimit);
   if (limited) return limited;
+  const { requireBillingUser } = await import("../../../lib/billing/entitlements");
+  const userId = await requireBillingUser().catch(() => null);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const subscription = await getSubscription(userId);
+  if (!hasAccess(subscription)) return NextResponse.json({ error: "subscription_required", message: "Your trial or subscription has ended." }, { status: 403 });
+  if (subscription?.plan === "core") return NextResponse.json({ upgradeRequired: true, message: "AI Analysis is a Pro feature — upgrade to turn these signals into a decision." });
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.error("[ClearCFO AI] OPENAI_API_KEY is missing.");

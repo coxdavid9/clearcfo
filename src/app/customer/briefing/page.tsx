@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Navbar from "../../../components/Navbar";
 import CFOBriefing from "../../../components/CFOBriefing";
-import SetupGate from "../../../components/SetupGate";
 import QuickBooksSyncAction from "../../../components/QuickBooksSyncAction";
 import QuickBooksBriefingCache from "../../../components/QuickBooksBriefingCache";
 import QuickBooksDiagnostics from "../../../components/QuickBooksDiagnostics";
@@ -24,7 +23,6 @@ export default async function CFOBriefingPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <Navbar loginHref="/api/auth/logout" loginLabel="Log Out" profileHref="/profile" sessionAware showMarketingLinks />
-      <SetupGate />
       <QuickBooksBriefingCache />
       <QuickBooksSyncAction />
       <CFOBriefing />
