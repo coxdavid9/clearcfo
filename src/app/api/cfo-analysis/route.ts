@@ -227,6 +227,7 @@ export async function POST(request: Request) {
       : {};
     const currentExpense = asFiniteNumber(snapshot.operatingExpense);
     const previousExpense = asFiniteNumber(snapshot.previousOperatingExpense);
+    const liveCashNote = typeof snapshot.liveCashNote === "string" && snapshot.liveCashNote.trim() ? snapshot.liveCashNote.trim() : null;
     const expenseDelta = currentExpense !== null && previousExpense !== null ? currentExpense - previousExpense : null;
     const priorFromChange = (current: number | null, change: number | null): number | null => {
       if (current === null || change === null || change === -100) return null;
@@ -260,10 +261,14 @@ export async function POST(request: Request) {
     if (currentExpense !== null && previousExpense !== null && expenseDelta !== null) {
       materialityDirectives.push(`For operating expense, the observed dollar movement is ${expenseDelta >= 0 ? "+" : ""}${Math.round(expenseDelta).toLocaleString("en-US")} from ${Math.round(previousExpense).toLocaleString("en-US")} to ${Math.round(currentExpense).toLocaleString("en-US")}. Treat this dollar movement as more informative than the percentage when the baseline is small.`);
     }
+    if (liveCashNote) {
+      materialityDirectives.push(`The cash position has a live balance note: "${liveCashNote}". Treat the live figure as the current cash position. The month-end cash balance (${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}) and its change (${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}%) remain the period anchor for change math only. Do not present the month-end balance as the current cash position.`);
+    }
     const scenarioDirectives = [
       scenarioSignals.inventoryBuildup ? "Inventory buildup is a confirmed deterministic signal. Explicitly name inventory as the primary working-capital pattern; do not replace it with a generic margin or revenue statement." : "",
       scenarioSignals.expenseSpikeRecovery ? "Operating expenses spiked and then recovered. Explicitly name the OPEX spike/recovery pattern and keep it distinct from any revenue spike." : "",
-      scenarioSignals.revenueVolatility ? `Revenue volatility is a deterministic signal: revenue spans $${Math.round(scenarioSignals.revenueVolatility.min).toLocaleString("en-US")} to $${Math.round(scenarioSignals.revenueVolatility.max).toLocaleString("en-US")} (${scenarioSignals.revenueVolatility.maxMinRatio.toFixed(1)}x). Discuss volatility explicitly; seasonality is only a hypothesis.` : "",
+      scenarioSignals.revenueVolatility ? `Revenue volatility is a deterministic signal: revenue spans ${Math.round(scenarioSignals.revenueVolatility.min).toLocaleString("en-US")} to ${Math.round(scenarioSignals.revenueVolatility.max).toLocaleString("en-US")} (${scenarioSignals.revenueVolatility.maxMinRatio.toFixed(1)}x). Discuss volatility explicitly; seasonality is only a hypothesis.` : "",
+      scenarioSignals.revenueVolatility ? `Revenue volatility spans ${scenarioSignals.revenueVolatility.periods} displayed periods — use this count when describing the volatility window; do not recount periods from the trend series.` : "",
     ...materialityDirectives,
     ].filter(Boolean).join(" ");
 
