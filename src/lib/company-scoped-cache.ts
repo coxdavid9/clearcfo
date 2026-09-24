@@ -56,6 +56,12 @@ export function saveQuickBooksBriefingCache(briefing: unknown, companyId: string
     return;
   }
   stampQuickBooksCacheCompany(companyId);
+  try {
+    window.localStorage.removeItem("clearcfo_qb_ai_analysis_cache");
+    window.localStorage.removeItem("clearcfo_qb_ai_analysis_cache_signature");
+  } catch {
+    // Keep the sync usable if browser storage is unavailable.
+  }
 }
 
 /**
