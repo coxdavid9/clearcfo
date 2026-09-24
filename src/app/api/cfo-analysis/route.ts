@@ -54,6 +54,7 @@ const instructions = [
   "If operating expenses spike and subsequently recover, identify that spike/recovery pattern separately from any revenue movement and investigate whether the expense was truly non-recurring.",
   "Return 1 to 4 practical management actions and 0 to 4 material unknowns. Every action should relate to supplied financial evidence.",
   "When financialRatios, monthToDate, varianceMovers, or cashFlowBridge are supplied, use them as evidence: name weak ratios, day-matched month-to-date movements, the largest account/customer/vendor movers, and the cash-flow bridge lines where they support the analysis.",
+  "For every dollar-denominated amount in the analysis, always include the $ symbol. This applies to revenue, cash, prior-period balances, expenses, inventory, accounts receivable, estimated impact, dollar movements, ranges, and any other monetary amount. Never write a dollar amount as a bare number.",
   "For each action, include estimatedImpact as a dollar estimate of the amount at stake when the supplied evidence supports one; otherwise return null. Never invent the estimate.",
   "Return only the requested structured analysis.",
 ].join(" ");
@@ -263,6 +264,7 @@ export async function POST(request: Request) {
       materialityDirectives.push(`For operating expense, the observed dollar movement is ${expenseDelta >= 0 ? "+" : ""}${Math.round(expenseDelta).toLocaleString("en-US")} from ${Math.round(previousExpense).toLocaleString("en-US")} to ${Math.round(currentExpense).toLocaleString("en-US")}. Treat this dollar movement as more informative than the percentage when the baseline is small.`);
     }
     const scenarioDirectives = [
+      "FORMAT: Every monetary amount you write must include a leading $ symbol, including amounts inside evidence, summaries, explanations, recommendations, and action rationales. Percentages and period counts do not use $.",
       scenarioSignals.inventoryBuildup ? "Inventory buildup is a confirmed deterministic signal. Explicitly name inventory as the primary working-capital pattern; do not replace it with a generic margin or revenue statement." : "",
       scenarioSignals.expenseSpikeRecovery ? "Operating expenses spiked and then recovered. Explicitly name the OPEX spike/recovery pattern and keep it distinct from any revenue spike." : "",
       scenarioSignals.revenueVolatility ? `Revenue volatility is a deterministic signal: revenue spans ${Math.round(scenarioSignals.revenueVolatility.min).toLocaleString("en-US")} to ${Math.round(scenarioSignals.revenueVolatility.max).toLocaleString("en-US")} (${scenarioSignals.revenueVolatility.maxMinRatio.toFixed(1)}x). Discuss volatility explicitly; seasonality is only a hypothesis.` : "",
