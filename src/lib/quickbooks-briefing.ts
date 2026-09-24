@@ -1198,7 +1198,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     ? "Live: " + currency.format(liveCash) + " · " + formatCashAsOfDate(liveCashLabel, true)
     : undefined;
   const liveCashAsOf = hasNewerLiveCashColumn
-    ? formatCashAsOfDate(liveCashLabel, false).replace(/^as of /, "")
+    ? formatCashAsOfDate(liveCashLabel, true).replace(/^as of /, "")
     : null;
 
   const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : []), ...(reconciliationDriver ? [reconciliationDriver] : [])].sort((a, b) => b.impact - a.impact);
