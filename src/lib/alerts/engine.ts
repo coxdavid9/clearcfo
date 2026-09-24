@@ -177,7 +177,7 @@ function opexOutpacingCheck(snapshot: BriefingSnapshot): BuiltinHit | null {
     detail:
       `Operating expenses grew ${opexGrowth.toFixed(1)}% while revenue ` +
       `${snapshot.revenueChange >= 0 ? "grew" : "changed"} ${snapshot.revenueChange.toFixed(1)}% — a ${gap.toFixed(1)} point gap.`,
-    estimatedImpact: Math.abs(current * (gap / 100)),
+    estimatedImpact: Math.abs(current - previous),
     metric: "operatingExpense",
   };
 }
@@ -188,13 +188,15 @@ function inventoryOutpacingCheck(snapshot: BriefingSnapshot): BuiltinHit | null 
     return null;
   const gap = snapshot.inventoryChange - snapshot.revenueChange;
   if (gap < 15) return null;
+  const previousInventory = snapshot.inventory / (1 + snapshot.inventoryChange / 100);
+  if (!isFiniteNumber(previousInventory)) return null;
   return {
     severity: "medium",
     title: "Inventory is outpacing revenue",
     detail:
       `Inventory grew ${snapshot.inventoryChange.toFixed(1)}% while revenue ` +
       `${snapshot.revenueChange >= 0 ? "grew" : "changed"} ${snapshot.revenueChange.toFixed(1)}% — cash is getting tied up in stock.`,
-    estimatedImpact: Math.abs(snapshot.inventory * (gap / 100)),
+    estimatedImpact: Math.abs(snapshot.inventory - previousInventory),
     metric: "inventory",
   };
 }
