@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getAuthCookieNames, getSupabaseUser } from "./supabase-auth";
+import { BUSINESS_LIMIT, getSubscription, hasAccess } from "./billing/entitlements";
 
 const ACTIVE_COMPANY_COOKIE = "clearcfo_active_company_id";
 
@@ -126,6 +127,11 @@ export async function setActiveCompany(userId: string, companyId: string) {
 }
 
 export async function createCompany(userId: string, input: { name: string; industry?: string; companySize?: string; contactPhone?: string }) {
+  const subscription = await getSubscription(userId);
+  if (!hasAccess(subscription)) throw new Error("upgrade_required: Your trial or subscription is not active. Subscribe to continue.");
+  const memberships = await listUserCompanies(userId);
+  const limit = BUSINESS_LIMIT[subscription!.plan];
+  if (memberships.length >= limit) throw new Error(subscription!.plan === "core" ? "upgrade_required: Core includes 1 business — upgrade to Pro for up to 5." : "upgrade_required: Pro includes up to 5 businesses.");
   const name = input.name.trim().slice(0, 200);
   if (!name) throw new Error("Business name is required.");
 
