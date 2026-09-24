@@ -3,6 +3,8 @@ import { alertDue, weeklyDue } from "../../../../lib/jobs/due";
 import { authorizeCron } from "../../../../lib/jobs/auth";
 import { runAlertDelivery, runWeeklyReportDelivery } from "../../../../lib/jobs/delivery";
 import { getNotificationPreferences, listConnectedCompanies, markAlertDelivery, markWeeklyDelivery, pauseBetweenCompanies } from "../../../../lib/jobs/company-sync";
+import { ownerSubscription, hasAccess } from "../../../../lib/billing/entitlements";
+import { dispatchTrialEmails } from "../../../../lib/billing/trial-email";
 
 export const runtime = "nodejs";
 
@@ -13,6 +15,7 @@ export async function POST(request: Request) {
   const dispatched: Array<{ company_id: string; alert_sent: boolean; weekly_sent: boolean; briefingPersisted: boolean; error?: string }> = [];
   let first = true;
   try {
+    await dispatchTrialEmails();
     const companies = await listConnectedCompanies();
     for (const company of companies) {
       if (!first) await pauseBetweenCompanies();
@@ -21,6 +24,11 @@ export async function POST(request: Request) {
       let alertSent = false;
       let weeklySent = false;
       try {
+        const subscription = await ownerSubscription(company.id);
+        if (!hasAccess(subscription) || subscription?.plan === "core") {
+          dispatched.push({ company_id: company.id, alert_sent: false, weekly_sent: false, briefingPersisted: false });
+          continue;
+        }
         const preferences = await getNotificationPreferences(company.id);
         const shouldAlert = alertDue(now, preferences);
         const shouldWeekly = weeklyDue(now, preferences);
