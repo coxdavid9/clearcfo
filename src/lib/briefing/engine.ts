@@ -13,7 +13,7 @@ export type BriefingData = {
   liveCashChange?: number;
   liveCashChangePct?: number;
   cashAsOfDate?: string;
-  cashDeltaLabel?: string;
+  liveCashNote?: string;
 
   inventory: number;
   inventoryChange: number;
