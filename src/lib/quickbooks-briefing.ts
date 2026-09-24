@@ -840,9 +840,6 @@ function buildKpiBreakdowns(args: {
   const liveCash = cashByPeriod.get(liveCashLabel) ?? currentCash;
   const liveCashChange = liveCash - currentCash;
   const liveCashChangePct = currentCash === 0 ? Number.NaN : (liveCashChange / Math.abs(currentCash)) * 100;
-  const liveCashNote = hasNewerLiveCashColumn
-    ? "Live: " + currency.format(liveCash) + " · " + formatCashAsOfDate(liveCashLabel, true)
-    : undefined;
   const currentNetIncome = netIncome?.[currentIndex];
   const cashInsight = Number.isFinite(currentNetIncome) && Math.abs(cashDelta - (currentNetIncome as number)) < 1
     ? "Cash grew " + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + " — every dollar of reported profit landed in the bank."
@@ -1197,6 +1194,9 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const liveCash = cashByPeriod.get(liveCashLabel) ?? currentCash;
   const liveCashChange = liveCash - currentCash;
   const liveCashChangePct = currentCash === 0 ? Number.NaN : (liveCashChange / Math.abs(currentCash)) * 100;
+  const liveCashNote = hasNewerLiveCashColumn
+    ? "Live: " + currency.format(liveCash) + " · " + formatCashAsOfDate(liveCashLabel, true)
+    : undefined;
 
   const mergedDrivers = [...detailed.drivers, ...drivers, ...(classificationReview.driver ? [classificationReview.driver] : []), ...(reconciliationDriver ? [reconciliationDriver] : [])].sort((a, b) => b.impact - a.impact);
 
