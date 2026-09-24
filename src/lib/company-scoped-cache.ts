@@ -59,6 +59,8 @@ export function saveQuickBooksBriefingCache(briefing: unknown, companyId: string
   try {
     window.localStorage.removeItem("clearcfo_qb_ai_analysis_cache");
     window.localStorage.removeItem("clearcfo_qb_ai_analysis_cache_signature");
+    window.localStorage.removeItem("clearcfo_ai_analysis_cache_v3");
+    window.localStorage.removeItem("clearcfo_ai_analysis_cache_v2");
   } catch {
     // Keep the sync usable if browser storage is unavailable.
   }
