@@ -22,10 +22,6 @@ export type AlertRule = {
   id: string;
   metric: AlertMetric;
   operator: AlertOperator;
-  /**
-   * Threshold. Dollars for cash / revenue / operatingExpense / inventory;
-   * percentage points for grossMargin.
-   */
   value: number;
   severity: AlertSeverity;
   enabled: boolean;
@@ -33,17 +29,12 @@ export type AlertRule = {
 
 export type BriefingSnapshot = {
   revenue: number;
-  /** Percent change vs prior period. */
   revenueChange: number;
-  /** Gross margin, percent. */
   grossMargin: number;
-  /** Margin change, percentage points vs prior period. */
   marginChange: number;
   cash: number;
-  /** Percent change vs prior period. */
   cashChange: number;
   inventory: number;
-  /** Percent change vs prior period. */
   inventoryChange: number;
   operatingExpense?: number;
   previousOperatingExpense?: number;
@@ -57,7 +48,6 @@ export type BriefingSnapshot = {
 };
 
 export type Alert = {
-  /** Stable dedupe key: the job layer skips keys already sent recently. */
   key: string;
   ruleId: string;
   severity: AlertSeverity;
@@ -177,7 +167,7 @@ function opexOutpacingCheck(snapshot: BriefingSnapshot): BuiltinHit | null {
     detail:
       `Operating expenses grew ${opexGrowth.toFixed(1)}% while revenue ` +
       `${snapshot.revenueChange >= 0 ? "grew" : "changed"} ${snapshot.revenueChange.toFixed(1)}% — a ${gap.toFixed(1)} point gap.`,
-    estimatedImpact: Math.abs(current * (gap / 100)),
+    estimatedImpact: Math.abs(current - previous),
     metric: "operatingExpense",
   };
 }
@@ -188,13 +178,15 @@ function inventoryOutpacingCheck(snapshot: BriefingSnapshot): BuiltinHit | null 
     return null;
   const gap = snapshot.inventoryChange - snapshot.revenueChange;
   if (gap < 15) return null;
+  const previousInventory = snapshot.inventory / (1 + snapshot.inventoryChange / 100);
+  if (!isFiniteNumber(previousInventory)) return null;
   return {
     severity: "medium",
     title: "Inventory is outpacing revenue",
     detail:
       `Inventory grew ${snapshot.inventoryChange.toFixed(1)}% while revenue ` +
       `${snapshot.revenueChange >= 0 ? "grew" : "changed"} ${snapshot.revenueChange.toFixed(1)}% — cash is getting tied up in stock.`,
-    estimatedImpact: Math.abs(snapshot.inventory * (gap / 100)),
+    estimatedImpact: Math.abs(snapshot.inventory - previousInventory),
     metric: "inventory",
   };
 }
@@ -271,11 +263,6 @@ function metricLabel(metric: AlertMetric): string {
   }
 }
 
-/**
- * Evaluate built-in proactive rules plus the company's custom threshold
- * rules against a briefing snapshot. Returns at most MAX_ALERTS alerts,
- * ordered by severity then estimated impact.
- */
 export function evaluateAlerts(
   snapshot: BriefingSnapshot,
   rules: AlertRule[] = [],
