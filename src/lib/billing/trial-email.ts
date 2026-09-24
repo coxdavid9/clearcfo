@@ -22,10 +22,10 @@ export async function dispatchTrialEmails(){
     if(!s.trial_ends_at)continue;
     const end=new Date(s.trial_ends_at).getTime(),start=end-7*86400000,elapsed=(now-start)/86400000;
     try{
-      if(elapsed>=0&&elapsed<1&&!s.trial_email_day0_sent_at)await sendTrialEmail(s,0);
-      else if(elapsed>=2&&elapsed<3&&!s.trial_email_day2_sent_at&&!(await hasBriefing(s.user_id)))await sendTrialEmail(s,2);
-      else if(elapsed>=5&&elapsed<6&&!s.trial_email_day5_sent_at)await sendTrialEmail(s,5);
-      else if(elapsed>=6&&elapsed<7&&!s.trial_email_day7_sent_at)await sendTrialEmail(s,7);
+      if(elapsed>=0&&!s.trial_email_day0_sent_at)await sendTrialEmail(s,0);
+      else if(elapsed>=2&&!s.trial_email_day2_sent_at&&!(await hasBriefing(s.user_id)))await sendTrialEmail(s,2);
+      else if(elapsed>=5&&!s.trial_email_day5_sent_at)await sendTrialEmail(s,5);
+      else if(elapsed>=6&&!s.trial_email_day7_sent_at)await sendTrialEmail(s,7);
     }catch(error){console.error("[ClearCFO Trial Email]",s.user_id,error instanceof Error?error.message:"Unknown error")}
   }
 }
