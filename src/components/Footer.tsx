@@ -8,6 +8,7 @@ const links = [
 
 type FooterProps = {
   onNavigate?: (href: string) => void;
+  tagline?: string;
 };
 
 function marketingHref(label: string, href: string) {
@@ -15,7 +16,7 @@ function marketingHref(label: string, href: string) {
   return href.startsWith("#") ? `/${href}` : href;
 }
 
-export default function Footer({ onNavigate }: FooterProps) {
+export default function Footer({ onNavigate, tagline = "Turning financial data into better decisions through financial intelligence, evidence, and action." }: FooterProps) {
   return (
     <footer id="footer" className="border-t border-slate-200 bg-slate-950 px-5 py-12 text-white sm:px-8">
       <div className="mx-auto max-w-6xl">
@@ -30,7 +31,7 @@ export default function Footer({ onNavigate }: FooterProps) {
                 Clear<span className="text-blue-400">CFO</span>
               </a>
             )}
-            <p className="mt-3 text-sm leading-6 text-slate-400">Turning financial data into better decisions through financial intelligence, evidence, and action.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">{tagline}</p>
           </div>
           <nav aria-label="Footer navigation" className="grid grid-cols-2 gap-x-10 gap-y-3 text-sm sm:grid-cols-3">
             {links.map(([label, href]) =>
