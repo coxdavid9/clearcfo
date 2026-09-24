@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import OnboardingFlow from "./OnboardingFlow";
+import BusinessSwitcher from "./BusinessSwitcher";
 import PlanSelection from "./PlanSelection";
 import {
   type BriefingData,
@@ -559,7 +560,8 @@ export default function CFOBriefing() {
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">TODAY&apos;S CFO BRIEFING</p>
               <p className="mt-1 text-sm text-slate-500">{liveSource === "quickbooks" ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}` : liveSource === "upload" ? `${data.companyName} · Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo data"}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+              <BusinessSwitcher />
               <button type="button" onClick={() => fileRef.current?.click()} className={liveSource === "quickbooks" ? "text-sm font-semibold text-slate-500 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30" : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"}>{uploading ? "Analyzing…" : "Upload Excel"}</button>
             </div>
           </div>
