@@ -95,7 +95,8 @@ export function buildWeeklyReportEmail(companyName: string, briefing: BriefingDa
     "SNAPSHOT",
     "Revenue: " + money(briefing.revenue) + " (" + pct(briefing.revenueChange) + " vs prior period)",
     "Gross margin: " + (Number.isFinite(briefing.grossMargin) ? briefing.grossMargin.toFixed(1) + "%" : "Unavailable") + " (" + points(briefing.marginChange) + " vs prior period)",
-    "Cash: " + money(briefing.cash) + " (" + pct(briefing.cashChange) + " vs prior period)", "",
+    "Cash: " + money(briefing.cash) + " (" + pct(briefing.cashChange) + " vs prior period)",
+    ...(briefing.liveCashNote ? [briefing.liveCashNote] : []), "",
     "BIGGEST MOVER", biggest ? driverText(biggest) : "No material driver was identified.", "",
     "RISKS", risks.length ? risks.map(driverText).join("\n") : "No high-severity risks were identified.", "",
     "OPPORTUNITIES", opportunityLines.length ? opportunityLines.join("\n") : "No positive drivers were identified in the available data.", "",
@@ -126,7 +127,9 @@ export function buildWeeklyReportEmail(companyName: string, briefing: BriefingDa
     '<div style="padding:18px;background:#f8fafc;border-radius:12px"><h3 style="margin:0 0 12px;font-size:17px">Snapshot</h3>' +
     '<p style="margin:7px 0"><strong>Revenue:</strong> ' + money(briefing.revenue) + " (" + pct(briefing.revenueChange) + " vs prior period)</p>" +
     '<p style="margin:7px 0"><strong>Gross margin:</strong> ' + (Number.isFinite(briefing.grossMargin) ? briefing.grossMargin.toFixed(1) + "%" : "Unavailable") + " (" + points(briefing.marginChange) + " vs prior period)</p>" +
-    '<p style="margin:7px 0"><strong>Cash:</strong> ' + money(briefing.cash) + " (" + pct(briefing.cashChange) + " vs prior period)</p></div>" +
+    '<p style="margin:7px 0"><strong>Cash:</strong> ' + money(briefing.cash) + " (" + pct(briefing.cashChange) + " vs prior period)</p>" +
+    (briefing.liveCashNote ? '<p style="margin:7px 0">' + escapeHtml(briefing.liveCashNote) + "</p>" : "") +
+    "</div>" +
     '<div style="margin-top:24px"><h3 style="margin:0 0 8px;font-size:17px">Biggest mover</h3><p style="margin:0;color:#475569">' + escapeHtml(biggest ? driverText(biggest).slice(2) : "No material driver was identified.") + "</p></div>" +
     '<div style="margin-top:24px"><h3 style="margin:0 0 8px;font-size:17px">Risks</h3><ul style="margin:0;padding-left:20px;color:#475569">' + riskHtml + "</ul></div>" +
     '<div style="margin-top:24px"><h3 style="margin:0 0 8px;font-size:17px">Opportunities</h3><ul style="margin:0;padding-left:20px;color:#475569">' + opportunityHtml + "</ul></div>" +
