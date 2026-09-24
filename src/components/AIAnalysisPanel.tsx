@@ -95,6 +95,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
         marginChange: briefing.marginChange,
         cash: briefing.cash,
         cashChange: briefing.cashChange,
+        liveCashNote: briefing.liveCashNote ?? null,
         inventory: briefing.inventory,
         inventoryChange: briefing.inventoryChange,
         operatingExpense: briefing.operatingExpense,
