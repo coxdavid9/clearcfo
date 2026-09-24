@@ -14,6 +14,7 @@ export type BriefingData = {
   liveCashChangePct?: number;
   cashAsOfDate?: string;
   cashDeltaLabel?: string;
+  liveCashNote?: string;
 
   inventory: number;
   inventoryChange: number;
@@ -67,7 +68,6 @@ export type KpiBreakdown = {
   title: string;
   periodLabel: string;
   asOfLabel?: string;
-  liveCashNote?: string;
   variant: "bars" | "walk";
   rows: KpiBreakdownRow[];
   insight: string;
