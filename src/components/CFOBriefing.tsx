@@ -519,6 +519,11 @@ export default function CFOBriefing() {
   const visibleAttention = showAllAttention ? attentionCandidates : shownAttention;
   const attentionCountLabel = showAllAttention ? attentionCandidates.length : Math.min(3, attentionCandidates.length);
 
+  if (billingLoading) {
+    return <main className="min-h-screen bg-slate-50 px-5 py-10"><div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"><p className="text-sm font-semibold text-slate-500">Checking your ClearCFO plan…</p></div></main>;
+  }
+  if (billingLocked) return <PlanSelection cancelled={billingCancelled} />;
+
   if (isLoading) {
     return (
       <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
@@ -543,11 +548,6 @@ export default function CFOBriefing() {
       </div>
     );
   }
-
-  if (billingLoading) {
-    return <main className="min-h-screen bg-slate-50 px-5 py-10"><div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"><p className="text-sm font-semibold text-slate-500">Checking your ClearCFO plan…</p></div></main>;
-  }
-  if (billingLocked) return <PlanSelection cancelled={billingCancelled} />;
 
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
