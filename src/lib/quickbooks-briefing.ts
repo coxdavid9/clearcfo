@@ -748,7 +748,7 @@ function formatCashAsOfDate(periodLabel: string, live: boolean): string {
     const now = new Date();
     return `as of ${SHORT_MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
   }
-  const match = periodLabel.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{4})$/i);
+  const match = periodLabel.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})$/i);
   if (!match) return `as of ${periodLabel}`;
   const monthIndex = SHORT_MONTHS.findIndex((month) => month.toLowerCase() === match[1].toLowerCase());
   if (monthIndex < 0) return `as of ${periodLabel}`;
