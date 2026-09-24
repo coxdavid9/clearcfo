@@ -4,6 +4,7 @@ import Navbar from "../../components/Navbar";
 import CustomerProfile from "../../components/CustomerProfile";
 import QuickBooksProfileConnection from "../../components/QuickBooksProfileConnection";
 import BusinessManager from "../../components/BusinessManager";
+import BillingPortalButton from "../../components/BillingPortalButton";
 import { getAuthCookieNames, getSupabaseUser } from "../../lib/supabase-auth";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export default async function ProfilePage() {
         <section className="mb-7 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 className="text-base font-semibold text-slate-900">Billing</h2><p className="mt-1 text-sm leading-6 text-slate-500">View your plan, update your card, upgrade, downgrade, or cancel through Stripe.</p></div>
-            <button type="button" onClick={async()=>{const r=await fetch("/api/billing/portal",{method:"POST"});const d=await r.json().catch(()=>({}));if(d?.url)window.location.href=d.url;}} className="shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Manage billing</button>
+            <BillingPortalButton />
           </div>
         </section>
 
