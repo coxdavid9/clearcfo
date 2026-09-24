@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveCompany, requireCurrentCompanyUser } from "../../../lib/company";
+import { getSubscription, hasAccess } from "../../../lib/billing/entitlements";
 
 export const runtime = "nodejs";
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -16,6 +17,10 @@ async function activeCompany() {
 
 export async function GET() {
   try {
+    const userId = await requireCurrentCompanyUser();
+    const subscription = await getSubscription(userId);
+    if (!hasAccess(subscription)) return NextResponse.json({ error: "subscription_required", message: "Your trial or subscription is not active. Subscribe to continue." }, { status: 403 });
+    if (subscription?.plan === "core") return NextResponse.json({ error: "upgrade_required", message: "Custom alerts are a Pro feature — upgrade to create alert rules." }, { status: 403 });
     const company = await activeCompany();
     const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
