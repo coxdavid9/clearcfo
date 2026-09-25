@@ -270,6 +270,22 @@ function findHeaderIndex(rows: unknown[][], candidates: string[]): number {
   return rows.findIndex((row) => row.some((cell) => normalized.includes(normalizeText(cell).toLowerCase())));
 }
 
+function findPeriodHeaderIndex(rows: unknown[][]): number {
+  const monthYearText = /^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[ -]?\d{2,4}$/i;
+  const numericMonthYear = /^(?:0?[1-9]|1[0-2])\/\d{2,4}$/;
+  const isoMonth = /^\d{4}-\d{2}$/;
+  const quarter = /^q[1-4][ -]?\d{2,4}$/i;
+  const isPeriodLike = (cell: unknown): boolean => {
+    if (cell instanceof Date && !Number.isNaN(cell.getTime())) return true;
+    const text = normalizeText(cell);
+    if (!text) return false;
+    return monthYearText.test(text) || numericMonthYear.test(text) || isoMonth.test(text) || quarter.test(text);
+  };
+  const structuralIndex = rows.findIndex((row) => row.slice(1).filter(isPeriodLike).length >= 3);
+  if (structuralIndex >= 0) return structuralIndex;
+  return findPeriodHeaderIndex(rows);
+}
+
 function valueFromRow(row: unknown[], labelCandidates: string[]): number {
   const normalized = labelCandidates.map((candidate) => candidate.toLowerCase());
   const labelIndex = row.findIndex((cell) => normalized.includes(normalizeText(cell).toLowerCase()));
@@ -442,7 +458,7 @@ function buildSustainedTrendDrivers(
   const inventorySheet = findSheet(workbook, ["Inventory_Summary"]);
   if (inventorySheet) {
     const inventoryRows = sheetRows(inventorySheet);
-    const inventoryHeaderIndex = findHeaderIndex(inventoryRows, ["Month", "Date", "Period", "Account"]);
+    const inventoryHeaderIndex = findPeriodHeaderIndex(inventoryRows);
     const inventoryLabels = periodLabels(inventoryRows, inventoryHeaderIndex);
     const inventoryRow = findDataRow(inventoryRows, [/ending inventory/i, /^inventory$/i, /total inventory/i]);
     if (inventoryRow && inventoryLabels.length >= 5) {
@@ -588,7 +604,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
       const inventorySheet = findSheet(workbookForSeries, ["Inventory_Summary"]);
       if (inventorySheet) {
         const inventoryRows = sheetRows(inventorySheet);
-        const inventoryHeaderIndex = findHeaderIndex(inventoryRows, ["Month", "Date", "Period", "Account"]);
+        const inventoryHeaderIndex = findPeriodHeaderIndex(inventoryRows);
         const inventoryLabels = periodLabels(inventoryRows, inventoryHeaderIndex);
         const inventoryRow = findDataRow(inventoryRows, [/ending inventory/i, /^inventory$/i, /total inventory/i]);
         if (inventoryRow && inventoryLabels.length) {
@@ -606,7 +622,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
 function detailRowsFromSheet(sheet: XLSX.WorkSheet): Array<{ label: string; current: number; previous: number }> {
   const rows = sheetRows(sheet);
   if (!rows.length) return [];
-  const headerIndex = findHeaderIndex(rows, ["Month", "Date", "Period", "Account", "Customer", "Vendor", "Balance"]);
+  const headerIndex = findPeriodHeaderIndex(rows);
   const labels = periodLabels(rows, headerIndex);
   if (!labels.length) return [];
 
@@ -766,7 +782,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   let inventoryOverride: { inventory: number; previousInventory: number; inventoryChange: number } | null = null;
   if (inventorySheet) {
     const inventoryRows = sheetRows(inventorySheet);
-    const inventoryHeaderIndex = findHeaderIndex(inventoryRows, ["Month", "Date", "Period", "Account"]);
+    const inventoryHeaderIndex = findPeriodHeaderIndex(inventoryRows);
     const inventoryLabels = periodLabels(inventoryRows, inventoryHeaderIndex);
     const inventoryRow = findDataRow(inventoryRows, [/ending inventory/i, /^inventory$/i, /total inventory/i]);
     if (inventoryRow && inventoryLabels.length >= 2) {
