@@ -14,6 +14,7 @@ export type BriefingData = {
   liveCashChangePct?: number;
   liveCashAsOf?: string | null;
   cashAsOfDate?: string;
+  dataAvailability?: { cash: boolean; inventory: boolean };
   cashDeltaLabel?: string;
   liveCashNote?: string;
 
@@ -761,6 +762,8 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   if (!rows.length) throw new Error("The financial worksheet is empty.");
 
   const base = buildBriefingFromRows(rows, sheetName, workbook);
+  const hasBalanceSheet = Boolean(findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]));
+  const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet };
   const detailed = detailedExcelAnalysis(workbook);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
@@ -774,7 +777,8 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     managementQuestions: detailed.questions,
     relationships: [...base.relationships, ...detailed.relationships].slice(0, 8),
     detailDrivers: detailed.details,
-    unknowns: detailed.unknowns,
+    unknowns: Array.from(new Set([...detailed.unknowns, ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown (shown as $0)."] : [])])).slice(0, 10),
+    dataAvailability,
   };
 }
 

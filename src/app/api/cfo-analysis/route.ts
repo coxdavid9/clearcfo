@@ -263,7 +263,12 @@ export async function POST(request: Request) {
     if (currentExpense !== null && previousExpense !== null && expenseDelta !== null) {
       materialityDirectives.push(`For operating expense, the observed dollar movement is ${expenseDelta >= 0 ? "+" : ""}${Math.round(expenseDelta).toLocaleString("en-US")} from ${Math.round(previousExpense).toLocaleString("en-US")} to ${Math.round(currentExpense).toLocaleString("en-US")}. Treat this dollar movement as more informative than the percentage when the baseline is small.`);
     }
+    const dataAvailability = bodyObject.dataAvailability && typeof bodyObject.dataAvailability === "object" ? bodyObject.dataAvailability as Record<string, unknown> : {};
+    const cashDataSupplied = dataAvailability.cash !== false;
+    const inventoryDataSupplied = dataAvailability.inventory !== false;
     const scenarioDirectives = [
+      !cashDataSupplied ? "DATA PROVENANCE: The uploaded workbook did not supply balance-sheet cash. A financialSnapshot cash value of $0 with cash dataAvailability=false is missing data, not a reported cash balance. Treat cash as unknown; never present $0 as the business cash balance, never select it as the primary driver, and never recommend liquidity-crisis actions such as emergency cash measures or credit facilities on that basis. Record the data gap in unknowns." : "",
+      !inventoryDataSupplied ? "DATA PROVENANCE: The uploaded workbook did not supply a balance-sheet inventory value. A financialSnapshot inventory value of $0 with inventory dataAvailability=false is missing data, not a reported inventory balance. Treat it as unknown rather than evidence of no inventory." : "",
       "FORMAT: Every monetary amount you write must include a leading $ symbol, including amounts inside evidence, summaries, explanations, recommendations, and action rationales. Percentages and period counts do not use $.",
       scenarioSignals.inventoryBuildup ? "Inventory buildup is a confirmed deterministic signal. Explicitly name inventory as the primary working-capital pattern; do not replace it with a generic margin or revenue statement." : "",
       scenarioSignals.expenseSpikeRecovery ? "Operating expenses spiked and then recovered. Explicitly name the OPEX spike/recovery pattern and keep it distinct from any revenue spike." : "",
