@@ -2,6 +2,8 @@ import { detectCashSqueeze } from "../src/lib/briefing/emerging-constraints.ts";
 import {
   aging,
   buildBaseCashSqueezeInput,
+  buildEasingCashSqueezeInput,
+  buildStableCashSqueezeInput,
   buildConcentratedCashSqueezeInput,
   buildMediumCashSqueezeInput,
   buildResolvedCashSqueezeInput,
@@ -24,6 +26,29 @@ if (!worsening || worsening.status !== "worsening") {
   console.error("FAIL: stronger pattern should become worsening", worsening);
 } else {
   console.log("PASS: stronger pattern -> worsening");
+}
+
+const stable = high ? detectCashSqueeze(buildStableCashSqueezeInput(high)) : null;
+if (!stable || stable.status !== "stable" || stable.relationship === high?.relationship || stable.whyNow === high?.whyNow || stable.decisionWindow === high?.decisionWindow) {
+  failed++;
+  console.error("FAIL: stable lifecycle should use distinct persistence prose", stable);
+} else {
+  console.log("PASS: stable lifecycle -> persistence prose");
+}
+
+const easing = high ? detectCashSqueeze(buildEasingCashSqueezeInput(high)) : null;
+if (!easing || easing.status !== "easing" || easing.relationship === high?.relationship || easing.whyNow === high?.whyNow || easing.decisionWindow === high?.decisionWindow || !/not resolved/i.test(easing.relationship)) {
+  failed++;
+  console.error("FAIL: easing lifecycle should use distinct improvement/not-resolved prose", easing);
+} else {
+  console.log("PASS: easing lifecycle -> improvement/not-resolved prose");
+}
+
+if (!worsening || !/accelerated from \+50\.0% to \+150\.0%/.test(worsening.relationship) || !/window to act is narrowing/i.test(worsening.decisionWindow)) {
+  failed++;
+  console.error("FAIL: worsening prose should name the acceleration and narrowing decision window", worsening);
+} else {
+  console.log("PASS: worsening lifecycle -> acceleration/narrowing prose");
 }
 
 const medium = detectCashSqueeze(buildMediumCashSqueezeInput());
@@ -51,4 +76,4 @@ if (concentrated) {
 }
 
 if (failed) process.exit(1);
-console.log("\n5/5 emerging-constraint scenarios passed.");
+console.log("\n8/8 emerging-constraint scenarios passed.");
