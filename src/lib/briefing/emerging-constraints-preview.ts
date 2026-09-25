@@ -66,6 +66,24 @@ export function buildWorseningCashSqueezeInput(previousConstraint: EmergingConst
   };
 }
 
+export function buildStableCashSqueezeInput(previousConstraint: EmergingConstraint): CashSqueezeInput {
+  return {
+    ...buildBaseCashSqueezeInput(),
+    previousConstraint,
+  };
+}
+
+export function buildEasingCashSqueezeInput(previousConstraint: EmergingConstraint): CashSqueezeInput {
+  return {
+    ...buildBaseCashSqueezeInput(),
+    revenue: [100000, 93000, 80000],
+    agedReceivablesPrevious: aging([["A", 3000], ["B", 3000], ["C", 3000]]),
+    agedReceivables: aging([["A", 3800], ["B", 3800], ["C", 3800]]),
+    profitAndLossDetail: payrollReport([10000, 10500, 11000]),
+    previousConstraint,
+  };
+}
+
 export function buildMediumCashSqueezeInput(): CashSqueezeInput {
   return {
     ...buildBaseCashSqueezeInput(),
