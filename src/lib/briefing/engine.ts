@@ -777,7 +777,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     }
   }
   const hasBalanceSheet = Boolean(findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]));
-  const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet };
+  const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet || Boolean(inventoryOverride) };
   const detailed = detailedExcelAnalysis(workbook);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
