@@ -107,7 +107,9 @@ export async function syncCompanyBriefing(companyId: string) {
     incomeByCustomer: quickBooksReportForCompany(companyId, "IncomeByCustomerSummary", reportParams),
     expenseByVendor: quickBooksReportForCompany(companyId, "ExpenseByVendorSummary", reportParams),
     agedReceivables: quickBooksReportForCompany(companyId, "AgedReceivableDetail", { end_date: reportParams.end_date }),
+    agedReceivablesPrevious: quickBooksReportForCompany(companyId, "AgedReceivableDetail", { end_date: isoDate(prevMonthEnd) }),
     agedPayables: quickBooksReportForCompany(companyId, "AgedPayableDetail", { end_date: reportParams.end_date }),
+    cashFlowStatement: quickBooksReportForCompany(companyId, "CashFlow", reportParams),
     inventoryValuation: quickBooksReportForCompany(companyId, "InventoryValuationSummary", { end_date: reportParams.end_date }),
     mtdCurrent: quickBooksReportForCompany(companyId, "ProfitAndLoss", { start_date: isoDate(currentMonthStart), end_date: isoDate(end), summarize_column_by: "Days" }),
     mtdPrevious: quickBooksReportForCompany(companyId, "ProfitAndLoss", { start_date: isoDate(prevMonthStart), end_date: isoDate(prevMonthEnd), summarize_column_by: "Days" }),
@@ -142,7 +144,29 @@ export async function syncCompanyBriefing(companyId: string) {
   }
 
   detailReports.arAsOfDate = reportParams.end_date;
-  const briefing = buildQuickBooksBriefing(pnl, balanceSheet, connection.company_name || null, detailReports);
+  if (detailReports.agedReceivables) detailReports.agedReceivables.__asOfDate = reportParams.end_date;
+  if (detailReports.agedReceivablesPrevious) detailReports.agedReceivablesPrevious.__asOfDate = isoDate(prevMonthEnd);
+
+  let previousConstraint = null;
+  try {
+    const previousResponse = await supabaseRequest(
+      `synced_briefings?company_id=eq.${encodeURIComponent(companyId)}&select=briefing&limit=1`,
+    );
+    if (previousResponse.ok) {
+      const previousRows = await previousResponse.json() as Array<{ briefing?: any }>;
+      previousConstraint = previousRows[0]?.briefing?.emergingConstraints?.[0] || null;
+    }
+  } catch (error) {
+    console.warn("[ClearCFO Jobs] Could not load prior constraint state:", error instanceof Error ? error.message : error);
+  }
+
+  const briefing = buildQuickBooksBriefing(
+    pnl,
+    balanceSheet,
+    connection.company_name || null,
+    detailReports,
+    previousConstraint,
+  );
   const syncedAt = new Date().toISOString();
   let briefingPersisted = false;
   try {
