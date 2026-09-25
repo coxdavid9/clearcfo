@@ -48,7 +48,7 @@ export function buildBaseCashSqueezeInput(): CashSqueezeInput {
     periods: ["Jul 2026", "Aug 2026", "Sep 2026"],
     revenue: [100000, 95000, 85000],
     cash: [50000, 50000, 50000],
-    profitAndLossDetail: payrollReport([10000, 10600, 11200]),
+    profitAndLossDetail: payrollReport([10000, 11000, 12000]),
     agedReceivables: aging([["A", 3000], ["B", 3000], ["C", 3000]]),
     agedReceivablesPrevious: aging([["A", 2000], ["B", 2000], ["C", 2000]]),
     cashFlowStatement: cashFlow(0),
