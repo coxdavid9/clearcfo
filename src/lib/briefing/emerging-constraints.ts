@@ -451,7 +451,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
             decisionWindow: "The constraint is persisting, so continue reviewing collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
           }
         : {
-            relationship: statusProse.relationship,
+            relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
             whyNow: "Revenue is down " + Math.abs(revenueDrop).toFixed(1) + "% over the last two periods, overdue A/R is up " + arChange.toFixed(1) + "%, and payroll is up " + payrollChange.toFixed(1) + "% while cash remains stable.",
             decisionWindow: "Review collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
           };
@@ -466,7 +466,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
   return {
     id: "cash_squeeze",
     title: "Cash constraint may be forming",
-    relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
+    relationship: statusProse.relationship,
     evidenceChecked,
     whyNow: statusProse.whyNow,
     decisionWindow: statusProse.decisionWindow,
