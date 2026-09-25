@@ -1,6 +1,6 @@
 import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison, KpiBreakdowns } from "./briefing/engine";
 import { currency } from "./briefing/engine";
-import { detectCashSqueeze, type EmergingConstraint } from "./briefing/emerging-constraints";
+import { detectCashSqueeze, detectMarginErosion, type EmergingConstraint } from "./briefing/emerging-constraints";
 
 type Series = { name: string; values: number[]; periods: string[] };
 type ReportNode = { label: string; values: number[]; group: string; type: string };
@@ -1068,7 +1068,7 @@ function buildCashFlow(args: {
   return { bridge: { lines, operatingCashFlow, cashChange }, unknowns };
 }
 
-export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}, previousConstraint: EmergingConstraint | null = null): BriefingData {
+export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}, previousConstraint: EmergingConstraint | EmergingConstraint[] | null = null): BriefingData {
   const pnlPeriods = reportPeriods(profitAndLoss);
   const pnlRows = collectRows(profitAndLoss?.Rows, pnlPeriods.length);
   if (!pnlPeriods.length) throw new Error("ClearCFO received a QuickBooks P&L report, but no reporting periods were returned.");
@@ -1188,6 +1188,9 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
         estimatedImpact: Math.abs(pnlReconciliation.variance),
       }
     : null;
+  const priorConstraints = (Array.isArray(previousConstraint) ? previousConstraint : previousConstraint ? [previousConstraint] : []) as EmergingConstraint[];
+  const previousCashSqueeze = priorConstraints.find((constraint) => constraint.id === "cash_squeeze") || null;
+  const previousMarginErosion = priorConstraints.find((constraint) => constraint.id === "margin_erosion") || null;
   const emergingConstraint = detectCashSqueeze({
     periods: activePeriods,
     revenue: activeRevenue,
@@ -1196,9 +1199,16 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     agedReceivables: detailReports.agedReceivables,
     agedReceivablesPrevious: detailReports.agedReceivablesPrevious,
     cashFlowStatement: detailReports.cashFlowStatement,
-    previousConstraint,
+    previousConstraint: previousCashSqueeze,
   });
-  const emergingConstraints = emergingConstraint ? [emergingConstraint] : [];
+  const marginErosion = detectMarginErosion({
+    periods: activePeriods,
+    revenue: activeRevenue,
+    grossMargin: activeRevenue.map((value, index) => value ? (activeGrossProfit[index] / value) * 100 : Number.NaN),
+    profitAndLossDetail: detailReports.profitAndLossDetail,
+    previousConstraint: previousMarginErosion,
+  });
+  const emergingConstraints = [emergingConstraint, marginErosion].filter((constraint): constraint is EmergingConstraint => Boolean(constraint));
 
   const kpiBreakdowns = buildKpiBreakdowns({ pnlRows, activePeriods, activeRevenue, activeCogs, activeGrossProfit, balanceRows, balancePeriods, cashByPeriod, inventoryByPeriod, netIncome });
   const latestBalanceLabel = balancePeriods[balancePeriods.length - 1] || activePeriods[current];

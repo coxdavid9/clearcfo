@@ -1,6 +1,6 @@
-import type { EmergingConstraint, CashSqueezeInput } from "./emerging-constraints";
+import type { EmergingConstraint, CashSqueezeInput, MarginErosionInput } from "./emerging-constraints";
 
-export type { CashSqueezeInput };
+export type { CashSqueezeInput, MarginErosionInput };
 
 export function aging(rows: Array<[string, number]>) {
   return {
@@ -104,5 +104,72 @@ export function buildConcentratedCashSqueezeInput(): CashSqueezeInput {
     ...buildBaseCashSqueezeInput(),
     agedReceivablesPrevious: aging([["A", 2000], ["B", 1000], ["C", 1000]]),
     agedReceivables: aging([["A", 8000], ["B", 1100], ["C", 1100]]),
+  };
+}
+
+export function marginReport(values: number[], label = "COGS - Materials") {
+  return {
+    Columns: { Column: [{ ColTitle: "" }, { ColTitle: "Jul 2026" }, { ColTitle: "Aug 2026" }, { ColTitle: "Sep 2026" }] },
+    Rows: {
+      Row: [
+        { type: "Data", ColData: [{ value: label }, ...values.map((value) => ({ value: String(value) }))] },
+      ],
+    },
+  };
+}
+
+export function buildBaseMarginErosionInput(): MarginErosionInput {
+  return {
+    periods: ["Jul 2026", "Aug 2026", "Sep 2026"],
+    revenue: [100000, 102000, 104000],
+    grossMargin: [45, 44, 41],
+    profitAndLossDetail: marginReport([55000, 57000, 61360]),
+    now: "2026-09-25T12:00:00.000Z",
+  };
+}
+
+export function buildWorseningMarginErosionInput(previousConstraint: EmergingConstraint): MarginErosionInput {
+  return {
+    ...buildBaseMarginErosionInput(),
+    grossMargin: [45, 43, 36],
+    profitAndLossDetail: marginReport([55000, 58000, 66560]),
+    previousConstraint,
+  };
+}
+
+export function buildStableMarginErosionInput(previousConstraint: EmergingConstraint): MarginErosionInput {
+  return {
+    ...buildBaseMarginErosionInput(),
+    previousConstraint,
+  };
+}
+
+export function buildEasingMarginErosionInput(previousConstraint: EmergingConstraint): MarginErosionInput {
+  return {
+    ...buildBaseMarginErosionInput(),
+    grossMargin: [45, 44, 42],
+    profitAndLossDetail: marginReport([55000, 56000, 60000]),
+    previousConstraint,
+  };
+}
+
+export function buildMediumMarginErosionInput(): MarginErosionInput {
+  return {
+    ...buildBaseMarginErosionInput(),
+    profitAndLossDetail: undefined,
+  };
+}
+
+export function buildOneTimeCogsMarginErosionInput(): MarginErosionInput {
+  return {
+    ...buildBaseMarginErosionInput(),
+    profitAndLossDetail: marginReport([55000, 56000, 62000], "One-time COGS freight charge"),
+  };
+}
+
+export function buildRevenueDownMarginErosionInput(): MarginErosionInput {
+  return {
+    ...buildBaseMarginErosionInput(),
+    revenue: [100000, 92000, 88000],
   };
 }

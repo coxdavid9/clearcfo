@@ -1,10 +1,15 @@
 import { notFound } from "next/navigation";
-import { detectCashSqueeze } from "../../../lib/briefing/emerging-constraints";
+import { detectCashSqueeze, detectMarginErosion } from "../../../lib/briefing/emerging-constraints";
 import EmergingConstraintsCard from "../../../components/EmergingConstraintsCard";
 import {
   buildBaseCashSqueezeInput,
   buildMediumCashSqueezeInput,
   buildWorseningCashSqueezeInput,
+  buildBaseMarginErosionInput,
+  buildEasingMarginErosionInput,
+  buildMediumMarginErosionInput,
+  buildStableMarginErosionInput,
+  buildWorseningMarginErosionInput,
 } from "../../../lib/briefing/emerging-constraints-preview";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +22,13 @@ export default function EmergingConstraintsDevPreviewPage() {
     ? detectCashSqueeze(buildWorseningCashSqueezeInput(emerging))
     : null;
   const medium = detectCashSqueeze(buildMediumCashSqueezeInput());
+  const marginEmerging = detectMarginErosion(buildBaseMarginErosionInput());
+  const marginWorsening = marginEmerging ? detectMarginErosion(buildWorseningMarginErosionInput(marginEmerging)) : null;
+  const marginEasing = marginEmerging ? detectMarginErosion(buildEasingMarginErosionInput(marginEmerging)) : null;
+  const marginStable = marginEmerging ? detectMarginErosion(buildStableMarginErosionInput(marginEmerging)) : null;
+  const marginMedium = detectMarginErosion(buildMediumMarginErosionInput());
 
-  const constraints = [emerging, worsening, medium].filter(
+  const constraints = [emerging, worsening, medium, marginEmerging, marginWorsening, marginEasing, marginStable, marginMedium].filter(
     (constraint): constraint is NonNullable<typeof constraint> => Boolean(constraint),
   );
 
@@ -29,7 +39,7 @@ export default function EmergingConstraintsDevPreviewPage() {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">DEV ONLY</p>
           <h1 className="mt-2 text-2xl font-bold">Emerging Constraints preview</h1>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Synthetic regression view using the real detector and the same card markup used by the CFO Briefing.
+            Synthetic regression view using the real detectors and the same card markup used by the CFO Briefing, including cash-squeeze and margin-erosion lifecycle states.
           </p>
         </div>
 
