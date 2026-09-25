@@ -397,7 +397,7 @@ function healthFrom(alerts: string[], drivers: FinancialDriver[]): string {
   return "strong";
 }
 
-function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingData {
+function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookForSeries: XLSX.WorkBook): BriefingData {
   const headerIndex = findHeaderIndex(rows, ["Month", "Date", "Period", "Account"]);
   const labels = periodLabels(rows, headerIndex);
   const revenueRow = findDataRow(rows, [/^revenue$/i, /total revenue/i, /sales/i]);
@@ -459,7 +459,33 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string): BriefingDa
     relationships: [],
     detailDrivers: [],
     trendInsights: [],
-    trendSeries: [{ name: "Revenue", values: trend.values, periods: trend.labels }],
+    trendSeries: (() => {
+      const series: { name: string; values: number[]; periods: string[] }[] = [
+        { name: "Revenue", values: trend.values, periods: trend.labels },
+        {
+          name: "Gross Margin",
+          values: labels.map((_, index) => {
+            const revenueValue = revenueValues[index] ?? 0;
+            const grossProfitValue = grossProfitValues[index] ?? 0;
+            return revenueValue !== 0 ? (grossProfitValue / revenueValue) * 100 : 0;
+          }),
+          periods: labels,
+        },
+      ];
+      const inventorySheet = findSheet(workbookForSeries, ["Inventory_Summary"]);
+      if (inventorySheet) {
+        const inventoryRows = sheetRows(inventorySheet);
+        const inventoryHeaderIndex = findHeaderIndex(inventoryRows, ["Month", "Date", "Period", "Account"]);
+        const inventoryLabels = periodLabels(inventoryRows, inventoryHeaderIndex);
+        const inventoryRow = findDataRow(inventoryRows, [/ending inventory/i, /^inventory$/i, /total inventory/i]);
+        if (inventoryRow && inventoryLabels.length) {
+          const inventoryValues = rowValues(inventoryRow, inventoryLabels.length);
+          const aligned = safeTrend(inventoryValues, inventoryLabels);
+          series.push({ name: "Inventory", values: aligned.values, periods: aligned.labels });
+        }
+      }
+      return series;
+    })(),
     unknowns: [],
   };
 }
@@ -622,7 +648,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   const rows = sheetRows(sheet);
   if (!rows.length) throw new Error("The financial worksheet is empty.");
 
-  const base = buildBriefingFromRows(rows, sheetName);
+  const base = buildBriefingFromRows(rows, sheetName, workbook);
   const detailed = detailedExcelAnalysis(workbook);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
