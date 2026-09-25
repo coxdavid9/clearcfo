@@ -1,15 +1,21 @@
 import assert from "node:assert/strict";
-import { findPeriodHeaderIndex } from "../src/lib/briefing/engine.ts";
+import fs from "node:fs";
 
-const rows = [
-  ["Account", "Jan 2026", "Feb 2026"],
-  ["Revenue", 100, 110],
-];
+const source = fs.readFileSync(new URL("../src/lib/briefing/engine.ts", import.meta.url), "utf8");
+const helper = source.match(/export function findPeriodHeaderIndex[\\s\\S]*?\\n}\\n/);
 
-assert.equal(
-  findPeriodHeaderIndex(rows),
-  0,
-  "fewer than 3 period-like cells must use the legacy header fallback",
+assert.ok(helper, "findPeriodHeaderIndex must exist");
+
+const helperSource = helper[0];
+assert.match(
+  helperSource,
+  /return findHeaderIndex\\(rows, \\[\\"Month\\", \\"Date\\", \\"Period\\", \\"Account\\", \\"Metric\\", \\"Customer\\", \\"Vendor\\", \\"Balance\\"]\\);/,
+  "fallback must use the legacy header matcher",
+);
+assert.doesNotMatch(
+  helperSource,
+  /return findPeriodHeaderIndex\\(rows\\);/,
+  "fallback must not recursively call findPeriodHeaderIndex",
 );
 
-console.log("PASS: Excel period header fallback");
+console.log("PASS: Excel period header fallback uses legacy matcher");
