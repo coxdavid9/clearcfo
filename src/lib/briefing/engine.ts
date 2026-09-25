@@ -631,19 +631,36 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   };
 }
 
-function detailRowsFromSheet(sheet: XLSX.WorkSheet): Array<{ label: string; current: number; previous: number }> {
+function detailRowsFromSheet(sheet: XLSX.WorkSheet, inventory = false): Array<{ label: string; current: number; previous: number }> {
   const rows = sheetRows(sheet);
   if (!rows.length) return [];
   const headerIndex = findPeriodHeaderIndex(rows);
   const labels = periodLabels(rows, headerIndex);
   if (!labels.length) return [];
 
+  const header = rows[headerIndex] || [];
+  const unitCostIndex = inventory
+    ? header.findIndex((cell) => /unit.?cost|cost per unit|^unit price$/i.test(normalizeText(cell)))
+    : -1;
+  const unitCost = (row: unknown[]) => unitCostIndex >= 0 ? toNumber(row[unitCostIndex]) : 0;
+  const valueForPeriod = (row: unknown[], raw: number) => {
+    if (!inventory || unitCostIndex < 0) return raw;
+    const cost = unitCost(row);
+    return Number.isFinite(cost) && cost !== 0 ? cost * raw : raw;
+  };
+
   return rows
     .filter((row) => row.length >= 2)
     .map((row) => {
       const label = normalizeText(row[0]);
       const values = rowValues(row, labels.length);
-      return { label, current: values[values.length - 1] ?? 0, previous: values.length > 1 ? values[values.length - 2] ?? 0 : 0 };
+      const rawCurrent = values[values.length - 1] ?? 0;
+      const rawPrevious = values.length > 1 ? values[values.length - 2] ?? 0 : 0;
+      return {
+        label,
+        current: valueForPeriod(row, rawCurrent),
+        previous: valueForPeriod(row, rawPrevious),
+      };
     })
     .filter((row) => row.label && Number.isFinite(row.current) && row.current !== 0)
     .filter((row) => !/^total|^net income|^gross profit|^operating income|^revenue|^sales|^cogs/i.test(row.label));
@@ -693,7 +710,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
     if (!sheet) continue;
     const rows = sheetRows(sheet);
     const type = classifyExcelSheet(sheetName, rows);
-    const candidates = detailRowsFromSheet(sheet)
+    const candidates = detailRowsFromSheet(sheet, type === "inventory")
       .filter((row) => !/total|subtotal|ending|balance|units/i.test(row.label) && !row.label.includes("%"))
       .sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
     if (!candidates.length) continue;
