@@ -283,7 +283,7 @@ function findPeriodHeaderIndex(rows: unknown[][]): number {
   };
   const structuralIndex = rows.findIndex((row) => row.slice(1).filter(isPeriodLike).length >= 3);
   if (structuralIndex >= 0) return structuralIndex;
-  return findPeriodHeaderIndex(rows);
+  return findHeaderIndex(rows, ["Month", "Date", "Period", "Account", "Metric", "Customer", "Vendor", "Balance"]);
 }
 
 function valueFromRow(row: unknown[], labelCandidates: string[]): number {
