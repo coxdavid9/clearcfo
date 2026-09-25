@@ -622,7 +622,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
         if (cashRow && balanceLabels.length) {
           const cashValues = rowValues(cashRow, balanceLabels.length);
           const aligned = safeTrend(cashValues, balanceLabels);
-          series.push({ name: "Cash", values: aligned.values, periods: aligned.labels });
+          series.push({ name: "Cash Position", values: aligned.values, periods: aligned.labels });
         }
       }
       return series;
