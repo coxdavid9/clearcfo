@@ -2,19 +2,21 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/lib/briefing/engine.ts", import.meta.url), "utf8");
-const helper = source.match(/export function findPeriodHeaderIndex[\\s\\S]*?\\n}\\n/);
+const start = source.indexOf("export function findPeriodHeaderIndex");
+const end = source.indexOf("\n}\n", start);
 
-assert.ok(helper, "findPeriodHeaderIndex must exist");
+assert.ok(start >= 0, "findPeriodHeaderIndex must exist");
+assert.ok(end >= 0, "findPeriodHeaderIndex must have a closing brace");
 
-const helperSource = helper[0];
-assert.match(
-  helperSource,
-  /return findHeaderIndex\\(rows, \\[\\"Month\\", \\"Date\\", \\"Period\\", \\"Account\\", \\"Metric\\", \\"Customer\\", \\"Vendor\\", \\"Balance\\"]\\);/,
+const helperSource = source.slice(start, end + 3);
+const fallback = 'return findHeaderIndex(rows, ["Month", "Date", "Period", "Account", "Metric", "Customer", "Vendor", "Balance"]);';
+
+assert.ok(
+  helperSource.includes(fallback),
   "fallback must use the legacy header matcher",
 );
-assert.doesNotMatch(
-  helperSource,
-  /return findPeriodHeaderIndex\\(rows\\);/,
+assert.ok(
+  !helperSource.includes("return findPeriodHeaderIndex(rows);"),
   "fallback must not recursively call findPeriodHeaderIndex",
 );
 
