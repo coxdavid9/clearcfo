@@ -529,11 +529,17 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const labels = periodLabels(rows, headerIndex);
   const revenueRow = findDataRow(rows, [/^revenue$/i, /total revenue/i, /sales/i]);
   const grossProfitRow = findDataRow(rows, [/gross profit/i]);
+  const cogsRow = findDataRow(rows, [/^cogs$/i, /cost of goods sold/i, /cost of sales/i, /cost of revenue/i]);
   const cashRow = findDataRow(rows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
   const inventoryRow = findDataRow(rows, [/^inventory$/i, /total inventory/i, /inventory asset/i]);
   const expenseRow = findDataRow(rows, [/^operating expenses$/i, /total operating expenses/i, /^total expenses$/i, /^expenses$/i]);
   const revenueValues = revenueRow ? rowValues(revenueRow, labels.length) : [];
-  const grossProfitValues = grossProfitRow ? rowValues(grossProfitRow, labels.length) : [];
+  const cogsValues = cogsRow ? rowValues(cogsRow, labels.length) : [];
+  const grossProfitValues = grossProfitRow
+    ? rowValues(grossProfitRow, labels.length)
+    : cogsRow
+      ? revenueValues.map((value, index) => value - (cogsValues[index] ?? 0))
+      : [];
   const cashValues = cashRow ? rowValues(cashRow, labels.length) : [];
   const inventoryValues = inventoryRow ? rowValues(inventoryRow, labels.length) : [];
   const expenseValues = expenseRow ? rowValues(expenseRow, labels.length) : [];
@@ -674,6 +680,11 @@ function detailRowsFromSheet(sheet: XLSX.WorkSheet, inventory = false): Array<{ 
 
 function classifyExcelSheet(sheetName: string, rows: unknown[][]): "customer" | "vendor" | "ar" | "inventory" | "expense" | "other" {
   const text = `${sheetName} ${rows.slice(0, 8).flat().map(normalizeText).join(" ")}`.toLowerCase();
+  const hasCash = rows.some((row) => /cash/i.test(normalizeText(row[0])));
+  const hasReceivable = rows.some((row) => /receivable|accounts receivable|a\/r/i.test(normalizeText(row[0])));
+  const hasInventory = rows.some((row) => /inventory|stock/i.test(normalizeText(row[0])));
+  // A balance-sheet-shaped sheet must not be treated as transactional detail.
+  if (hasCash && (hasReceivable || hasInventory)) return "other";
   if (/customer|client|sales by customer|income by customer/.test(text)) return "customer";
   if (/vendor|supplier|expense by vendor|spend by vendor/.test(text)) return "vendor";
   if (/receivable|accounts receivable|a\/r|ar aging|aged receivable/.test(text)) return "ar";
@@ -682,7 +693,7 @@ function classifyExcelSheet(sheetName: string, rows: unknown[][]): "customer" | 
   return "other";
 }
 
-function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
+function detailedExcelAnalysis(workbook: XLSX.WorkBook, primarySheetName: string): {
   drivers: FinancialDriver[];
   details: DetailDriver[];
   relationships: string[];
@@ -711,7 +722,9 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
     questionSources.set(category, { sheetName, candidateCount });
   };
 
+  const balanceSheetNames = new Set(["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
   for (const sheetName of workbook.SheetNames) {
+    if (sheetName === primarySheetName || balanceSheetNames.has(sheetName)) continue;
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
     const rows = sheetRows(sheet);
@@ -874,7 +887,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   }
   const hasBalanceSheet = Boolean(balanceSheet);
   const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet || Boolean(inventoryOverride) };
-  const detailed = detailedExcelAnalysis(workbook);
+  const detailed = detailedExcelAnalysis(workbook, sheetName);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
   const resolvedInventory = inventoryOverride ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
