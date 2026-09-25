@@ -48,7 +48,7 @@ export function buildBaseCashSqueezeInput(): CashSqueezeInput {
     periods: ["Jul 2026", "Aug 2026", "Sep 2026"],
     revenue: [100000, 95000, 85000],
     cash: [50000, 50000, 50000],
-    profitAndLossDetail: payrollReport([10000, 10600, 11200]),
+    profitAndLossDetail: payrollReport([10000, 11000, 12000]),
     agedReceivables: aging([["A", 3000], ["B", 3000], ["C", 3000]]),
     agedReceivablesPrevious: aging([["A", 2000], ["B", 2000], ["C", 2000]]),
     cashFlowStatement: cashFlow(0),
@@ -62,6 +62,24 @@ export function buildWorseningCashSqueezeInput(previousConstraint: EmergingConst
     revenue: [100000, 90000, 70000],
     agedReceivablesPrevious: aging([["A", 2000], ["B", 2000], ["C", 2000]]),
     agedReceivables: aging([["A", 5000], ["B", 5000], ["C", 5000]]),
+    previousConstraint,
+  };
+}
+
+export function buildStableCashSqueezeInput(previousConstraint: EmergingConstraint): CashSqueezeInput {
+  return {
+    ...buildBaseCashSqueezeInput(),
+    previousConstraint,
+  };
+}
+
+export function buildEasingCashSqueezeInput(previousConstraint: EmergingConstraint): CashSqueezeInput {
+  return {
+    ...buildBaseCashSqueezeInput(),
+    revenue: [100000, 95000, 90000],
+    agedReceivablesPrevious: aging([["A", 3000], ["B", 3000], ["C", 3000]]),
+    agedReceivables: aging([["A", 3600], ["B", 3600], ["C", 3600]]),
+    profitAndLossDetail: payrollReport([10000, 10500, 11025]),
     previousConstraint,
   };
 }
