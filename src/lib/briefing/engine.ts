@@ -957,6 +957,9 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     cashChange: resolvedCash.cashChange,
     inventory: resolvedInventory.inventory,
     inventoryChange: resolvedInventory.inventoryChange,
+    trendSeries: inventoryDetailFallback && inventoryDetailSeries
+      ? [...base.trendSeries, { name: "Inventory", values: inventoryDetailSeries.values, periods: inventoryDetailSeries.periods }]
+      : base.trendSeries,
     drivers: allDrivers,
     alerts: finalAlerts,
     attention: finalAlerts.length,
