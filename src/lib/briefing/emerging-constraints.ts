@@ -281,6 +281,8 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
     return null;
   }
 
+  if (revenueDrop === null || arChange === null || payrollChange === null) return null;
+
   const confidence: ConstraintConfidence = complete && !validationIncomplete ? "High" : "Medium";
   const dataCompleteness: ConstraintDataCompleteness = complete && !validationIncomplete ? "complete" : "partial";
   const strength = strengthScore(Math.abs(revenueDrop), arChange, payrollChange);
