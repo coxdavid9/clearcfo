@@ -613,6 +613,18 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
           series.push({ name: "Inventory", values: aligned.values, periods: aligned.labels });
         }
       }
+      const balanceSheet = findSheet(workbookForSeries, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
+      if (balanceSheet) {
+        const balanceRows = sheetRows(balanceSheet);
+        const balanceHeaderIndex = findPeriodHeaderIndex(balanceRows);
+        const balanceLabels = periodLabels(balanceRows, balanceHeaderIndex);
+        const cashRow = findDataRow(balanceRows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
+        if (cashRow && balanceLabels.length) {
+          const cashValues = rowValues(cashRow, balanceLabels.length);
+          const aligned = safeTrend(cashValues, balanceLabels);
+          series.push({ name: "Cash", values: aligned.values, periods: aligned.labels });
+        }
+      }
       return series;
     })(),
     unknowns: [],
@@ -792,16 +804,33 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
       inventoryOverride = { inventory: current, previousInventory: previous, inventoryChange: changePercent(current, previous) };
     }
   }
-  const hasBalanceSheet = Boolean(findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]));
+  const balanceSheet = findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
+  let cashOverride: { cash: number; previousCash: number; cashChange: number } | null = null;
+  if (balanceSheet) {
+    const balanceRows = sheetRows(balanceSheet);
+    const balanceHeaderIndex = findPeriodHeaderIndex(balanceRows);
+    const balanceLabels = periodLabels(balanceRows, balanceHeaderIndex);
+    const cashRow = findDataRow(balanceRows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
+    if (cashRow && balanceLabels.length >= 2) {
+      const values = rowValues(cashRow, balanceLabels.length);
+      const current = values[values.length - 1] ?? 0;
+      const previous = values[values.length - 2] ?? 0;
+      cashOverride = { cash: current, previousCash: previous, cashChange: changePercent(current, previous) };
+    }
+  }
+  const hasBalanceSheet = Boolean(balanceSheet);
   const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet || Boolean(inventoryOverride) };
   const detailed = detailedExcelAnalysis(workbook);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
   const resolvedInventory = inventoryOverride ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
+  const resolvedCash = cashOverride ?? { cash: base.cash, previousCash: base.cash, cashChange: base.cashChange };
   const sustainedAlerts = allDrivers.map((driver) => driver.observation);
   const finalAlerts = Array.from(new Set([...base.alerts, ...sustainedAlerts]));
   return {
     ...base,
+    cash: resolvedCash.cash,
+    cashChange: resolvedCash.cashChange,
     inventory: resolvedInventory.inventory,
     inventoryChange: resolvedInventory.inventoryChange,
     drivers: allDrivers,
