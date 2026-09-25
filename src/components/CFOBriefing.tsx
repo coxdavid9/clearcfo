@@ -613,7 +613,7 @@ export default function CFOBriefing() {
   return (
     <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
       <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_-35px_rgba(15,23,42,0.35)]">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        <input ref={fileRef} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
         <div className="border-b border-slate-200 bg-white px-6 py-6 sm:px-8 sm:py-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
