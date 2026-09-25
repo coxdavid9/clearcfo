@@ -76,9 +76,9 @@ export function buildStableCashSqueezeInput(previousConstraint: EmergingConstrai
 export function buildEasingCashSqueezeInput(previousConstraint: EmergingConstraint): CashSqueezeInput {
   return {
     ...buildBaseCashSqueezeInput(),
-    revenue: [100000, 93000, 80000],
+    revenue: [100000, 95000, 90000],
     agedReceivablesPrevious: aging([["A", 3000], ["B", 3000], ["C", 3000]]),
-    agedReceivables: aging([["A", 3800], ["B", 3800], ["C", 3800]]),
+    agedReceivables: aging([["A", 3600], ["B", 3600], ["C", 3600]]),
     profitAndLossDetail: payrollReport([10000, 10500, 11025]),
     previousConstraint,
   };
