@@ -1,5 +1,6 @@
 import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison, KpiBreakdowns } from "./briefing/engine";
 import { currency } from "./briefing/engine";
+import { detectCashSqueeze, type EmergingConstraint } from "./briefing/emerging-constraints";
 
 type Series = { name: string; values: number[]; periods: string[] };
 type ReportNode = { label: string; values: number[]; group: string; type: string };
@@ -1067,7 +1068,7 @@ function buildCashFlow(args: {
   return { bridge: { lines, operatingCashFlow, cashChange }, unknowns };
 }
 
-export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}): BriefingData {
+export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, companyName: string | null, detailReports: Record<string, any> = {}, previousConstraint: EmergingConstraint | null = null): BriefingData {
   const pnlPeriods = reportPeriods(profitAndLoss);
   const pnlRows = collectRows(profitAndLoss?.Rows, pnlPeriods.length);
   if (!pnlPeriods.length) throw new Error("ClearCFO received a QuickBooks P&L report, but no reporting periods were returned.");
@@ -1187,6 +1188,18 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
         estimatedImpact: Math.abs(pnlReconciliation.variance),
       }
     : null;
+  const emergingConstraint = detectCashSqueeze({
+    periods: activePeriods,
+    revenue: activeRevenue,
+    cash: cashAligned,
+    profitAndLossDetail: detailReports.profitAndLossDetail,
+    agedReceivables: detailReports.agedReceivables,
+    agedReceivablesPrevious: detailReports.agedReceivablesPrevious,
+    cashFlowStatement: detailReports.cashFlowStatement,
+    previousConstraint,
+  });
+  const emergingConstraints = emergingConstraint ? [emergingConstraint] : [];
+
   const kpiBreakdowns = buildKpiBreakdowns({ pnlRows, activePeriods, activeRevenue, activeCogs, activeGrossProfit, balanceRows, balancePeriods, cashByPeriod, inventoryByPeriod, netIncome });
   const latestBalanceLabel = balancePeriods[balancePeriods.length - 1] || activePeriods[current];
   const hasNewerLiveCashColumn = latestBalanceLabel !== activePeriods[current] && cashByPeriod.has(latestBalanceLabel);
@@ -1253,6 +1266,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     ratios: ratioResult.ratios,
     cashFlow: cashFlowResult.bridge,
     kpiBreakdowns,
+    emergingConstraints,
     unknowns: [
       ...cashFlowResult.unknowns,
       ...ratioResult.unknowns,
