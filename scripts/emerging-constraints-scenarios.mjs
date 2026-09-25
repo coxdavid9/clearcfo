@@ -1,4 +1,4 @@
-import { detectCashSqueeze } from "../src/lib/briefing/emerging-constraints.ts";
+import { detectCashSqueeze, detectMarginErosion } from "../src/lib/briefing/emerging-constraints.ts";
 import {
   aging,
   buildBaseCashSqueezeInput,
@@ -8,6 +8,13 @@ import {
   buildMediumCashSqueezeInput,
   buildResolvedCashSqueezeInput,
   buildWorseningCashSqueezeInput,
+  buildBaseMarginErosionInput,
+  buildEasingMarginErosionInput,
+  buildMediumMarginErosionInput,
+  buildOneTimeCogsMarginErosionInput,
+  buildRevenueDownMarginErosionInput,
+  buildStableMarginErosionInput,
+  buildWorseningMarginErosionInput,
 } from "../src/lib/briefing/emerging-constraints-preview.ts";
 
 let failed = 0;
@@ -75,5 +82,61 @@ if (concentrated) {
   console.log("PASS: concentrated A/R deterioration rejected");
 }
 
+const margin = detectMarginErosion(buildBaseMarginErosionInput());
+if (!margin || margin.id !== "margin_erosion" || margin.status !== "emerging" || margin.confidence !== "High" || margin.dataCompleteness !== "complete") {
+  failed++;
+  console.error("FAIL: complete margin erosion should be High/emerging/complete", margin);
+} else {
+  console.log("PASS: complete margin erosion -> High / emerging / complete");
+}
+
+const marginWorsening = margin ? detectMarginErosion(buildWorseningMarginErosionInput(margin)) : null;
+if (!marginWorsening || marginWorsening.status !== "worsening" || !/accelerated/i.test(marginWorsening.relationship) || !/window to act is narrowing/i.test(marginWorsening.decisionWindow)) {
+  failed++;
+  console.error("FAIL: worsening margin erosion should use accelerated/narrowing prose", marginWorsening);
+} else {
+  console.log("PASS: margin erosion worsening -> status-aware prose");
+}
+
+const marginStable = margin ? detectMarginErosion(buildStableMarginErosionInput(margin)) : null;
+if (!marginStable || marginStable.status !== "stable" || marginStable.relationship === margin?.relationship || !/persisting across briefings/i.test(marginStable.relationship)) {
+  failed++;
+  console.error("FAIL: stable margin erosion should use persistence prose", marginStable);
+} else {
+  console.log("PASS: margin erosion stable -> persistence prose");
+}
+
+const marginEasing = margin ? detectMarginErosion(buildEasingMarginErosionInput(margin)) : null;
+if (!marginEasing || marginEasing.status !== "easing" || marginEasing.relationship === margin?.relationship || !/not resolved/i.test(marginEasing.relationship)) {
+  failed++;
+  console.error("FAIL: easing margin erosion should use improvement/not-resolved prose", marginEasing);
+} else {
+  console.log("PASS: margin erosion easing -> improvement/not-resolved prose");
+}
+
+const marginMedium = detectMarginErosion(buildMediumMarginErosionInput());
+if (!marginMedium || marginMedium.confidence !== "Medium" || marginMedium.dataCompleteness !== "partial" || !marginMedium.evidenceChecked.some((item) => /could not determine which cost lines/i.test(item)) || !marginMedium.evidenceChecked.some((item) => /one-time or recurring/i.test(item))) {
+  failed++;
+  console.error("FAIL: missing COGS detail should produce Medium honesty output", marginMedium);
+} else {
+  console.log("PASS: missing COGS detail -> Medium honesty output");
+}
+
+const oneTime = detectMarginErosion(buildOneTimeCogsMarginErosionInput());
+if (oneTime) {
+  failed++;
+  console.error("FAIL: one-time COGS item explaining the decline should suppress the pattern", oneTime);
+} else {
+  console.log("PASS: one-time COGS decline -> no margin-erosion pattern");
+}
+
+const revenueDown = detectMarginErosion(buildRevenueDownMarginErosionInput());
+if (revenueDown) {
+  failed++;
+  console.error("FAIL: revenue-down case should suppress margin erosion", revenueDown);
+} else {
+  console.log("PASS: revenue decline -> margin-erosion suppression");
+}
+
 if (failed) process.exit(1);
-console.log("\n8/8 emerging-constraint scenarios passed.");
+console.log("\n15/15 emerging-constraint scenarios passed.");

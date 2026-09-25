@@ -154,7 +154,7 @@ export async function syncCompanyBriefing(companyId: string) {
     );
     if (previousResponse.ok) {
       const previousRows = await previousResponse.json() as Array<{ briefing?: any }>;
-      previousConstraint = previousRows[0]?.briefing?.emergingConstraints?.[0] || null;
+      previousConstraint = previousRows[0]?.briefing?.emergingConstraints || null;
     }
   } catch (error) {
     console.warn("[ClearCFO Jobs] Could not load prior constraint state:", error instanceof Error ? error.message : error);

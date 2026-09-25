@@ -3,7 +3,7 @@ export type ConstraintConfidence = "High" | "Medium";
 export type ConstraintDataCompleteness = "complete" | "partial" | "insufficient";
 
 export type EmergingConstraint = {
-  id: "cash_squeeze";
+  id: "cash_squeeze" | "margin_erosion";
   title: string;
   relationship: string;
   evidenceChecked: string[];
@@ -18,6 +18,8 @@ export type EmergingConstraint = {
   revenueDropPct?: number;
   arIncreasePct?: number;
   payrollIncreasePct?: number;
+  marginDropPts?: number;
+  revenueChangePct?: number;
 };
 
 type ReportRow = {
@@ -41,6 +43,15 @@ type Validation = {
   passed: boolean;
   available: boolean;
   detail: string;
+};
+
+export type MarginErosionInput = {
+  periods: string[];
+  revenue: number[];
+  grossMargin: number[];
+  profitAndLossDetail?: any;
+  previousConstraint?: EmergingConstraint | null;
+  now?: string;
 };
 
 export type CashSqueezeInput = {
@@ -209,6 +220,131 @@ function offsettingFinancing(report: any): Validation {
   return { passed: true, available: true, detail: "No positive financing inflow was detected in the latest cash-flow period." };
 }
 
+
+function cogsRows(report: any): ReportRow[] {
+  if (!report) return [];
+  return collectRows(report.Rows).filter((row) =>
+    row.type !== "Section" &&
+    /cogs|cost of goods|cost of sales|cost of revenue/i.test(row.label) &&
+    !/^total/i.test(row.label),
+  );
+}
+
+function marginStatusProse(
+  status: ConstraintStatus,
+  marginDropPts: number,
+  revenueChange: number,
+  previousMarginDropPts?: number,
+): { relationship: string; whyNow: string; decisionWindow: string } {
+  if (status === "worsening") {
+    const acceleration = previousMarginDropPts !== undefined
+      ? `Margin erosion accelerated from ${previousMarginDropPts.toFixed(1)} points to ${marginDropPts.toFixed(1)} points.`
+      : `Margin has now fallen ${marginDropPts.toFixed(1)} points.`;
+    return {
+      relationship: `Gross margin is eroding while revenue is holding up; ${acceleration} Standard P&L data cannot separate whether the pressure is from price, cost, or mix.`,
+      whyNow: `Gross margin is down ${marginDropPts.toFixed(1)} points over the last two periods while revenue is ${revenueChange >= 0 ? "up" : "down only " + Math.abs(revenueChange).toFixed(1) + "%"}; the erosion is worsening.`,
+      decisionWindow: "The window to act is narrowing: review the largest COGS movements and pricing before the margin pressure reaches net income.",
+    };
+  }
+  if (status === "easing") {
+    return {
+      relationship: "Gross margin pressure has improved from the prior briefing, but the margin-erosion constraint has not resolved. Standard P&L data cannot separate price, cost, or mix.",
+      whyNow: `The margin erosion is easing: the latest gross-margin drop is ${marginDropPts.toFixed(1)} points while revenue is ${revenueChange >= 0 ? "holding up" : "down only " + Math.abs(revenueChange).toFixed(1) + "%"}.`,
+      decisionWindow: "The pressure is easing, but continue reviewing COGS movements and pricing until the margin trend no longer meets the erosion threshold.",
+    };
+  }
+  if (status === "stable") {
+    return {
+      relationship: "Gross margin erosion is persisting across briefings while revenue continues to hold up. Standard P&L data cannot separate price, cost, or mix.",
+      whyNow: `The margin-erosion pattern persists across briefings: gross margin is down ${marginDropPts.toFixed(1)} points over the last two periods while revenue is ${revenueChange >= 0 ? "holding up" : "down only " + Math.abs(revenueChange).toFixed(1) + "%"}.`,
+      decisionWindow: "The constraint is persisting, so continue reviewing COGS movements and pricing before the pressure reaches net income.",
+    };
+  }
+  return {
+    relationship: "Gross margin is drifting down while revenue holds up, pointing to pressure within pricing or cost structure. Standard P&L data cannot separate price, cost, or mix.",
+    whyNow: `Gross margin is down ${marginDropPts.toFixed(1)} points over the last two periods while revenue is ${revenueChange >= 0 ? "up " + revenueChange.toFixed(1) + "%" : "down only " + Math.abs(revenueChange).toFixed(1) + "%"}.`,
+    decisionWindow: "Review the largest COGS movements and pricing before the margin pressure reaches net income.",
+  };
+}
+
+export function detectMarginErosion(input: MarginErosionInput): EmergingConstraint | null {
+  const now = input.now || new Date().toISOString();
+  const previous = input.previousConstraint || null;
+  const revenue = input.revenue;
+  const grossMargin = input.grossMargin;
+
+  if (revenue.length < 3 || grossMargin.length < 3 || !revenue.slice(-3).every(Number.isFinite) || !grossMargin.slice(-3).every(Number.isFinite)) {
+    if (previous?.id === "margin_erosion" && previous.status !== "resolved") {
+      return { ...previous, status: "resolved", statusDetail: "The required trend data is no longer available, so the prior margin-erosion pattern cannot be confirmed.", updatedAt: now };
+    }
+    return null;
+  }
+
+  const currentIndex = revenue.length - 1;
+  const twoBackIndex = revenue.length - 3;
+  const revenueChange = pct(revenue[currentIndex], revenue[twoBackIndex]);
+  const marginDropPts = grossMargin[twoBackIndex] - grossMargin[currentIndex];
+  if (revenueChange === null || revenueChange < -5 || marginDropPts < 3) {
+    if (previous?.id === "margin_erosion" && previous.status !== "resolved") {
+      return { ...previous, status: "resolved", statusDetail: "The margin-erosion thresholds are no longer met in the latest briefing.", updatedAt: now };
+    }
+    return null;
+  }
+
+  const rows = cogsRows(input.profitAndLossDetail);
+  const cogsBreadthAvailable = rows.length > 0;
+  const cogsChanges = rows.map((row) => ({
+    label: row.label,
+    change: (row.values[currentIndex] || 0) - (row.values[twoBackIndex] || 0),
+  })).filter((row) => row.change > 0);
+  const cogsBreadthPassed = cogsChanges.length > 0;
+  const cogsBreadthDetail = cogsBreadthAvailable
+    ? cogsBreadthPassed
+      ? `COGS detail shows ${cogsChanges.length} cost line${cogsChanges.length === 1 ? "" : "s"} increasing over the erosion period.`
+      : "We could not determine which cost lines drove the erosion."
+    : "We could not determine which cost lines drove the erosion.";
+
+  const grossProfitTwoBack = revenue[twoBackIndex] * (grossMargin[twoBackIndex] / 100);
+  const grossProfitCurrent = revenue[currentIndex] * (grossMargin[currentIndex] / 100);
+  const grossProfitDecline = Math.max(0, grossProfitTwoBack - grossProfitCurrent);
+  const oneTimeRows = rows.filter((row) => /one[ -]?time|unusual|non[- ]?recurring|nonrecurring|special charge/i.test(row.label) && ((row.values[currentIndex] || 0) - (row.values[twoBackIndex] || 0)) > 0);
+  const oneTimeExplains = oneTimeRows.some((row) => ((row.values[currentIndex] || 0) - (row.values[twoBackIndex] || 0)) >= grossProfitDecline);
+  const oneTimeCheckAvailable = cogsBreadthAvailable;
+  if (oneTimeExplains) return null;
+
+  const oneTimeDetail = oneTimeCheckAvailable
+    ? "No labeled one-time or unusual COGS line explains the gross-margin decline."
+    : "We could not determine whether the COGS movement was one-time or recurring.";
+
+  const confidence: ConstraintConfidence = cogsBreadthAvailable && cogsBreadthPassed && oneTimeCheckAvailable ? "High" : "Medium";
+  const dataCompleteness: ConstraintDataCompleteness = confidence === "High" ? "complete" : "partial";
+  const strength = Math.min(1, marginDropPts / 8);
+  const lifecycle = statusFromStrength(previous?.id === "margin_erosion" ? previous : null, strength);
+  const previousMarginDropPts = previous?.id === "margin_erosion" ? previous.marginDropPts : undefined;
+  const prose = marginStatusProse(lifecycle.status, marginDropPts, revenueChange, previousMarginDropPts);
+
+  return {
+    id: "margin_erosion",
+    title: "Margin erosion is emerging",
+    relationship: prose.relationship,
+    evidenceChecked: [
+      cogsBreadthDetail,
+      oneTimeDetail,
+      "Standard P&L data cannot separate price, cost, or mix as the underlying cause.",
+    ],
+    whyNow: prose.whyNow,
+    decisionWindow: prose.decisionWindow,
+    confidence,
+    dataCompleteness,
+    status: lifecycle.status,
+    statusDetail: lifecycle.detail,
+    strength,
+    updatedAt: now,
+    marginDropPts,
+    revenueChangePct: revenueChange,
+  };
+}
+
 function pct(current: number, prior: number): number | null {
   if (!Number.isFinite(current) || !Number.isFinite(prior) || prior === 0) return null;
   return ((current - prior) / Math.abs(prior)) * 100;
@@ -290,6 +426,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
   const dataCompleteness: ConstraintDataCompleteness = complete && !validationIncomplete ? "complete" : "partial";
   const strength = strengthScore(Math.abs(revenueDrop), arChange, payrollChange);
   const lifecycle = statusFromStrength(previous, strength);
+
   const priorArIncrease = previous?.arIncreasePct;
   const statusProse = lifecycle.status === "worsening"
     ? {
@@ -314,7 +451,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
             decisionWindow: "The constraint is persisting, so continue reviewing collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
           }
         : {
-            relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
+            relationship: statusProse.relationship,
             whyNow: "Revenue is down " + Math.abs(revenueDrop).toFixed(1) + "% over the last two periods, overdue A/R is up " + arChange.toFixed(1) + "%, and payroll is up " + payrollChange.toFixed(1) + "% while cash remains stable.",
             decisionWindow: "Review collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
           };
@@ -329,7 +466,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
   return {
     id: "cash_squeeze",
     title: "Cash constraint may be forming",
-    relationship: statusProse.relationship,
+    relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
     evidenceChecked,
     whyNow: statusProse.whyNow,
     decisionWindow: statusProse.decisionWindow,
