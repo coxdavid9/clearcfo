@@ -239,6 +239,19 @@ export default function CFOBriefing() {
       const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
       let cached: BriefingData | null = null;
       let cachedSyncedAt: string | null = null;
+      let excelCached: BriefingData | null = null;
+      let excelUploadedAt: string | null = null;
+      try {
+        const storedExcelBriefing = window.localStorage.getItem("clearcfo_excel_briefing");
+        if (storedExcelBriefing) {
+          const parsed = JSON.parse(storedExcelBriefing) as BriefingData;
+          if (parsed?.companyName && Array.isArray(parsed.alerts)) excelCached = parsed;
+        }
+        excelUploadedAt = window.localStorage.getItem("clearcfo_excel_uploaded_at");
+      } catch {
+        excelCached = null;
+        excelUploadedAt = null;
+      }
       try {
         if (cachedBriefing) cached = JSON.parse(cachedBriefing) as BriefingData;
         cachedSyncedAt = window.localStorage.getItem("clearcfo_qb_last_synced_at");
@@ -299,28 +312,33 @@ export default function CFOBriefing() {
       }
       if (!statusOk || !statusPayload?.connection?.connected) {
         if (statusOk) {
-          // The status check succeeded and QuickBooks is definitively
-          // disconnected: never render a stale cached briefing. (When the
-          // status check itself fails we keep the offline stale-cache
-          // fallback below.)
           evictQuickBooksCache();
-          setLiveSource("demo");
-          setHasValidAnalysis(false);
+        }
+        if (excelCached) {
+          setData(excelCached);
+          setLiveSource("upload");
+          setHasValidAnalysis(true);
           setError("");
           setSyncNotice("");
-          setLastSyncedLabel("");
+          setLastSyncedLabel(excelUploadedAt || "");
+          cacheAnalysisInput(excelCached);
           return;
         }
-        if (cached?.companyName && Array.isArray(cached.alerts)) {
+        if (!statusOk && cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
           cacheAnalysisInput(cached);
           setLastSyncedLabel(formatSyncedAt(cachedSyncedAt));
+        } else {
+          setLiveSource("demo");
+          setHasValidAnalysis(false);
+          setError("");
+          setSyncNotice("");
+          setLastSyncedLabel("");
         }
         return;
       }
-
       try {
         const response = await fetch("/api/quickbooks/sync", { cache: "no-store" });
         const payload = await response.json();
@@ -456,7 +474,14 @@ export default function CFOBriefing() {
       setLiveSource("upload");
       setHasValidAnalysis(true);
       setSyncNotice("");
-      setLastSyncedLabel("");
+      const uploadedAt = new Date().toISOString();
+      setLastSyncedLabel(uploadedAt);
+      try {
+        window.localStorage.setItem("clearcfo_excel_briefing", JSON.stringify(analyzed));
+        window.localStorage.setItem("clearcfo_excel_uploaded_at", uploadedAt);
+      } catch {
+        // Keep the in-session briefing usable if browser storage is unavailable.
+      }
       cacheAnalysisInput(analyzed);
       markBriefingReady();
     } catch (err) {
@@ -558,7 +583,7 @@ export default function CFOBriefing() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">TODAY&apos;S CFO BRIEFING</p>
-              <p className="mt-1 text-sm text-slate-500">{liveSource === "quickbooks" ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}` : liveSource === "upload" ? `${data.companyName} · Last analyzed: ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Demo data"}</p>
+              <p className="mt-1 text-sm text-slate-500">{liveSource === "quickbooks" ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}` : liveSource === "upload" ? `${data.companyName} · Last uploaded: ${lastSyncedLabel ? new Date(lastSyncedLabel).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "unknown"}` : "Demo data"}</p>
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
               <BusinessSwitcher />
