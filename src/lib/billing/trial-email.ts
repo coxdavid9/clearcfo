@@ -11,19 +11,19 @@ async function hasBriefing(userId:string){const r=await sb("company_memberships?
 export async function sendTrialEmail(s:Subscription,day:0|2|5|7){
   const to=await ownerEmail(s.user_id),date=chargeDate(s),amt=amount(s),plan=s.plan==="pro"?"Pro":"Core",interval=s.interval==="year"?"annual":"monthly",url=appUrl();
   const subject=day===0?"Welcome to ClearCFO — let's set up your briefing":day===2?"Your CFO Briefing is one step away":day===5?"Your ClearCFO trial ends in 2 days":"Your ClearCFO trial ends today";
-  const text=day===0?\`Your 7-day ${plan} trial has started. You won't be charged until ${date} — cancel anytime before then and you'll pay nothing.
+  const text=day===0?`Your 7-day ${plan} trial has started. You won't be charged until ${date} — cancel anytime before then and you'll pay nothing.
 
 Get your first CFO Briefing in a few minutes:
 1. Connect QuickBooks for live sync, or
 2. Upload a P&L in Excel — no QuickBooks needed.
 
-Open your briefing: ${url}\`:day===2?\`There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&L in Excel:
+Open your briefing: ${url}`:day===2?`There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&L in Excel:
 
-Open your briefing: ${url}\`:day===5?\`Your ${plan} trial ends on ${date}. After that, your plan continues at ${amt}. Cancel anytime from your Account page — cancel before ${date} and you won't be charged.\`:\`Your card will be charged ${amt} tomorrow for your ${plan} ${interval} plan. Cancel anytime from your Account page.\`;
+Open your briefing: ${url}`:day===5?`Your ${plan} trial ends on ${date}. After that, your plan continues at ${amt}. Cancel anytime from your Account page — cancel before ${date} and you won't be charged.`:`Your card will be charged ${amt} tomorrow for your ${plan} ${interval} plan. Cancel anytime from your Account page.`;
   const e={url:escapeHtml(url),plan:escapeHtml(plan),date:escapeHtml(date),amount:escapeHtml(amt),interval:escapeHtml(interval)};
   const c='display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;';
-  const button=\`<p><a href="${e.url}" style="${c}">Open your briefing</a></p>\`;
-  const html=day===0?\`<p>Your 7-day ${e.plan} trial has started. You won't be charged until ${e.date} — cancel anytime before then and you'll pay nothing.</p><p>Get your first CFO Briefing in a few minutes:</p><p>1. Connect QuickBooks for live sync, or<br>2. Upload a P&amp;L in Excel — no QuickBooks needed.</p>${button}\`:day===2?\`<p>There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&amp;L in Excel:</p>${button}\`:day===5?\`<p>Your ${e.plan} trial ends on ${e.date}. After that, your plan continues at ${e.amount}. Cancel anytime from your Account page — cancel before ${e.date} and you won't be charged.</p>${button}\`:\`<p>Your card will be charged ${e.amount} tomorrow for your ${e.plan} ${e.interval} plan. Cancel anytime from your Account page.</p>${button}\`;
+  const button=`<p><a href="${e.url}" style="${c}">Open your briefing</a></p>`;
+  const html=day===0?`<p>Your 7-day ${e.plan} trial has started. You won't be charged until ${e.date} — cancel anytime before then and you'll pay nothing.</p><p>Get your first CFO Briefing in a few minutes:</p><p>1. Connect QuickBooks for live sync, or<br>2. Upload a P&amp;L in Excel — no QuickBooks needed.</p>${button}`:day===2?`<p>There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&amp;L in Excel:</p>${button}`:day===5?`<p>Your ${e.plan} trial ends on ${e.date}. After that, your plan continues at ${e.amount}. Cancel anytime from your Account page — cancel before ${e.date} and you won't be charged.</p>${button}`:`<p>Your card will be charged ${e.amount} tomorrow for your ${e.plan} ${e.interval} plan. Cancel anytime from your Account page.</p>${button}`;
   await sendEmail({to,subject,text,html});
   const column=day===0?"trial_email_day0_sent_at":day===2?"trial_email_day2_sent_at":day===5?"trial_email_day5_sent_at":"trial_email_day7_sent_at";
   await mark(s.user_id,column);
