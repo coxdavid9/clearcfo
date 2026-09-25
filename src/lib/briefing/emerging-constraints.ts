@@ -154,7 +154,7 @@ function agingBroadBased(current: AgingSnapshot, previous: AgingSnapshot): Valid
   if (topShare > 0.6) {
     return { passed: false, available: true, detail: "A/R deterioration is concentrated in one customer rather than broadly distributed." };
   }
-  return { passed: true, available: true, detail: \`A/R deterioration is broad-based across ${increases.length} customers; the largest customer's share of the increase is ${Math.round(topShare * 100)}%.\` };
+  return { passed: true, available: true, detail: `A/R deterioration is broad-based across ${increases.length} customers; the largest customer's share of the increase is ${Math.round(topShare * 100)}%.` };
 }
 
 function payrollSeries(report: any): { periods: string[]; values: number[] } | null {
@@ -186,7 +186,7 @@ function payrollRecurring(report: any): Validation {
   if (currentChange < 5 || priorChange < 0) {
     return { passed: false, available: true, detail: "Payroll is not showing a recurring increase across the last two period changes." };
   }
-  return { passed: true, available: true, detail: \`Payroll increased ${currentChange.toFixed(1)}% in the latest period after a ${priorChange.toFixed(1)}% increase in the preceding period.\` };
+  return { passed: true, available: true, detail: `Payroll increased ${currentChange.toFixed(1)}% in the latest period after a ${priorChange.toFixed(1)}% increase in the preceding period.` };
 }
 
 function offsettingFinancing(report: any): Validation {
@@ -197,11 +197,11 @@ function offsettingFinancing(report: any): Validation {
   const rows = collectRows(report.Rows);
   const latestIndex = periods.length ? periods.length - 1 : 0;
   const financingRows = rows.filter((row) =>
-    /financingactivities|financing activities|loan proceeds|owner contribution|capital contribution|investor funding|proceeds from/i.test(\`${clean(row.group)} ${clean(row.label)}\`)
+    /financingactivities|financing activities|loan proceeds|owner contribution|capital contribution|investor funding|proceeds from/i.test(`${clean(row.group)} ${clean(row.label)}`)
   );
   const financingInflow = financingRows.reduce((sum, row) => sum + Math.max(0, row.values[latestIndex] || 0), 0);
   if (financingInflow > 0) {
-    return { passed: false, available: true, detail: \`An offsetting financing inflow of $${Math.round(financingInflow).toLocaleString("en-US")} was detected.\` };
+    return { passed: false, available: true, detail: `An offsetting financing inflow of $${Math.round(financingInflow).toLocaleString("en-US")} was detected.` };
   }
   return { passed: true, available: true, detail: "No positive financing inflow was detected in the latest cash-flow period." };
 }
@@ -223,8 +223,8 @@ function statusFromStrength(previous: EmergingConstraint | null, currentStrength
     return { status: "emerging", detail: "First detected in this briefing." };
   }
   const delta = currentStrength - previous.strength;
-  if (delta >= 0.1) return { status: "worsening", detail: \`Pattern strength increased ${Math.round(delta * 100)} points since the last briefing.\` };
-  if (delta <= -0.1) return { status: "easing", detail: \`Pattern strength decreased ${Math.round(Math.abs(delta) * 100)} points since the last briefing.\` };
+  if (delta >= 0.1) return { status: "worsening", detail: `Pattern strength increased ${Math.round(delta * 100)} points since the last briefing.` };
+  if (delta <= -0.1) return { status: "easing", detail: `Pattern strength decreased ${Math.round(Math.abs(delta) * 100)} points since the last briefing.` };
   return { status: "stable", detail: "Pattern strength is broadly unchanged since the last briefing." };
 }
 
@@ -290,7 +290,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
     arValidation.detail,
     payrollValidation.detail,
     financingValidation.detail,
-    \`Cash balance has not declined: $${Math.round(cash[cash.length - 2]).toLocaleString("en-US")} to $${Math.round(cash[cash.length - 1]).toLocaleString("en-US")}.\`,
+    `Cash balance has not declined: $${Math.round(cash[cash.length - 2]).toLocaleString("en-US")} to $${Math.round(cash[cash.length - 1]).toLocaleString("en-US")}.`,
   ];
 
   return {
@@ -298,7 +298,7 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
     title: "Cash constraint may be forming",
     relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
     evidenceChecked,
-    whyNow: \`Revenue is down ${Math.abs(revenueDrop).toFixed(1)}% over the last two periods, overdue A/R is up ${arChange.toFixed(1)}%, and payroll is up ${payrollChange.toFixed(1)}% while cash remains stable.\`,
+    whyNow: `Revenue is down ${Math.abs(revenueDrop).toFixed(1)}% over the last two periods, overdue A/R is up ${arChange.toFixed(1)}%, and payroll is up ${payrollChange.toFixed(1)}% while cash remains stable.`,
     decisionWindow: "Review collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
     confidence,
     dataCompleteness,
