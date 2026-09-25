@@ -397,6 +397,116 @@ function healthFrom(alerts: string[], drivers: FinancialDriver[]): string {
   return "strong";
 }
 
+function buildSustainedTrendDrivers(
+  revenueValues: number[],
+  grossProfitValues: number[],
+  labels: string[],
+  workbook: XLSX.WorkBook,
+): FinancialDriver[] {
+  const drivers: FinancialDriver[] = [];
+  const revenue = revenueValues.slice(-6);
+  const grossProfitValues6 = grossProfitValues.slice(-6);
+  const periods = labels.slice(-6);
+  if (revenue.length < 4 || periods.length < 4) return drivers;
+
+  const moves = revenue.slice(1).map((value, index) => value - (revenue[index] ?? 0));
+  const declineMoves = moves.filter((value) => value < 0).length;
+  let consecutiveDeclines = 0;
+  for (let index = moves.length - 1; index >= 0 && moves[index] < 0; index -= 1) consecutiveDeclines += 1;
+
+  const peakRevenue = Math.max(...revenue);
+  const latestRevenue = revenue[revenue.length - 1] ?? 0;
+  const revenueDrop = Math.max(0, peakRevenue - latestRevenue);
+  const revenueOffPeak = peakRevenue !== 0 ? (revenueDrop / Math.abs(peakRevenue)) * 100 : 0;
+
+  if (consecutiveDeclines >= 3 || declineMoves >= 4) {
+    drivers.push({
+      id: "excel-revenue-decline-streak",
+      category: "Revenue",
+      title: "Revenue is in a sustained decline",
+      observation: `Revenue declined from a trailing-6-period peak of ${formatCurrency(peakRevenue)} to ${formatCurrency(latestRevenue)} (${formatPercentValue(-revenueOffPeak)} from peak).`,
+      evidence: [
+        `Revenue peak: ${formatCurrency(peakRevenue)}`,
+        `Revenue latest: ${formatCurrency(latestRevenue)}`,
+        `Revenue declined in ${declineMoves} of the last ${moves.length} moves`,
+      ],
+      direction: "down",
+      severity: revenueOffPeak >= 15 ? "High" : "Medium",
+      impact: Math.min(10, Math.max(1, Math.round(revenueDrop / 25000))),
+      confidence: 0.93,
+      managementQuestion: "What is driving the sustained revenue decline, and which demand or customer trends need action?",
+    });
+  }
+
+  const inventorySheet = findSheet(workbook, ["Inventory_Summary"]);
+  if (inventorySheet) {
+    const inventoryRows = sheetRows(inventorySheet);
+    const inventoryHeaderIndex = findHeaderIndex(inventoryRows, ["Month", "Date", "Period", "Account"]);
+    const inventoryLabels = periodLabels(inventoryRows, inventoryHeaderIndex);
+    const inventoryRow = findDataRow(inventoryRows, [/ending inventory/i, /^inventory$/i, /total inventory/i]);
+    if (inventoryRow && inventoryLabels.length >= 5) {
+      const inventoryTrend = safeTrend(rowValues(inventoryRow, inventoryLabels.length), inventoryLabels);
+      const inventory = inventoryTrend.values.slice(-6);
+      const alignedRevenue = revenueValues.slice(-inventory.length);
+      const inventoryMoves = inventory.slice(1).map((value, index) => value - (inventory[index] ?? 0));
+      const risingMoves = inventoryMoves.slice(-5).filter((value) => value > 0).length;
+      const revenueWindowDrop = alignedRevenue.length >= 2
+        ? (alignedRevenue[alignedRevenue.length - 1] ?? 0) < (alignedRevenue[0] ?? 0)
+        : false;
+      if (inventory.length >= 5 && risingMoves >= 4 && revenueWindowDrop) {
+        const inventoryThen = inventory[0] ?? 0;
+        const inventoryNow = inventory[inventory.length - 1] ?? 0;
+        const revenueThen = alignedRevenue[0] ?? 0;
+        drivers.push({
+          id: "excel-inventory-into-soft-demand",
+          category: "Inventory",
+          title: "Inventory is building while demand softens",
+          observation: `Ending inventory rose from ${formatCurrency(inventoryThen)} to ${formatCurrency(inventoryNow)} while revenue fell from ${formatCurrency(revenueThen)} to ${formatCurrency(latestRevenue)} over the same trailing window.`,
+          evidence: [
+            `Ending inventory: ${formatCurrency(inventoryThen)} → ${formatCurrency(inventoryNow)}`,
+            `Revenue: ${formatCurrency(revenueThen)} → ${formatCurrency(latestRevenue)}`,
+            `Inventory rose in ${risingMoves} of the last 5 moves`,
+          ],
+          direction: "up",
+          severity: "High",
+          impact: Math.min(10, Math.max(1, Math.round(Math.abs(inventoryNow - inventoryThen) / 25000))),
+          confidence: 0.92,
+          managementQuestion: "What is driving the inventory build while demand is weakening, and where can purchasing or production be slowed?",
+        });
+      }
+    }
+  }
+
+  const margins = revenue.map((value, index) => {
+    const gp = grossProfitValues6[index] ?? 0;
+    return value !== 0 ? (gp / value) * 100 : Number.NaN;
+  }).filter(Number.isFinite);
+
+  if (margins.length >= 4) {
+    const latestMargin = margins[margins.length - 1] ?? 0;
+    const trailingHigh = Math.max(...margins);
+    const compression = trailingHigh - latestMargin;
+    if (compression >= 2) {
+      drivers.push({
+        id: "excel-sustained-margin-compression",
+        category: "Margin",
+        title: "Gross margin remains below its trailing high",
+        observation: `Gross margin is ${formatPercentValue(-compression)} below its trailing-6-period high (${formatPercentValue(latestMargin)} latest vs ${formatPercentValue(trailingHigh)} high).`,
+        evidence: [
+          `Trailing-6-period high: ${formatPercentValue(trailingHigh)}`,
+          `Latest gross margin: ${formatPercentValue(latestMargin)}`,
+        ],
+        direction: "down",
+        severity: compression >= 5 ? "High" : "Medium",
+        impact: Math.min(10, Math.max(1, Math.round(compression))),
+        confidence: 0.9,
+        managementQuestion: "What is sustaining the margin compression, and is it coming from pricing, mix, or direct costs?",
+      });
+    }
+  }
+  return drivers;
+}
+
 function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookForSeries: XLSX.WorkBook): BriefingData {
   const headerIndex = findHeaderIndex(rows, ["Month", "Date", "Period", "Account"]);
   const labels = periodLabels(rows, headerIndex);
@@ -431,6 +541,8 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const inventoryChange = changePercent(inventory, previousInventory);
   const expenseChange = changePercent(expense, previousExpense);
   const drivers = buildDrivers(revenue, previousRevenue, revenueChange, marginChange, cash, previousCash, cashChange, inventory, previousInventory, inventoryChange, expense, previousExpense, expenseChange);
+  const sustainedDrivers = buildSustainedTrendDrivers(revenueValues, grossProfitValues, labels, workbookForSeries);
+  const allDrivers = [...drivers, ...sustainedDrivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
   const trend = safeTrend(revenueValues, labels);
   return {
@@ -447,15 +559,15 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
     previousOperatingExpense: previousExpense,
     attention: alerts.length,
     alerts,
-    recommendation: drivers[0]?.observation || "Review the latest financial signals and determine the most important management action.",
-    impact: drivers[0]?.impact || 0,
-    impactReason: drivers[0]?.observation || "No major exceptions were detected.",
+    recommendation: allDrivers[0]?.observation || "Review the latest financial signals and determine the most important management action.",
+    impact: allDrivers[0]?.impact || 0,
+    impactReason: allDrivers[0]?.observation || "No major exceptions were detected.",
     trend: trend.values,
     periods: trend.labels,
-    health: healthFrom(alerts, drivers),
+    health: healthFrom(alerts, allDrivers),
     confidence: 0.8,
     source: "upload",
-    drivers,
+    drivers: allDrivers,
     relationships: [],
     detailDrivers: [],
     trendInsights: [],
