@@ -631,19 +631,42 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   };
 }
 
-function detailRowsFromSheet(sheet: XLSX.WorkSheet): Array<{ label: string; current: number; previous: number }> {
+function detailRowsFromSheet(sheet: XLSX.WorkSheet, inventory = false): Array<{ label: string; current: number; previous: number }> {
   const rows = sheetRows(sheet);
   if (!rows.length) return [];
   const headerIndex = findPeriodHeaderIndex(rows);
   const labels = periodLabels(rows, headerIndex);
   if (!labels.length) return [];
 
+  const header = rows[headerIndex] || [];
+  const unitCostIndex = inventory
+    ? header.findIndex((cell) => /unit.?cost|cost per unit|^unit price$/i.test(normalizeText(cell)))
+    : -1;
+  const periodIndexes = unitCostIndex >= 0
+    ? header.map((cell, index) => index > unitCostIndex && normalizeText(cell) ? index : -1).filter((index) => index >= 0)
+    : [];
+
   return rows
     .filter((row) => row.length >= 2)
     .map((row) => {
       const label = normalizeText(row[0]);
+      if (unitCostIndex >= 0 && periodIndexes.length >= 2) {
+        const unitCost = toNumber(row[unitCostIndex]);
+        const currentQuantity = toNumber(row[periodIndexes[periodIndexes.length - 1]]);
+        const previousQuantity = toNumber(row[periodIndexes[periodIndexes.length - 2]]);
+        return {
+          label,
+          current: unitCost * currentQuantity,
+          previous: unitCost * previousQuantity,
+        };
+      }
+
       const values = rowValues(row, labels.length);
-      return { label, current: values[values.length - 1] ?? 0, previous: values.length > 1 ? values[values.length - 2] ?? 0 : 0 };
+      return {
+        label,
+        current: values[values.length - 1] ?? 0,
+        previous: values.length > 1 ? values[values.length - 2] ?? 0 : 0,
+      };
     })
     .filter((row) => row.label && Number.isFinite(row.current) && row.current !== 0)
     .filter((row) => !/^total|^net income|^gross profit|^operating income|^revenue|^sales|^cogs/i.test(row.label));
@@ -693,7 +716,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
     if (!sheet) continue;
     const rows = sheetRows(sheet);
     const type = classifyExcelSheet(sheetName, rows);
-    const candidates = detailRowsFromSheet(sheet)
+    const candidates = detailRowsFromSheet(sheet, type === "inventory")
       .filter((row) => !/total|subtotal|ending|balance|units/i.test(row.label) && !row.label.includes("%"))
       .sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
     if (!candidates.length) continue;
