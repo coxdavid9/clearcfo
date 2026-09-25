@@ -40,7 +40,7 @@ type Validation = {
   detail: string;
 };
 
-type CashSqueezeInput = {
+export type CashSqueezeInput = {
   periods: string[];
   revenue: number[];
   cash: number[];
