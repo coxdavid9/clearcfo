@@ -670,14 +670,31 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
   const details: DetailDriver[] = [];
   const relationships: string[] = [];
   const questions: Array<{ category: string; question: string }> = [];
+  const questionSources = new Map<string, { sheetName: string; candidateCount: number }>();
   const unknowns: string[] = [];
+
+  const addQuestion = (category: string, question: string, sheetName: string, candidateCount: number) => {
+    const existing = questionSources.get(category);
+    const isMoreGranular = /sku|item|detail/i.test(sheetName) && !(existing && /sku|item|detail/i.test(existing.sheetName));
+    const isBetterFallback = !existing || (candidateCount > existing.candidateCount && !/sku|item|detail/i.test(existing.sheetName));
+    if (!isMoreGranular && !isBetterFallback) return;
+    if (existing) {
+      const index = questions.findIndex((entry) => entry.category === category);
+      if (index >= 0) questions[index] = { category, question };
+    } else {
+      questions.push({ category, question });
+    }
+    questionSources.set(category, { sheetName, candidateCount });
+  };
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
     const rows = sheetRows(sheet);
     const type = classifyExcelSheet(sheetName, rows);
-    const candidates = detailRowsFromSheet(sheet).sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
+    const candidates = detailRowsFromSheet(sheet)
+      .filter((row) => !/total|subtotal|ending|balance|units/i.test(row.label) && !row.label.includes("%"))
+      .sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
     if (!candidates.length) continue;
 
     if (type === "customer") {
@@ -698,7 +715,8 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           managementQuestion: "Are these customer movements recurring, or are they tied to one-time orders or timing?",
         });
         relationships.push("Customer-level revenue movement can be reviewed alongside total revenue to determine whether growth is broad-based or concentrated.");
-        questions.push({ category: "Revenue", question: `Are the largest customer movements in ${sheetName} expected to continue, or are they tied to one-time orders or timing?` });
+        const top3 = [...increases, ...decreases].sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous)).slice(0, 3);
+        addQuestion("Revenue", `The largest customer movements are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they expected to continue, or are they tied to one-time orders or timing?`, sheetName, candidates.length);
       }
     }
 
@@ -718,7 +736,8 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           confidence: 0.88, managementQuestion: "Are these expense increases recurring, discretionary, or timing-related?",
         });
         relationships.push("The largest expense-account movements should be compared with revenue growth to determine whether operating costs are scaling with the business.");
-        questions.push({ category: "Expenses", question: `Are the largest expense increases in ${sheetName} recurring, discretionary, or timing-related?` });
+        const top3 = increases.slice(0, 3);
+        addQuestion("Expenses", `The largest expense increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, discretionary, or timing-related?`, sheetName, candidates.length);
       }
     }
 
@@ -738,7 +757,8 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           confidence: 0.84, managementQuestion: "What is driving these vendor spend increases, and are they expected to persist?",
         });
         relationships.push("Vendor-level spend detail can identify whether expense growth is concentrated in a small number of suppliers.");
-        questions.push({ category: "Vendors", question: `Are the largest vendor spend increases in ${sheetName} recurring, and are they expected to persist?` });
+        const top3 = increases.slice(0, 3);
+        addQuestion("Vendors", `The largest vendor spend increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, and are they expected to persist?`, sheetName, candidates.length);
       }
     }
 
@@ -753,7 +773,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         managementQuestion: "When are the largest balances expected to convert to cash, and which need collection action?",
       });
       relationships.push("Receivables detail provides a direct bridge between reported sales activity and the timing of cash collection.");
-      questions.push({ category: "Cash", question: `When are the largest receivable balances in ${sheetName} expected to convert to cash, and which need collection action?` });
+      addQuestion("Cash", `The largest receivable balances are ${balances.slice(0, 3).map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — when are they expected to convert to cash, and which need collection action?`, sheetName, candidates.length);
       for (const row of balances) details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
     }
 
@@ -768,7 +788,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           managementQuestion: "Are the largest-stock items moving at the expected rate, and should purchasing slow for any of them?",
         });
         relationships.push("Inventory detail can be compared with revenue growth to identify stock that may be building faster than demand.");
-        questions.push({ category: "Inventory", question: `Are the largest inventory balances in ${sheetName} moving at the expected rate, and should purchasing slow for any of them?` });
+        addQuestion("Inventory", `The largest inventory balances are ${balances.slice(0, 3).map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are those items moving at the expected rate, and should purchasing slow for any of them?`, sheetName, candidates.length);
         for (const row of balances) details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
       }
     }
