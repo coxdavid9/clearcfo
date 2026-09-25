@@ -120,9 +120,9 @@ export default function CFOBriefing() {
     };
     const label = metricLabels[activeMetricKey] || "Revenue";
     return data.trendSeries?.find((series) => series.name === label) || {
-      name: "Revenue",
-      values: data.trend,
-      periods: data.periods,
+      name: label,
+      values: [],
+      periods: [],
     };
   }, [activeMetricKey, data.trendSeries, data.trend, data.periods]);
 
@@ -642,12 +642,28 @@ export default function CFOBriefing() {
 
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7" aria-labelledby="trend-heading">
             <div className="flex items-start justify-between gap-4"><div><p id="trend-heading" className="text-sm font-semibold text-slate-900">{activeMetric.name} trend</p><p className="mt-1 text-xs text-slate-500">Trailing {trendValues.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange, activeMetricKey, activeMetricDefinition.current)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
-            <div className="relative mt-5 h-60 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60 pl-14">
-              <div className="pointer-events-none absolute left-2 top-2 bottom-8 flex flex-col justify-between text-[10px] font-medium text-slate-400">
-                <span>{formatTrendValue(activeMetricKey, trendValues.length ? Math.max(...trendValues) : 0)}</span>
-                <span>{formatTrendValue(activeMetricKey, trendValues.length ? (Math.min(...trendValues) + Math.max(...trendValues)) / 2 : 0)}</span>
-                <span>{formatTrendValue(activeMetricKey, trendValues.length ? Math.min(...trendValues) : 0)}</span>
-              </div>
+            <div className="relative mt-5 h-60 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
+              {trendValues.length ? (
+                <>
+                  <div className="pointer-events-none absolute left-2 top-2 bottom-8 flex flex-col justify-between text-[10px] font-medium text-slate-400">
+                    <span>{formatTrendValue(activeMetricKey, Math.max(...trendValues))}</span>
+                    <span>{formatTrendValue(activeMetricKey, (Math.min(...trendValues) + Math.max(...trendValues)) / 2)}</span>
+                    <span>{formatTrendValue(activeMetricKey, Math.min(...trendValues))}</span>
+                  </div>
+                  <div className="h-full pl-14">
+                    <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label={`${activeMetric.name} trend over available periods`} preserveAspectRatio="none">
+                      <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
+                      {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+                      {trendPoints.map((point, index) => <circle key={`${trendPeriods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"}><title>{`${trendPeriods[index] || "Period"}: ${formatTrendValue(activeMetricKey, point.value)}`}</title></circle>)}
+                    </svg>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-full items-center justify-center px-6 text-center">
+                  <p className="max-w-md text-sm leading-6 text-slate-500">No {activeMetric.name} trend available — connect QuickBooks or upload a file with balance-sheet data.</p>
+                </div>
+              )}
+            </div>
               <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label={`${activeMetric.name} trend over available periods`} preserveAspectRatio="none">
                 <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
                 {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
