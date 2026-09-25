@@ -715,8 +715,8 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           managementQuestion: "Are these customer movements recurring, or are they tied to one-time orders or timing?",
         });
         relationships.push("Customer-level revenue movement can be reviewed alongside total revenue to determine whether growth is broad-based or concentrated.");
-        const top3 = [...increases, ...decreases].sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous)).slice(0, 3);
-        addQuestion("Revenue", `The largest customer movements are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they expected to continue, or are they tied to one-time orders or timing?`, sheetName, candidates.length);
+        const questionTop3 = [...increases, ...decreases].sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous)).slice(0, 3);
+        addQuestion("Revenue", `The largest customer movements are ${questionTop3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they expected to continue, or are they tied to one-time orders or timing?`, sheetName, candidates.length);
       }
     }
 
@@ -736,8 +736,8 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           confidence: 0.88, managementQuestion: "Are these expense increases recurring, discretionary, or timing-related?",
         });
         relationships.push("The largest expense-account movements should be compared with revenue growth to determine whether operating costs are scaling with the business.");
-        const top3 = increases.slice(0, 3);
-        addQuestion("Expenses", `The largest expense increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, discretionary, or timing-related?`, sheetName, candidates.length);
+        const questionTop3 = increases.slice(0, 3);
+        addQuestion("Expenses", `The largest expense increases are ${questionTop3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, discretionary, or timing-related?`, sheetName, candidates.length);
       }
     }
 
@@ -757,8 +757,8 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
           confidence: 0.84, managementQuestion: "What is driving these vendor spend increases, and are they expected to persist?",
         });
         relationships.push("Vendor-level spend detail can identify whether expense growth is concentrated in a small number of suppliers.");
-        const top3 = increases.slice(0, 3);
-        addQuestion("Vendors", `The largest vendor spend increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, and are they expected to persist?`, sheetName, candidates.length);
+        const questionTop3 = increases.slice(0, 3);
+        addQuestion("Vendors", `The largest vendor spend increases are ${questionTop3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, and are they expected to persist?`, sheetName, candidates.length);
       }
     }
 
