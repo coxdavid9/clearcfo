@@ -29,7 +29,9 @@ jobs:
         run: npm run test:security
 
       - name: Run deterministic financial engine regression tests
-        run: node scripts/financial-engine-scenarios.mjs
+        run: |
+          node scripts/financial-engine-scenarios.mjs
+          node --experimental-strip-types scripts/emerging-constraints-scenarios.mjs
 
       - name: Run Excel header regression test
         run: npm run test:excel-header
