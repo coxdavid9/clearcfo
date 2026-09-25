@@ -270,7 +270,7 @@ function findHeaderIndex(rows: unknown[][], candidates: string[]): number {
   return rows.findIndex((row) => row.some((cell) => normalized.includes(normalizeText(cell).toLowerCase())));
 }
 
-function findPeriodHeaderIndex(rows: unknown[][]): number {
+export function findPeriodHeaderIndex(rows: unknown[][]): number {
   const monthYearText = /^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[ -]?\d{2,4}$/i;
   const numericMonthYear = /^(?:0?[1-9]|1[0-2])\/\d{2,4}$/;
   const isoMonth = /^\d{4}-\d{2}$/;
