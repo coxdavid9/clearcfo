@@ -189,7 +189,7 @@ export default function CFOBriefing() {
         question: `Revenue is ${currency.format(data.revenue)} and moved ${changeDescription(data.revenue, data.revenueChange)} versus the prior period. What changed in customer volume, pricing, or mix to produce that movement?`,
       });
     }
-    if (Number.isFinite(data.operatingExpense) && Number.isFinite(data.previousOperatingExpense)) {
+    if (Number.isFinite(data.operatingExpense) && Number.isFinite(data.previousOperatingExpense) && (currentExpense !== 0 || previousExpense !== 0)) {
       const currentExpense = data.operatingExpense ?? 0;
       const previousExpense = data.previousOperatingExpense ?? 0;
       const delta = currentExpense - previousExpense;
