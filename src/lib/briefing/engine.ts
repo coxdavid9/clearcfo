@@ -716,7 +716,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
     if (!sheet) continue;
     const rows = sheetRows(sheet);
     const type = classifyExcelSheet(sheetName, rows);
-    const candidates = detailRowsFromSheet(sheet)
+    const candidates = detailRowsFromSheet(sheet, type === "inventory")
       .filter((row) => !/total|subtotal|ending|balance|units/i.test(row.label) && !row.label.includes("%"))
       .sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
     if (!candidates.length) continue;
