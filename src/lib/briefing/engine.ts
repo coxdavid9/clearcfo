@@ -850,10 +850,20 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   }
   const balanceSheet = findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
   let cashOverride: { cash: number; previousCash: number; cashChange: number } | null = null;
+  let periodMismatchUnknown: string | null = null;
   if (balanceSheet) {
     const balanceRows = sheetRows(balanceSheet);
     const balanceHeaderIndex = findPeriodHeaderIndex(balanceRows);
     const balanceLabels = periodLabels(balanceRows, balanceHeaderIndex);
+    const pnlHeaderIndex = findPeriodHeaderIndex(rows);
+    const pnlLabels = periodLabels(rows, pnlHeaderIndex);
+    if (balanceLabels.length && pnlLabels.length) {
+      const balanceRange = `${balanceLabels[0]}–${balanceLabels[balanceLabels.length - 1]}`;
+      const pnlRange = `${pnlLabels[0]}–${pnlLabels[pnlLabels.length - 1]}`;
+      if (balanceRange !== pnlRange) {
+        periodMismatchUnknown = `The balance sheet covers ${balanceRange} while the P&L covers ${pnlRange}; cash figures use the balance sheet's latest periods.`;
+      }
+    }
     const cashRow = findDataRow(balanceRows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
     if (cashRow && balanceLabels.length >= 2) {
       const values = rowValues(cashRow, balanceLabels.length);
@@ -886,7 +896,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     managementQuestions: detailed.questions,
     relationships: [...base.relationships, ...detailed.relationships].slice(0, 8),
     detailDrivers: detailed.details,
-    unknowns: Array.from(new Set([...detailed.unknowns, ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown (shown as $0)."] : [])])).slice(0, 10),
+    unknowns: Array.from(new Set([...detailed.unknowns, ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown (shown as $0)."] : []), ...(periodMismatchUnknown ? [periodMismatchUnknown] : [])])).slice(0, 10),
     dataAvailability,
   };
 }

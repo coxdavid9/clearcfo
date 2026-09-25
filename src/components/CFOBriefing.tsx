@@ -85,6 +85,7 @@ export default function CFOBriefing() {
   const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedFileLabel, setSelectedFileLabel] = useState("");
   const [error, setError] = useState("");
   const [syncNotice, setSyncNotice] = useState("");
   const [lastSyncedLabel, setLastSyncedLabel] = useState("");
@@ -458,8 +459,8 @@ export default function CFOBriefing() {
   }, [billingLoading, billingLocked]);
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
     setUploading(true);
     setHasValidAnalysis(false);
     setError("");
@@ -467,11 +468,45 @@ export default function CFOBriefing() {
     setOnboardingStep("building");
     try { sessionStorage.setItem("clearcfo_onboarding_syncing", "1"); } catch {}
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { cellDates: true });
+      const workbook = XLSX.utils.book_new();
+      const usedSheetNames = new Set<string>();
+
+      const appendSheet = (sheet: XLSX.WorkSheet, requestedName: string) => {
+        // First file wins on sheet-name collisions; later sheets are suffixed.
+        const baseName = requestedName.replace(/[\\/?*\[\]:]/g, " ").trim().slice(0, 31) || "Sheet";
+        let sheetName = baseName;
+        let suffix = 2;
+        while (usedSheetNames.has(sheetName)) {
+          const suffixText = ` (${suffix++})`;
+          sheetName = `${baseName.slice(0, Math.max(1, 31 - suffixText.length))}${suffixText}`;
+        }
+        usedSheetNames.add(sheetName);
+        XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+      };
+
+      for (const file of files) {
+        const buffer = await file.arrayBuffer();
+        const parsed = XLSX.read(buffer, { cellDates: true });
+        const isCsv = /\.csv$/i.test(file.name);
+        if (isCsv) {
+          const sheet = parsed.Sheets[parsed.SheetNames[0]];
+          if (sheet) appendSheet(sheet, file.name.replace(/\.[^.]+$/, ""));
+          continue;
+        }
+        for (const sheetName of parsed.SheetNames) {
+          const sheet = parsed.Sheets[sheetName];
+          if (sheet) appendSheet(sheet, sheetName);
+        }
+      }
+
+      if (!workbook.SheetNames.length) {
+        throw new Error("We couldn't find a readable worksheet in the selected files. Please check the file format and sheet names.");
+      }
+
       const analyzed = analyzeWorkbook(workbook);
       setData(analyzed);
       setLiveSource("upload");
+      setSelectedFileLabel(files.length === 1 ? files[0].name : `${files.length} files: ${files.map((file) => file.name).join(", ")}`);
       setHasValidAnalysis(true);
       setSyncNotice("");
       const uploadedAt = new Date().toISOString();
@@ -568,7 +603,7 @@ export default function CFOBriefing() {
   if (!hasValidAnalysis) {
     return (
       <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        <input ref={fileRef} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
         {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
         <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
       </div>
@@ -587,6 +622,7 @@ export default function CFOBriefing() {
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
               <BusinessSwitcher />
+              {selectedFileLabel && liveSource === "upload" ? <p className="max-w-xs truncate text-xs text-slate-400" title={selectedFileLabel}>{selectedFileLabel}</p> : null}
               <button type="button" onClick={() => fileRef.current?.click()} className={liveSource === "quickbooks" ? "text-sm font-semibold text-slate-500 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30" : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"}>{uploading ? "Analyzing…" : "Upload Excel"}</button>
             </div>
           </div>
