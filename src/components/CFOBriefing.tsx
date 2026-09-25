@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import OnboardingFlow from "./OnboardingFlow";
 import BusinessSwitcher from "./BusinessSwitcher";
 import PlanSelection from "./PlanSelection";
+import EmergingConstraintsCard from "./EmergingConstraintsCard";
 import {
   type BriefingData,
   demoData,
