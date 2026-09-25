@@ -268,18 +268,21 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
   const requiredSignalsAvailable = revenueDrop !== null && arChange !== null && payrollChange !== null;
   const signalCount = [revenueDrop !== null && revenueDrop <= -10, arSignal, payrollSignal, cash[cash.length - 1] >= cash[cash.length - 2]].filter(Boolean).length;
   const allSignals = signalCount === 4;
+  const validationChecks = [arValidation, payrollValidation, financingValidation];
+  const validationFailed = validationChecks.some((check) => check.available && !check.passed);
+  const validationIncomplete = validationChecks.some((check) => !check.available);
   const complete = requiredSignalsAvailable && arSignal && payrollSignal && arValidation.available && payrollValidation.available && financingValidation.available;
-  const requiredChecksPassed = arValidation.passed && payrollValidation.passed && financingValidation.passed;
+  const requiredChecksPassed = !validationFailed;
 
-  if (!allSignals || !requiredChecksPassed) {
-    if (previous && previous.status !== "resolved" && allSignals && complete === false) {
-      return { ...previous, status: "resolved", statusDetail: "The signal remains present, but required validation evidence is incomplete, so the prior confirmed pattern is no longer carried forward.", updatedAt: now };
+  if (!allSignals || validationFailed || !requiredChecksPassed) {
+    if (previous && previous.status !== "resolved" && allSignals && validationFailed) {
+      return { ...previous, status: "resolved", statusDetail: "A required disconfirming check failed, so the prior pattern is no longer carried forward.", updatedAt: now };
     }
     return null;
   }
 
-  const confidence: ConstraintConfidence = complete ? "High" : "Medium";
-  const dataCompleteness: ConstraintDataCompleteness = complete ? "complete" : "partial";
+  const confidence: ConstraintConfidence = complete && !validationIncomplete ? "High" : "Medium";
+  const dataCompleteness: ConstraintDataCompleteness = complete && !validationIncomplete ? "complete" : "partial";
   const strength = strengthScore(Math.abs(revenueDrop), arChange, payrollChange);
   const lifecycle = statusFromStrength(previous, strength);
 
