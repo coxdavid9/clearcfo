@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { type AIAnalysis, type BriefingData, demoData } from "../lib/briefing/engine";
-import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
+import { evictQuickBooksCache, getActiveCompanyId, getCachedCompanyId, isQuickBooksCacheUsable } from "../lib/company-scoped-cache";
 
 const ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v3";
 const LEGACY_ANALYSIS_CACHE_KEY = "clearcfo_ai_analysis_cache_v2";
@@ -72,12 +72,20 @@ export default function CFOAnalysisPage() {
         // The cached analysis input belongs to exactly one business; never
         // analyze another business's numbers here.
         const activeCompanyId = await getActiveCompanyId();
-        const stored = isQuickBooksCacheUsable(activeCompanyId)
-          ? window.localStorage.getItem("clearcfo_analysis_input") || window.localStorage.getItem("clearcfo_qb_briefing_cache")
-          : null;
-        if (stored) {
-          const parsed = JSON.parse(stored) as BriefingData;
+        const cachedCompanyId = getCachedCompanyId();
+        const storedInput = window.localStorage.getItem("clearcfo_analysis_input");
+        if (storedInput && (!cachedCompanyId || !activeCompanyId || cachedCompanyId === activeCompanyId)) {
+          const parsed = JSON.parse(storedInput) as BriefingData;
           if (parsed?.companyName && Array.isArray(parsed.alerts)) briefing = parsed;
+        } else if (storedInput && cachedCompanyId && activeCompanyId && cachedCompanyId !== activeCompanyId) {
+          evictQuickBooksCache();
+        }
+        if (!briefing && isQuickBooksCacheUsable(activeCompanyId)) {
+          const storedQb = window.localStorage.getItem("clearcfo_qb_briefing_cache");
+          if (storedQb) {
+            const parsed = JSON.parse(storedQb) as BriefingData;
+            if (parsed?.companyName && Array.isArray(parsed.alerts)) briefing = parsed;
+          }
         }
         if (!briefing) {
           const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
