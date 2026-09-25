@@ -762,15 +762,35 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   if (!rows.length) throw new Error("The financial worksheet is empty.");
 
   const base = buildBriefingFromRows(rows, sheetName, workbook);
+  const inventorySheet = findSheet(workbook, ["Inventory_Summary"]);
+  let inventoryOverride: { inventory: number; previousInventory: number; inventoryChange: number } | null = null;
+  if (inventorySheet) {
+    const inventoryRows = sheetRows(inventorySheet);
+    const inventoryHeaderIndex = findHeaderIndex(inventoryRows, ["Month", "Date", "Period", "Account"]);
+    const inventoryLabels = periodLabels(inventoryRows, inventoryHeaderIndex);
+    const inventoryRow = findDataRow(inventoryRows, [/ending inventory/i, /^inventory$/i, /total inventory/i]);
+    if (inventoryRow && inventoryLabels.length >= 2) {
+      const values = rowValues(inventoryRow, inventoryLabels.length);
+      const current = values[values.length - 1] ?? 0;
+      const previous = values[values.length - 2] ?? 0;
+      inventoryOverride = { inventory: current, previousInventory: previous, inventoryChange: changePercent(current, previous) };
+    }
+  }
   const hasBalanceSheet = Boolean(findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]));
   const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet };
   const detailed = detailedExcelAnalysis(workbook);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
+  const resolvedInventory = inventoryOverride ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
+  const sustainedAlerts = allDrivers.map((driver) => driver.observation);
+  const finalAlerts = Array.from(new Set([...base.alerts, ...sustainedAlerts]));
   return {
     ...base,
+    inventory: resolvedInventory.inventory,
+    inventoryChange: resolvedInventory.inventoryChange,
     drivers: allDrivers,
-    attention: base.alerts.length + detailed.drivers.filter((driver) => driver.severity !== "Watch").length,
+    alerts: finalAlerts,
+    attention: finalAlerts.length,
     recommendation: allDrivers[0]?.observation || base.recommendation,
     impact: allDrivers[0]?.impact || base.impact,
     impactReason: allDrivers[0]?.observation || base.impactReason,
@@ -783,8 +803,8 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
 }
 
 export function buildDeterministicExecutiveSummary(data: BriefingData): string {
-  if (!data.alerts.length) return "No major exceptions were detected in the latest financial data.";
-  return data.alerts.slice(0, 2).join(" ");
+  if (!data.alerts.length && !data.drivers.length) return "No major exceptions were detected in the latest financial data.";
+  return (data.alerts.length ? data.alerts : data.drivers.map((driver) => driver.observation)).slice(0, 2).join(" ");
 }
 
 export function scoreAIAction(action: AIAction, data: BriefingData): number {
