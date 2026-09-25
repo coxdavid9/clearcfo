@@ -907,6 +907,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   }
   const balanceSheet = findSheet(workbook, ["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
   let cashOverride: { cash: number; previousCash: number; cashChange: number } | null = null;
+  let balanceInventory: { inventory: number; previousInventory: number; inventoryChange: number } | null = null;
   let periodMismatchUnknown: string | null = null;
   if (balanceSheet) {
     const balanceRows = sheetRows(balanceSheet);
@@ -918,7 +919,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
       const balanceRange = `${balanceLabels[0]}–${balanceLabels[balanceLabels.length - 1]}`;
       const pnlRange = `${pnlLabels[0]}–${pnlLabels[pnlLabels.length - 1]}`;
       if (balanceRange !== pnlRange) {
-        periodMismatchUnknown = `The balance sheet covers ${balanceRange} while the P&L covers ${pnlRange}; cash figures use the balance sheet's latest periods.`;
+        periodMismatchUnknown = `The balance sheet covers ${balanceRange} while the P&L covers ${pnlRange}; cash and inventory figures use the balance sheet's latest periods.`;
       }
     }
     const cashRow = findDataRow(balanceRows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
@@ -927,6 +928,13 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
       const current = values[values.length - 1] ?? 0;
       const previous = values[values.length - 2] ?? 0;
       cashOverride = { cash: current, previousCash: previous, cashChange: changePercent(current, previous) };
+    }
+    const balanceInventoryRow = findDataRow(balanceRows, [/^inventory$/i, /total inventory/i, /inventory asset/i]);
+    if (balanceInventoryRow && balanceLabels.length >= 2) {
+      const values = rowValues(balanceInventoryRow, balanceLabels.length);
+      const current = values[values.length - 1] ?? 0;
+      const previous = values[values.length - 2] ?? 0;
+      balanceInventory = { inventory: current, previousInventory: previous, inventoryChange: changePercent(current, previous) };
     }
   }
   const hasBalanceSheet = Boolean(balanceSheet);
@@ -950,7 +958,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   const detailed = detailedExcelAnalysis(workbook, sheetName);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
-  const resolvedInventory = inventoryOverride ?? inventoryDetailFallback ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
+  const resolvedInventory = inventoryOverride ?? balanceInventory ?? inventoryDetailFallback ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
   const resolvedCash = cashOverride ?? { cash: base.cash, previousCash: base.cash, cashChange: base.cashChange };
   const sustainedAlerts = allDrivers.map((driver) => driver.observation);
   const finalAlerts = Array.from(new Set([...base.alerts, ...sustainedAlerts]));
