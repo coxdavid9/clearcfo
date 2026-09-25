@@ -15,6 +15,9 @@ export type EmergingConstraint = {
   statusDetail: string;
   strength: number;
   updatedAt: string;
+  revenueDropPct?: number;
+  arIncreasePct?: number;
+  payrollIncreasePct?: number;
 };
 
 type ReportRow = {
@@ -287,6 +290,34 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
   const dataCompleteness: ConstraintDataCompleteness = complete && !validationIncomplete ? "complete" : "partial";
   const strength = strengthScore(Math.abs(revenueDrop), arChange, payrollChange);
   const lifecycle = statusFromStrength(previous, strength);
+  const priorArIncrease = previous?.arIncreasePct;
+  const statusProse = lifecycle.status === "worsening"
+    ? {
+        relationship: priorArIncrease !== undefined
+          ? "Revenue is slowing while collections are taking longer and payroll is increasing; A/R deterioration accelerated from +" + priorArIncrease.toFixed(1) + "% to +" + arChange.toFixed(1) + "% while cash remains stable."
+          : "Revenue is slowing while collections are taking longer and payroll is increasing; A/R deterioration is now +" + arChange.toFixed(1) + "% while cash remains stable.",
+        whyNow: priorArIncrease !== undefined
+          ? "A/R deterioration accelerated from +" + priorArIncrease.toFixed(1) + "% to +" + arChange.toFixed(1) + "; revenue is down " + Math.abs(revenueDrop).toFixed(1) + "% and payroll is up " + payrollChange.toFixed(1) + "% while cash remains stable."
+          : "A/R deterioration is now +" + arChange.toFixed(1) + "; revenue is down " + Math.abs(revenueDrop).toFixed(1) + "% and payroll is up " + payrollChange.toFixed(1) + "% while cash remains stable.",
+        decisionWindow: "The window to act is narrowing: review collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
+      }
+    : lifecycle.status === "easing"
+      ? {
+          relationship: "Revenue pressure, collections timing, or payroll pressure has improved from the prior briefing, but the cash constraint has not resolved and cash remains under pressure.",
+          whyNow: "The constraint is easing: revenue is down " + Math.abs(revenueDrop).toFixed(1) + "%, overdue A/R is up " + arChange.toFixed(1) + "%, and payroll is up " + payrollChange.toFixed(1) + "%, but the pattern remains above its confirmation thresholds.",
+          decisionWindow: "The pressure is easing, but continue reviewing collections and near-term cash commitments until the constraint is no longer confirmed.",
+        }
+      : lifecycle.status === "stable"
+        ? {
+            relationship: "Revenue is slowing while collections are taking longer and payroll is increasing; the same cash-squeeze pattern persists across briefings while cash remains stable.",
+            whyNow: "The cash-squeeze pattern persists across briefings: revenue is down " + Math.abs(revenueDrop).toFixed(1) + "%, overdue A/R is up " + arChange.toFixed(1) + "%, and payroll is up " + payrollChange.toFixed(1) + "% while cash remains stable.",
+            decisionWindow: "The constraint is persisting, so continue reviewing collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
+          }
+        : {
+            relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
+            whyNow: "Revenue is down " + Math.abs(revenueDrop).toFixed(1) + "% over the last two periods, overdue A/R is up " + arChange.toFixed(1) + "%, and payroll is up " + payrollChange.toFixed(1) + "% while cash remains stable.",
+            decisionWindow: "Review collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
+          };
 
   const evidenceChecked = [
     arValidation.detail,
@@ -298,16 +329,19 @@ export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint |
   return {
     id: "cash_squeeze",
     title: "Cash constraint may be forming",
-    relationship: "Revenue is slowing while collections are taking longer and payroll is increasing. Cash is being squeezed from both sides before the cash balance has turned down.",
+    relationship: statusProse.relationship,
     evidenceChecked,
-    whyNow: `Revenue is down ${Math.abs(revenueDrop).toFixed(1)}% over the last two periods, overdue A/R is up ${arChange.toFixed(1)}%, and payroll is up ${payrollChange.toFixed(1)}% while cash remains stable.`,
-    decisionWindow: "Review collections and planned near-term cash commitments before the pressure reaches the operating cash balance.",
+    whyNow: statusProse.whyNow,
+    decisionWindow: statusProse.decisionWindow,
     confidence,
     dataCompleteness,
     status: lifecycle.status,
     statusDetail: lifecycle.detail,
     strength,
     updatedAt: now,
+    revenueDropPct: revenueDrop,
+    arIncreasePct: arChange,
+    payrollIncreasePct: payrollChange,
   };
 }
 
