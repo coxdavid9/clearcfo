@@ -732,11 +732,11 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         const top3 = [...increases, ...decreases].sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous)).slice(0, 3);
         drivers.push({
           id: `excel-customer-mix-${sheetName}`, category: "Revenue", title: "Customer revenue movement is concentrated",
-          observation: `The largest reported customer movements are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
+          observation: `The largest reported customer movements are ${top3.map((row) => `${row.label} (${row.current - row.previous >= 0 ? "+" : "-"}${formatCurrency(Math.abs(row.current - row.previous))})`).join(", ")}.`,
           evidence: [...increases.slice(0, 3), ...decreases.slice(0, 2)].map((row) => `${row.label}: ${formatCurrency(row.current - row.previous)} change`),
           direction: increases.length >= decreases.length ? "up" : "mixed", severity: movement > 50000 ? "High" : "Medium",
           impact: Math.min(10, Math.max(1, Math.round(movement / 10000))), confidence: 0.86,
-          managementQuestion: "Are these customer movements recurring, or are they tied to one-time orders or timing?",
+          managementQuestion: `Are ${top3.map((row) => `${row.label} (${row.current - row.previous >= 0 ? "+" : "-"}${formatCurrency(Math.abs(row.current - row.previous))})`).join(", ")} movements recurring, or are they tied to one-time orders or timing?`,
         });
         relationships.push("Customer-level revenue movement can be reviewed alongside total revenue to determine whether growth is broad-based or concentrated.");
         addQuestion("Revenue", `The largest customer movements are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they expected to continue, or are they tied to one-time orders or timing?`, sheetName, candidates.length);
@@ -753,10 +753,10 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         const top3 = increases.slice(0, 3);
         drivers.push({
           id: `excel-expense-detail-${sheetName}`, category: "Operating Expense", title: "Specific expense accounts are driving the movement",
-          observation: `The largest reported expense increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
+          observation: `The largest reported expense increases are ${top3.map((row) => `${row.label} (+${formatCurrency(row.current - row.previous)})`).join(", ")}.`,
           evidence: increases.slice(0, 4).map((row) => `${row.label}: +${formatCurrency(row.current - row.previous)}`),
           direction: "up", severity: totalIncrease > 50000 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(totalIncrease / 10000))),
-          confidence: 0.88, managementQuestion: "Are these expense increases recurring, discretionary, or timing-related?",
+          confidence: 0.88, managementQuestion: `Are ${top3.map((row) => `${row.label} (+${formatCurrency(row.current - row.previous)})`).join(", ")} increases recurring, discretionary, or timing-related?`,
         });
         relationships.push("The largest expense-account movements should be compared with revenue growth to determine whether operating costs are scaling with the business.");
         addQuestion("Expenses", `The largest expense increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, discretionary, or timing-related?`, sheetName, candidates.length);
@@ -773,10 +773,10 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         const top3 = increases.slice(0, 3);
         drivers.push({
           id: `excel-vendor-spend-${sheetName}`, category: "Operating Expense", title: "Vendor spend has identifiable concentration",
-          observation: `The largest reported vendor increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
+          observation: `The largest reported vendor increases are ${top3.map((row) => `${row.label} (+${formatCurrency(row.current - row.previous)})`).join(", ")}.`,
           evidence: increases.slice(0, 4).map((row) => `${row.label}: +${formatCurrency(row.current - row.previous)}`),
           direction: "up", severity: totalIncrease > 50000 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(totalIncrease / 10000))),
-          confidence: 0.84, managementQuestion: "What is driving these vendor spend increases, and are they expected to persist?",
+          confidence: 0.84, managementQuestion: `What is driving ${top3.map((row) => `${row.label} (+${formatCurrency(row.current - row.previous)})`).join(", ")} vendor spend increases, and are they expected to persist?`,
         });
         relationships.push("Vendor-level spend detail can identify whether expense growth is concentrated in a small number of suppliers.");
         addQuestion("Vendors", `The largest vendor spend increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")} — are they recurring, and are they expected to persist?`, sheetName, candidates.length);
