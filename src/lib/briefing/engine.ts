@@ -881,8 +881,11 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook, primarySheetName: string
 }
 
 export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
-  const sheetName = workbook.SheetNames[0] || "Financial Data";
-  const sheet = findSheet(workbook, ["P&L", "Profit and Loss", "Income Statement", sheetName]) || workbook.Sheets[sheetName];
+  const fallbackSheetName = workbook.SheetNames[0] || "Financial Data";
+  const sheet = findSheet(workbook, ["P&L", "Profit and Loss", "Income Statement"]) || workbook.Sheets[fallbackSheetName];
+  const sheetName = sheet
+    ? workbook.SheetNames.find((name) => workbook.Sheets[name] === sheet) || fallbackSheetName
+    : fallbackSheetName;
   if (!sheet) throw new Error("No financial worksheet was found.");
   const rows = sheetRows(sheet);
   if (!rows.length) throw new Error("The financial worksheet is empty.");
