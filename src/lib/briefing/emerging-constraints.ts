@@ -231,10 +231,10 @@ function statusFromStrength(previous: EmergingConstraint | null, currentStrength
 export function detectCashSqueeze(input: CashSqueezeInput): EmergingConstraint | null {
   const now = input.now || new Date().toISOString();
   const previous = input.previousConstraint || null;
-  const revenue = input.revenue.filter(Number.isFinite);
-  const cash = input.cash.filter(Number.isFinite);
+  const revenue = input.revenue;
+  const cash = input.cash;
 
-  if (revenue.length < 3 || cash.length < 2) {
+  if (revenue.length < 3 || cash.length < 3 || !revenue.slice(-3).every(Number.isFinite) || !cash.slice(-3).every(Number.isFinite)) {
     if (previous && previous.status !== "resolved") {
       return { ...previous, status: "resolved", statusDetail: "The required trend data is no longer available, so the prior pattern cannot be confirmed.", updatedAt: now };
     }
