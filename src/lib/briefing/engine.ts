@@ -678,7 +678,7 @@ function detailRowsFromSheet(sheet: XLSX.WorkSheet, inventory = false): Array<{ 
     .filter((row) => !/^total|^net income|^gross profit|^operating income|^revenue|^sales|^cogs/i.test(row.label));
 }
 
-function inventoryDetailSeries(workbook: XLSX.WorkBook, primarySheetName: string): { values: number[]; periods: string[] } | null {
+function inventoryDetailSeriesFromWorkbook(workbook: XLSX.WorkBook, primarySheetName: string): { values: number[]; periods: string[] } | null {
   const balanceSheetNames = new Set(["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
   for (const sheetName of workbook.SheetNames) {
     if (sheetName === primarySheetName || balanceSheetNames.has(sheetName) || sheetName.trim().toLowerCase() === "inventory_summary") continue;
@@ -928,7 +928,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
   }
   const hasBalanceSheet = Boolean(balanceSheet);
   const inventoryDetailSeries = !inventoryOverride && !hasBalanceSheet
-    ? inventoryDetailSeries(workbook, sheetName)
+    ? inventoryDetailSeriesFromWorkbook(workbook, sheetName)
     : null;
   const inventoryDetailFallback = inventoryDetailSeries && inventoryDetailSeries.values.length >= 2
     ? {
