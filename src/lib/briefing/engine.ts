@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { detectExpenseSpikeRecovery } from "../../lib/scenario-detection";
+import type { EmergingConstraint } from "./emerging-constraints";
 
 export type BriefingData = {
   companyName: string;
@@ -43,6 +44,7 @@ export type BriefingData = {
   ratios?: FinancialRatio[];
   cashFlow?: CashFlowBridge | null;
   kpiBreakdowns?: KpiBreakdowns;
+  emergingConstraints?: EmergingConstraint[];
 };
 
 // Balance-sheet health ratios for the latest synced period. All values are
@@ -223,6 +225,7 @@ export const demoData: BriefingData = {
   trendInsights: ["Revenue has generally trended upward over the available period.", "Recent growth has slowed slightly."],
   trendSeries: [{ name: "Revenue", values: [93000, 98000, 102000, 105000, 109000, 111000, 114000, 118000, 121000, 119000, 123000, 124500], periods: ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"] }],
   unknowns: [],
+  emergingConstraints: [],
 };
 
 export const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
