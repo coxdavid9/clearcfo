@@ -678,6 +678,47 @@ function detailRowsFromSheet(sheet: XLSX.WorkSheet, inventory = false): Array<{ 
     .filter((row) => !/^total|^net income|^gross profit|^operating income|^revenue|^sales|^cogs/i.test(row.label));
 }
 
+function inventoryDetailSeries(workbook: XLSX.WorkBook, primarySheetName: string): { values: number[]; periods: string[] } | null {
+  const balanceSheetNames = new Set(["Balance Sheet", "Balance_Sheet", "BalanceSheet"]);
+  for (const sheetName of workbook.SheetNames) {
+    if (sheetName === primarySheetName || balanceSheetNames.has(sheetName) || sheetName.trim().toLowerCase() === "inventory_summary") continue;
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+    const rows = sheetRows(sheet);
+    if (classifyExcelSheet(sheetName, rows) !== "inventory") continue;
+
+    const headerIndex = findPeriodHeaderIndex(rows);
+    const labels = periodLabels(rows, headerIndex);
+    if (labels.length < 2) continue;
+    const header = rows[headerIndex] || [];
+    const unitCostIndex = header.findIndex((cell) => /unit.?cost|cost per unit|^unit price$/i.test(normalizeText(cell)));
+    const periodIndexes = unitCostIndex >= 0
+      ? header.map((cell, index) => index > unitCostIndex && normalizeText(cell) ? index : -1).filter((index) => index >= 0)
+      : [];
+
+    const values = labels.map((_, periodIndex) => {
+      return rows
+        .filter((row) => row.length >= 2)
+        .filter((row) => {
+          const label = normalizeText(row[0]);
+          return label && !/^total|^net income|^gross profit|^operating income|^revenue|^sales|^cogs/i.test(label)
+            && !/total|subtotal|ending|balance|units/i.test(label)
+            && !label.includes("%");
+        })
+        .reduce((sum, row) => {
+          if (unitCostIndex >= 0 && periodIndexes.length >= 2) {
+            const periodColumn = periodIndexes[periodIndex] ?? periodIndexes[periodIndexes.length - 1];
+            return sum + toNumber(row[unitCostIndex]) * toNumber(row[periodColumn]);
+          }
+          return sum + toNumber(row[periodIndex + 1]);
+        }, 0);
+    });
+
+    if (values.some((value) => value !== 0)) return { values, periods: labels };
+  }
+  return null;
+}
+
 function classifyExcelSheet(sheetName: string, rows: unknown[][]): "customer" | "vendor" | "ar" | "inventory" | "expense" | "other" {
   const text = `${sheetName} ${rows.slice(0, 8).flat().map(normalizeText).join(" ")}`.toLowerCase();
   const hasCash = rows.some((row) => /cash/i.test(normalizeText(row[0])));
@@ -886,11 +927,27 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     }
   }
   const hasBalanceSheet = Boolean(balanceSheet);
-  const dataAvailability = { cash: hasBalanceSheet, inventory: hasBalanceSheet || Boolean(inventoryOverride) };
+  const inventoryDetailSeries = !inventoryOverride && !hasBalanceSheet
+    ? inventoryDetailSeries(workbook, sheetName)
+    : null;
+  const inventoryDetailFallback = inventoryDetailSeries && inventoryDetailSeries.values.length >= 2
+    ? {
+        inventory: inventoryDetailSeries.values[inventoryDetailSeries.values.length - 1] ?? 0,
+        previousInventory: inventoryDetailSeries.values[inventoryDetailSeries.values.length - 2] ?? 0,
+        inventoryChange: changePercent(
+          inventoryDetailSeries.values[inventoryDetailSeries.values.length - 1] ?? 0,
+          inventoryDetailSeries.values[inventoryDetailSeries.values.length - 2] ?? 0,
+        ),
+      }
+    : null;
+  const dataAvailability = {
+    cash: hasBalanceSheet,
+    inventory: hasBalanceSheet || Boolean(inventoryOverride) || Boolean(inventoryDetailFallback),
+  };
   const detailed = detailedExcelAnalysis(workbook, sheetName);
   const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
-  const resolvedInventory = inventoryOverride ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
+  const resolvedInventory = inventoryOverride ?? inventoryDetailFallback ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
   const resolvedCash = cashOverride ?? { cash: base.cash, previousCash: base.cash, cashChange: base.cashChange };
   const sustainedAlerts = allDrivers.map((driver) => driver.observation);
   const finalAlerts = Array.from(new Set([...base.alerts, ...sustainedAlerts]));
@@ -909,7 +966,12 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     managementQuestions: detailed.questions,
     relationships: [...base.relationships, ...detailed.relationships].slice(0, 8),
     detailDrivers: detailed.details,
-    unknowns: Array.from(new Set([...detailed.unknowns, ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown (shown as $0)."] : []), ...(periodMismatchUnknown ? [periodMismatchUnknown] : [])])).slice(0, 10),
+    unknowns: Array.from(new Set([
+      ...detailed.unknowns,
+      ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown (shown as $0)."] : []),
+      ...(inventoryDetailFallback ? ["Inventory is estimated from SKU detail — no inventory summary or balance sheet was provided."] : []),
+      ...(periodMismatchUnknown ? [periodMismatchUnknown] : []),
+    ])).slice(0, 10),
     dataAvailability,
   };
 }
