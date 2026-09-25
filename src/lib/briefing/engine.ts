@@ -688,16 +688,17 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
       }
       if (increases.length || decreases.length) {
+        const top3 = [...increases, ...decreases].sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous)).slice(0, 3);
         drivers.push({
           id: `excel-customer-mix-${sheetName}`, category: "Revenue", title: "Customer revenue movement is concentrated",
-          observation: `The uploaded customer detail shows ${increases.length} customer increases and ${decreases.length} customer decreases among the largest reported movements.`,
+          observation: `The largest reported customer movements are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
           evidence: [...increases.slice(0, 3), ...decreases.slice(0, 2)].map((row) => `${row.label}: ${formatCurrency(row.current - row.previous)} change`),
           direction: increases.length >= decreases.length ? "up" : "mixed", severity: movement > 50000 ? "High" : "Medium",
           impact: Math.min(10, Math.max(1, Math.round(movement / 10000))), confidence: 0.86,
-          managementQuestion: "Are the largest customer movements recurring, or are they tied to one-time orders or timing?",
+          managementQuestion: "Are these customer movements recurring, or are they tied to one-time orders or timing?",
         });
         relationships.push("Customer-level revenue movement can be reviewed alongside total revenue to determine whether growth is broad-based or concentrated.");
-        questions.push({ category: "Revenue", question: `Which customers explain the largest revenue changes in ${sheetName}, and are those changes expected to continue?` });
+        questions.push({ category: "Revenue", question: `Are the largest customer movements in ${sheetName} expected to continue, or are they tied to one-time orders or timing?` });
       }
     }
 
@@ -708,15 +709,16 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         for (const row of increases) {
           details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: "up", impact: Math.abs(row.current - row.previous) });
         }
+        const top3 = increases.slice(0, 3);
         drivers.push({
           id: `excel-expense-detail-${sheetName}`, category: "Operating Expense", title: "Specific expense accounts are driving the movement",
-          observation: `The largest reported expense increases total ${formatCurrency(totalIncrease)} across the uploaded detail.`,
+          observation: `The largest reported expense increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
           evidence: increases.slice(0, 4).map((row) => `${row.label}: +${formatCurrency(row.current - row.previous)}`),
           direction: "up", severity: totalIncrease > 50000 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(totalIncrease / 10000))),
-          confidence: 0.88, managementQuestion: "Which of the largest expense increases are recurring, discretionary, or timing-related?",
+          confidence: 0.88, managementQuestion: "Are these expense increases recurring, discretionary, or timing-related?",
         });
         relationships.push("The largest expense-account movements should be compared with revenue growth to determine whether operating costs are scaling with the business.");
-        questions.push({ category: "Expenses", question: `Which expense accounts explain the largest increase in ${sheetName}, and which of those costs are recurring?` });
+        questions.push({ category: "Expenses", question: `Are the largest expense increases in ${sheetName} recurring, discretionary, or timing-related?` });
       }
     }
 
@@ -727,15 +729,16 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
         for (const row of increases) {
           details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: "up", impact: Math.abs(row.current - row.previous) });
         }
+        const top3 = increases.slice(0, 3);
         drivers.push({
           id: `excel-vendor-spend-${sheetName}`, category: "Operating Expense", title: "Vendor spend has identifiable concentration",
-          observation: `The largest reported vendor increases total ${formatCurrency(totalIncrease)}.`,
+          observation: `The largest reported vendor increases are ${top3.map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
           evidence: increases.slice(0, 4).map((row) => `${row.label}: +${formatCurrency(row.current - row.previous)}`),
           direction: "up", severity: totalIncrease > 50000 ? "High" : "Medium", impact: Math.min(10, Math.max(1, Math.round(totalIncrease / 10000))),
-          confidence: 0.84, managementQuestion: "What is driving the largest vendor spend increases, and are they expected to persist?",
+          confidence: 0.84, managementQuestion: "What is driving these vendor spend increases, and are they expected to persist?",
         });
         relationships.push("Vendor-level spend detail can identify whether expense growth is concentrated in a small number of suppliers.");
-        questions.push({ category: "Vendors", question: `Which vendors account for the largest spend increases in ${sheetName}, and are those increases recurring?` });
+        questions.push({ category: "Vendors", question: `Are the largest vendor spend increases in ${sheetName} recurring, and are they expected to persist?` });
       }
     }
 
@@ -744,13 +747,13 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
       const total = balances.reduce((sum, row) => sum + Math.max(0, row.current), 0);
       drivers.push({
         id: `excel-ar-detail-${sheetName}`, category: "Cash", title: "Accounts receivable detail is available",
-        observation: `The uploaded receivables detail shows ${formatCurrency(total)} across the largest reported balances. This can be used to investigate cash conversion pressure.`,
+        observation: `The largest reported receivable balances are ${balances.slice(0, 3).map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
         evidence: balances.slice(0, 4).map((row) => `${row.label}: ${formatCurrency(row.current)}`),
         direction: "watch", severity: "Watch", impact: Math.min(10, Math.max(1, Math.round(total / 50000))), confidence: 0.8,
-        managementQuestion: "Which receivable balances are most important to collect, and when are they expected to convert to cash?",
+        managementQuestion: "When are the largest balances expected to convert to cash, and which need collection action?",
       });
       relationships.push("Receivables detail provides a direct bridge between reported sales activity and the timing of cash collection.");
-      questions.push({ category: "Cash", question: `Which receivable balances are largest in ${sheetName}, and when are they expected to convert to cash?` });
+      questions.push({ category: "Cash", question: `When are the largest receivable balances in ${sheetName} expected to convert to cash, and which need collection action?` });
       for (const row of balances) details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
     }
 
@@ -759,13 +762,13 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook): {
       if (balances.length) {
         drivers.push({
           id: `excel-inventory-detail-${sheetName}`, category: "Inventory", title: "Inventory detail is available",
-          observation: "The uploaded inventory detail identifies the largest reported inventory balances for further review.",
+          observation: `The largest reported inventory balances are ${balances.slice(0, 3).map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
           evidence: balances.slice(0, 4).map((row) => `${row.label}: ${formatCurrency(row.current)}`),
           direction: "watch", severity: "Watch", impact: Math.min(10, Math.max(1, Math.round(balances[0].current / 50000))), confidence: 0.8,
-          managementQuestion: "Which inventory items are tying up the most cash, and are they moving at the expected rate?",
+          managementQuestion: "Are the largest-stock items moving at the expected rate, and should purchasing slow for any of them?",
         });
         relationships.push("Inventory detail can be compared with revenue growth to identify stock that may be building faster than demand.");
-        questions.push({ category: "Inventory", question: `Which inventory balances are largest in ${sheetName}, and are those items moving at the expected rate?` });
+        questions.push({ category: "Inventory", question: `Are the largest inventory balances in ${sheetName} moving at the expected rate, and should purchasing slow for any of them?` });
         for (const row of balances) details.push({ name: row.label, current: row.current, previous: row.previous, change: row.current - row.previous, percentChange: changePercent(row.current, row.previous), direction: row.current >= row.previous ? "up" : "down", impact: Math.abs(row.current - row.previous) });
       }
     }
