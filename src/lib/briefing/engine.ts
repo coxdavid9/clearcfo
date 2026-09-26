@@ -1063,7 +1063,6 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
       ...(inventoryDetailFallback ? ["Inventory is estimated from SKU detail — no inventory summary or balance sheet was provided."] : []),
       ...(periodMismatchUnknown ? [periodMismatchUnknown] : []),
     ])).slice(0, 10),
-    dataAvailability,
   };
 }
 
