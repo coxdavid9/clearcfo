@@ -388,7 +388,7 @@ function buildDrivers(
       id: "inventory-growth",
       category: "Inventory",
       title: "Inventory is outpacing revenue",
-      observation: `Inventory increased ${formatCurrency(Math.abs(inventoryDelta))} (${formatCurrency(previousInventory)} to ${formatCurrency(inventory)}) while revenue changed ${formatCurrency(Math.abs(revenueDelta))} (${formatCurrency(previousRevenue)} to ${formatCurrency(revenue)}).`,
+      observation: `Inventory ${inventoryDelta >= 0 ? "increased" : "decreased"} ${formatCurrency(Math.abs(inventoryDelta))} (${formatCurrency(previousInventory)} to ${formatCurrency(inventory)}) while revenue ${revenueDelta >= 0 ? "increased" : "decreased"} ${formatCurrency(Math.abs(revenueDelta))} (${formatCurrency(previousRevenue)} to ${formatCurrency(revenue)}).`,
       evidence: [`Inventory: ${formatCurrency(previousInventory)} → ${formatCurrency(inventory)} (${inventoryDelta >= 0 ? "+" : ""}${formatCurrency(inventoryDelta)})`, `Revenue: ${formatCurrency(previousRevenue)} → ${formatCurrency(revenue)} (${revenueDelta >= 0 ? "+" : ""}${formatCurrency(revenueDelta)})`],
       direction: "up",
       severity: "Medium",
@@ -528,7 +528,7 @@ function buildSustainedTrendDrivers(
 }
 
 function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookForSeries: XLSX.WorkBook): BriefingData {
-  const headerIndex = findHeaderIndex(rows, ["Month", "Date", "Period", "Account"]);
+  const headerIndex = findPeriodHeaderIndex(rows);
   const labels = periodLabels(rows, headerIndex);
   const revenueRow = findDataRow(rows, [/^revenue$/i, /total revenue/i, /sales/i]);
   const grossProfitRow = findDataRow(rows, [/gross profit/i]);
@@ -576,7 +576,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
       id: "excel-expense-spike-recovery",
       category: "Unusual Spend",
       title: "Operating expenses spiked and have returned toward baseline",
-      observation: `Operating expenses spiked in ${spikeLabel} to ${formatCurrency(expenseSpike.peak)} versus a baseline of ${formatCurrency(expenseSpike.baseline)}, then returned toward that baseline.`,
+      observation: `Operating expenses spiked in ${spikeLabel} to ${formatCurrency(expenseSpike.peak)} versus a baseline of ${formatCurrency(expenseSpike.baseline)} (about ${formatPercentValue(((expenseSpike.peak - expenseSpike.baseline) / expenseSpike.baseline) * 100)} above baseline), then returned toward that baseline.`,
       evidence: [`Spike period: ${spikeLabel}`, `Peak operating expenses: ${formatCurrency(expenseSpike.peak)}`, `Baseline operating expenses: ${formatCurrency(expenseSpike.baseline)}`, `Estimated excess spend: ${formatCurrency(expenseSpike.excess)}`],
       direction: "up",
       severity: expenseSpike.excess >= 50000 ? "High" : "Medium",
@@ -1043,9 +1043,14 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
 }
 
 export function buildDeterministicExecutiveSummary(data: BriefingData): string {
-  const meaningfulDrivers = data.drivers.filter((driver) => !(driver.severity === "Watch" && /detail is available|detail$/i.test(driver.title)));
+  const severityRank: Record<FinancialDriver["severity"], number> = { High: 3, Medium: 2, Watch: 1 };
+  const meaningfulDrivers = data.drivers
+    .filter((driver) => !(driver.severity === "Watch" && /detail is available|detail$/i.test(driver.title)))
+    .sort((a, b) => (severityRank[b.severity] - severityRank[a.severity]) || (b.impact - a.impact));
   if (!data.alerts.length && !meaningfulDrivers.length) return "No major exceptions were detected in the latest financial data.";
-  return (data.alerts.length ? data.alerts : meaningfulDrivers.map((driver) => driver.observation)).slice(0, 2).join(" ");
+  return meaningfulDrivers.length
+    ? meaningfulDrivers.slice(0, 2).map((driver) => driver.observation).join(" ")
+    : data.alerts.slice(0, 2).join(" ");
 }
 
 export function scoreAIAction(action: AIAction, data: BriefingData): number {
