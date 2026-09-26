@@ -10,6 +10,10 @@ export type BriefingData = {
   marginChange: number;
   cash: number;
   cashChange: number;
+  previousCash?: number;
+  previousInventory?: number;
+  hasCashRow?: boolean;
+  hasInventoryRow?: boolean;
   liveCash?: number;
   liveCashChange?: number;
   liveCashChangePct?: number;
@@ -597,6 +601,10 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
     marginChange,
     cash,
     cashChange,
+    previousCash,
+    previousInventory,
+    hasCashRow: Boolean(cashRow),
+    hasInventoryRow: Boolean(inventoryRow),
     inventory,
     inventoryChange,
     operatingExpense: expense,
@@ -657,6 +665,14 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
           const aligned = safeTrend(inventoryValues, balanceLabels);
           series.push({ name: "Inventory", values: aligned.values, periods: aligned.labels });
         }
+      }
+      if (!series.some((item) => item.name === "Cash Position") && cashValues.length >= 2) {
+        const aligned = safeTrend(cashValues, labels);
+        series.push({ name: "Cash Position", values: aligned.values, periods: aligned.labels });
+      }
+      if (!series.some((item) => item.name === "Inventory") && inventoryValues.length >= 2) {
+        const aligned = safeTrend(inventoryValues, labels);
+        series.push({ name: "Inventory", values: aligned.values, periods: aligned.labels });
       }
       return series;
     })(),
@@ -979,13 +995,13 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
       }
     : null;
   const dataAvailability = {
-    cash: hasBalanceSheet,
-    inventory: hasBalanceSheet || Boolean(inventoryOverride) || Boolean(inventoryDetailFallback),
+    cash: hasBalanceSheet || Boolean(base.hasCashRow),
+    inventory: hasBalanceSheet || Boolean(base.hasInventoryRow) || Boolean(inventoryOverride) || Boolean(inventoryDetailFallback),
   };
   const detailed = detailedExcelAnalysis(workbook, sheetName);
 
-  const resolvedInventory = inventoryOverride ?? balanceInventory ?? inventoryDetailFallback ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
-  const resolvedCash = cashOverride ?? { cash: base.cash, previousCash: base.cash, cashChange: base.cashChange };
+  const resolvedInventory = inventoryOverride ?? balanceInventory ?? inventoryDetailFallback ?? { inventory: base.inventory, previousInventory: base.previousInventory ?? base.inventory, inventoryChange: base.inventoryChange };
+  const resolvedCash = cashOverride ?? { cash: base.cash, previousCash: base.previousCash ?? base.cash, cashChange: base.cashChange };
   const coreDriverIds = new Set(["opex-growth", "cash-pressure", "inventory-growth", "margin-pressure"]);
   const resolvedPreviousRevenue = Number.isFinite(base.revenueChange) && base.revenueChange !== -100
     ? base.revenue / (1 + base.revenueChange / 100)
@@ -1024,6 +1040,9 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     ...base,
     cash: resolvedCash.cash,
     cashChange: resolvedCash.cashChange,
+    previousCash: resolvedCash.previousCash,
+    previousInventory: resolvedInventory.previousInventory,
+    dataAvailability,
     inventory: resolvedInventory.inventory,
     inventoryChange: resolvedInventory.inventoryChange,
     trendSeries: inventoryDetailFallback && inventoryDetailSeries
@@ -1040,11 +1059,10 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     detailDrivers: detailed.details,
     unknowns: Array.from(new Set([
       ...detailed.unknowns,
-      ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown."] : []),
+      ...(!dataAvailability.cash ? ["The uploaded workbook does not include cash data, so cash position is unknown."] : []),
       ...(inventoryDetailFallback ? ["Inventory is estimated from SKU detail — no inventory summary or balance sheet was provided."] : []),
       ...(periodMismatchUnknown ? [periodMismatchUnknown] : []),
     ])).slice(0, 10),
-    dataAvailability,
   };
 }
 
