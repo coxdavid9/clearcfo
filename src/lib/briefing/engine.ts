@@ -347,7 +347,7 @@ function buildDrivers(
   const cashDelta = cash - previousCash;
   const inventoryDelta = inventory - previousInventory;
 
-  if (expenseChange > revenueChange + 2) {
+  if (expenseChange > 0 && expenseChange > revenueChange + 2) {
     const usePercentage = Math.abs(previousExpense) >= 1000;
     const magnitude = Math.abs(expenseDelta);
     drivers.push({
@@ -405,7 +405,7 @@ function buildDrivers(
 
 function buildAlerts(revenueChange: number, cashChange: number, inventoryChange: number, expenseChange: number): string[] {
   const alerts: string[] = [];
-  if (expenseChange > revenueChange + 2) alerts.push(`Operating expenses increased ${formatPercentValue(expenseChange)} while revenue changed ${formatPercentValue(revenueChange)}.`);
+  if (expenseChange > 0 && expenseChange > revenueChange + 2) alerts.push(`Operating expenses increased ${formatPercentValue(expenseChange)} while revenue changed ${formatPercentValue(revenueChange)}.`);
   if (cashChange < -5) alerts.push(`Cash declined ${formatPercentValue(Math.abs(cashChange))} from the prior period.`);
   if (inventoryChange > revenueChange + 2) alerts.push(`Inventory increased ${formatPercentValue(inventoryChange)}, outpacing revenue change of ${formatPercentValue(revenueChange)}.`);
   return alerts;
@@ -567,6 +567,24 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const inventoryChange = changePercent(inventory, previousInventory);
   const expenseChange = changePercent(expense, previousExpense);
   const drivers = buildDrivers(revenue, previousRevenue, revenueChange, marginChange, cash, previousCash, cashChange, inventory, previousInventory, inventoryChange, expense, previousExpense, expenseChange);
+  const expenseSpike = detectExpenseSpikeRecovery(expenseValues);
+  if (expenseSpike) {
+    const spikeStart = labels[expenseSpike.index] || `period ${expenseSpike.index + 1}`;
+    const spikeEnd = labels[expenseSpike.index + expenseSpike.length - 1] || spikeStart;
+    const spikeLabel = expenseSpike.length === 1 ? spikeStart : `${spikeStart}–${spikeEnd}`;
+    drivers.push({
+      id: "excel-expense-spike-recovery",
+      category: "Unusual Spend",
+      title: "Operating expenses spiked and have returned toward baseline",
+      observation: `Operating expenses spiked in ${spikeLabel} to ${formatCurrency(expenseSpike.peak)} versus a baseline of ${formatCurrency(expenseSpike.baseline)}, then returned toward that baseline.`,
+      evidence: [`Spike period: ${spikeLabel}`, `Peak operating expenses: ${formatCurrency(expenseSpike.peak)}`, `Baseline operating expenses: ${formatCurrency(expenseSpike.baseline)}`, `Estimated excess spend: ${formatCurrency(expenseSpike.excess)}`],
+      direction: "up",
+      severity: expenseSpike.excess >= 50000 ? "High" : "Medium",
+      impact: Math.min(10, Math.max(2, Math.round(expenseSpike.excess / 25000))),
+      confidence: 0.9,
+      managementQuestion: "What caused the expense spike, and was it a one-time cost or something that could recur?",
+    });
+  }
   const sustainedDrivers = buildSustainedTrendDrivers(revenueValues, grossProfitValues, labels, workbookForSeries);
   const allDrivers = [...drivers, ...sustainedDrivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
@@ -847,7 +865,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook, primarySheetName: string
         id: `excel-ar-detail-${sheetName}`, category: "Cash", title: "Accounts receivable detail is available",
         observation: `The largest reported receivable balances are ${balances.slice(0, 3).map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
         evidence: balances.slice(0, 4).map((row) => `${row.label}: ${formatCurrency(row.current)}`),
-        direction: "watch", severity: "Watch", impact: Math.min(10, Math.max(1, Math.round(total / 50000))), confidence: 0.8,
+        direction: "watch", severity: "Watch", impact: Math.min(2, Math.max(1, Math.round(total / 50000))), confidence: 0.8,
         managementQuestion: "When are the largest balances expected to convert to cash, and which need collection action?",
       });
       relationships.push("Receivables detail provides a direct bridge between reported sales activity and the timing of cash collection.");
@@ -862,7 +880,7 @@ function detailedExcelAnalysis(workbook: XLSX.WorkBook, primarySheetName: string
           id: `excel-inventory-detail-${sheetName}`, category: "Inventory", title: "Inventory detail is available",
           observation: `The largest reported inventory balances are ${balances.slice(0, 3).map((row) => `${row.label} (${formatCurrency(row.current)})`).join(", ")}.`,
           evidence: balances.slice(0, 4).map((row) => `${row.label}: ${formatCurrency(row.current)}`),
-          direction: "watch", severity: "Watch", impact: Math.min(10, Math.max(1, Math.round(balances[0].current / 50000))), confidence: 0.8,
+          direction: "watch", severity: "Watch", impact: Math.min(2, Math.max(1, Math.round(balances[0].current / 50000))), confidence: 0.8,
           managementQuestion: "Are the largest-stock items moving at the expected rate, and should purchasing slow for any of them?",
         });
         relationships.push("Inventory detail can be compared with revenue growth to identify stock that may be building faster than demand.");
@@ -959,12 +977,43 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     inventory: hasBalanceSheet || Boolean(inventoryOverride) || Boolean(inventoryDetailFallback),
   };
   const detailed = detailedExcelAnalysis(workbook, sheetName);
-  const allDrivers = [...base.drivers, ...detailed.drivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
 
   const resolvedInventory = inventoryOverride ?? balanceInventory ?? inventoryDetailFallback ?? { inventory: base.inventory, previousInventory: base.inventory, inventoryChange: base.inventoryChange };
   const resolvedCash = cashOverride ?? { cash: base.cash, previousCash: base.cash, cashChange: base.cashChange };
-  const sustainedAlerts = allDrivers.map((driver) => driver.observation);
-  const finalAlerts = Array.from(new Set([...base.alerts, ...sustainedAlerts]));
+  const coreDriverIds = new Set(["opex-growth", "cash-pressure", "inventory-growth", "margin-pressure"]);
+  const resolvedPreviousRevenue = Number.isFinite(base.revenueChange) && base.revenueChange !== -100
+    ? base.revenue / (1 + base.revenueChange / 100)
+    : base.revenue;
+  const resolvedCoreDrivers = buildDrivers(
+    base.revenue,
+    resolvedPreviousRevenue,
+    base.revenueChange,
+    base.marginChange,
+    resolvedCash.cash,
+    resolvedCash.previousCash,
+    resolvedCash.cashChange,
+    resolvedInventory.inventory,
+    resolvedInventory.previousInventory,
+    resolvedInventory.inventoryChange,
+    base.operatingExpense ?? 0,
+    base.previousOperatingExpense ?? 0,
+    changePercent(base.operatingExpense ?? 0, base.previousOperatingExpense ?? 0),
+  );
+  const preservedBaseDrivers = base.drivers.filter((driver) => !coreDriverIds.has(driver.id));
+  const allDrivers = [...resolvedCoreDrivers, ...preservedBaseDrivers, ...detailed.drivers]
+    .map((driver) => driver.severity === "Watch" ? { ...driver, impact: Math.min(2, driver.impact) } : driver)
+    .sort((a, b) => b.impact - a.impact)
+    .slice(0, 8);
+
+  const isInformationalDetailDriver = (driver: FinancialDriver) =>
+    driver.severity === "Watch" && /detail is available|detail$/i.test(driver.title);
+  const sustainedAlerts = allDrivers
+    .filter((driver) => !isInformationalDetailDriver(driver))
+    .map((driver) => driver.observation);
+  const finalAlerts = Array.from(new Set([
+    ...base.alerts.filter((alert) => !/detail is available|detail/i.test(alert)),
+    ...sustainedAlerts,
+  ]));
   return {
     ...base,
     cash: resolvedCash.cash,
@@ -985,7 +1034,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     detailDrivers: detailed.details,
     unknowns: Array.from(new Set([
       ...detailed.unknowns,
-      ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown (shown as $0)."] : []),
+      ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown."] : []),
       ...(inventoryDetailFallback ? ["Inventory is estimated from SKU detail — no inventory summary or balance sheet was provided."] : []),
       ...(periodMismatchUnknown ? [periodMismatchUnknown] : []),
     ])).slice(0, 10),
@@ -994,8 +1043,9 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
 }
 
 export function buildDeterministicExecutiveSummary(data: BriefingData): string {
-  if (!data.alerts.length && !data.drivers.length) return "No major exceptions were detected in the latest financial data.";
-  return (data.alerts.length ? data.alerts : data.drivers.map((driver) => driver.observation)).slice(0, 2).join(" ");
+  const meaningfulDrivers = data.drivers.filter((driver) => !(driver.severity === "Watch" && /detail is available|detail$/i.test(driver.title)));
+  if (!data.alerts.length && !meaningfulDrivers.length) return "No major exceptions were detected in the latest financial data.";
+  return (data.alerts.length ? data.alerts : meaningfulDrivers.map((driver) => driver.observation)).slice(0, 2).join(" ");
 }
 
 export function scoreAIAction(action: AIAction, data: BriefingData): number {

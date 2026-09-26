@@ -545,10 +545,10 @@ export default function CFOBriefing() {
   );
 
   const metrics = [
-    { key: "revenue" as const, label: "Revenue", value: currency.format(data.revenue), change: data.revenueChange, tone: data.revenueChange > 0 ? "text-emerald-600" : data.revenueChange < 0 ? "text-red-600" : "text-amber-600", signal: data.revenueChange > 0 ? "bg-emerald-500" : data.revenueChange < 0 ? "bg-red-500" : "bg-amber-400" },
-    { key: "margin" as const, label: "Gross Margin", value: formatPercentValue(data.grossMargin), change: data.marginChange, tone: marginBaseline ? "text-amber-600" : data.marginChange > 0 ? "text-emerald-600" : data.marginChange < 0 ? "text-red-600" : "text-amber-600", signal: marginBaseline ? "bg-amber-400" : data.marginChange > 0 ? "bg-emerald-500" : data.marginChange < 0 ? "bg-red-500" : "bg-amber-400" },
-    { key: "cash" as const, label: "Cash Position", value: currency.format(data.cash), change: data.cashChange, tone: data.cashChange > 0 ? "text-emerald-600" : data.cashChange < 0 ? "text-red-600" : "text-amber-600", signal: data.cashChange > 0 ? "bg-emerald-500" : data.cashChange < 0 ? "bg-red-500" : "bg-amber-400", cashAsOfDate: data.cashAsOfDate, liveCashNote: data.liveCashNote },
-    { key: "inventory" as const, label: "Inventory", value: currency.format(data.inventory), change: data.inventoryChange, tone: !Number.isFinite(data.inventoryChange) ? "text-slate-500" : data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400" },
+    { key: "revenue" as const, label: "Revenue", value: currency.format(data.revenue), change: data.revenueChange, tone: data.revenueChange > 0 ? "text-emerald-600" : data.revenueChange < 0 ? "text-red-600" : "text-amber-600", signal: data.revenueChange > 0 ? "bg-emerald-500" : data.revenueChange < 0 ? "bg-red-500" : "bg-amber-400", available: true },
+    { key: "margin" as const, label: "Gross Margin", value: formatPercentValue(data.grossMargin), change: data.marginChange, tone: marginBaseline ? "text-amber-600" : data.marginChange > 0 ? "text-emerald-600" : data.marginChange < 0 ? "text-red-600" : "text-amber-600", signal: marginBaseline ? "bg-amber-400" : data.marginChange > 0 ? "bg-emerald-500" : data.marginChange < 0 ? "bg-red-500" : "bg-amber-400", available: true },
+    { key: "cash" as const, label: "Cash Position", value: data.dataAvailability?.cash === false ? "—" : currency.format(data.cash), change: data.dataAvailability?.cash === false ? Number.NaN : data.cashChange, tone: data.dataAvailability?.cash === false ? "text-slate-500" : data.cashChange > 0 ? "text-emerald-600" : data.cashChange < 0 ? "text-red-600" : "text-amber-600", signal: data.dataAvailability?.cash === false ? "bg-slate-400" : data.cashChange > 0 ? "bg-emerald-500" : data.cashChange < 0 ? "bg-red-500" : "bg-amber-400", available: data.dataAvailability?.cash !== false, cashAsOfDate: data.cashAsOfDate, liveCashNote: data.liveCashNote },
+    { key: "inventory" as const, label: "Inventory", value: data.dataAvailability?.inventory === false ? "—" : currency.format(data.inventory), change: data.dataAvailability?.inventory === false ? Number.NaN : data.inventoryChange, tone: data.dataAvailability?.inventory === false ? "text-slate-500" : !Number.isFinite(data.inventoryChange) ? "text-slate-500" : data.inventoryChange > 0 ? "text-amber-600" : data.inventoryChange < 0 ? "text-emerald-600" : "text-slate-500", signal: data.dataAvailability?.inventory === false ? "bg-slate-400" : data.inventoryChange > 0 ? "bg-amber-400" : data.inventoryChange < 0 ? "bg-emerald-500" : "bg-slate-400", available: data.dataAvailability?.inventory !== false },
   ];
   const mtd = data.mtdComparison;
   const attentionCandidates = useMemo(() => {
@@ -691,10 +691,12 @@ export default function CFOBriefing() {
                     <p className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{metric.value}</p>
                     {metric.key === "cash" && metric.cashAsOfDate && <p className="mt-1 text-[10px] font-medium text-slate-400">{`as of ${metric.cashAsOfDate}`}</p>}
                     {metric.key === "cash" && metric.liveCashNote && <p className="mt-1 text-[10px] font-medium text-slate-400">{metric.liveCashNote}</p>}
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm">
-                      <span className={metric.tone}>{displayChange(metric.change, metric.key, metric.key === "inventory" ? data.inventory : undefined)}</span>
-                      <span className="font-normal text-slate-400">vs. prior period</span>
-                    </div>
+                    {metric.available ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:text-sm">
+                        <span className={metric.tone}>{displayChange(metric.change, metric.key, metric.key === "inventory" ? data.inventory : undefined)}</span>
+                        <span className="font-normal text-slate-400">vs. prior period</span>
+                      </div>
+                    ) : null}
                     {metric.key === "margin" && (marginBaseline || zeroCogsNote) && <p className="mt-2 text-[10px] leading-4 text-amber-700">No COGS recorded in QuickBooks — 100% is a reported accounting margin, not necessarily economic gross margin.</p>}
                   </button>
                 );
