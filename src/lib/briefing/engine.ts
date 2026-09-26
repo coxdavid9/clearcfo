@@ -651,6 +651,12 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
           const aligned = safeTrend(cashValues, balanceLabels);
           series.push({ name: "Cash Position", values: aligned.values, periods: aligned.labels });
         }
+        const balanceInventoryRow = findDataRow(balanceRows, [/^inventory$/i, /total inventory/i, /inventory asset/i]);
+        if (balanceInventoryRow && balanceLabels.length && !series.some((item) => item.name === "Inventory")) {
+          const inventoryValues = rowValues(balanceInventoryRow, balanceLabels.length);
+          const aligned = safeTrend(inventoryValues, balanceLabels);
+          series.push({ name: "Inventory", values: aligned.values, periods: aligned.labels });
+        }
       }
       return series;
     })(),
