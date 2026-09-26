@@ -705,7 +705,7 @@ export default function CFOBriefing() {
           </section>
 
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7" aria-labelledby="trend-heading">
-            <div className="flex items-start justify-between gap-4"><div><p id="trend-heading" className="text-sm font-semibold text-slate-900">{activeMetric.name} trend</p><p className="mt-1 text-xs text-slate-500">Trailing {trendValues.length} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange, activeMetricKey, activeMetricDefinition.current)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
+            <div className="flex items-start justify-between gap-4"><div><p id="trend-heading" className="text-sm font-semibold text-slate-900">{activeMetric.name} trend</p><p className="mt-1 text-xs text-slate-500">Trailing {trendValues.length ? trendValues.length : "—"} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange, activeMetricKey, activeMetricDefinition.current)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
             <div className="relative mt-5 h-60 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
               {trendValues.length ? (
                 <>
@@ -724,7 +724,7 @@ export default function CFOBriefing() {
                 </>
               ) : (
                 <div className="flex h-full items-center justify-center px-6 text-center">
-                  <p className="max-w-md text-sm leading-6 text-slate-500">No {activeMetric.name} trend available — connect QuickBooks or upload a file with balance-sheet data.</p>
+                  <p className="max-w-md text-sm leading-6 text-slate-500">{activeMetricKey === "revenue" || activeMetricKey === "margin" ? `No ${activeMetric.name} trend available — upload a P&L with one column per month.` : `No ${activeMetric.name} trend available — connect QuickBooks or upload a file with a balance sheet.`}</p>
                 </div>
               )}
             </div>
