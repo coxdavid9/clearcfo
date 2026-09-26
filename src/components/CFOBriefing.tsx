@@ -660,7 +660,9 @@ export default function CFOBriefing() {
             <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm sm:p-7"><p className="text-base leading-7 text-slate-800 sm:text-lg">{deterministicAnalysis}</p></div>
           </section>
 
-          <EmergingConstraintsCard constraints={data.emergingConstraints || []} />\n\n          <section className="mt-8" aria-labelledby="attention-heading">
+          <EmergingConstraintsCard constraints={data.emergingConstraints || []} />
+
+          <section className="mt-8" aria-labelledby="attention-heading">
             <div className="flex items-center gap-2"><p id="attention-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">NEEDS YOUR ATTENTION</p><span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">{attentionCountLabel} of {attentionCandidates.length}</span></div>
             <p className="mt-1 text-xs text-slate-500">Ranked by estimated dollar impact, then severity.</p>
             {attentionCandidates.length > 0 ? (
