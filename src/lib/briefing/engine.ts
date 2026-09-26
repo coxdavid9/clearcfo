@@ -567,6 +567,29 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const inventoryChange = changePercent(inventory, previousInventory);
   const expenseChange = changePercent(expense, previousExpense);
   const drivers = buildDrivers(revenue, previousRevenue, revenueChange, marginChange, cash, previousCash, cashChange, inventory, previousInventory, inventoryChange, expense, previousExpense, expenseChange);
+  const expenseSpike = detectExpenseSpikeRecovery(expenseValues);
+  if (expenseSpike) {
+    const spikeStart = labels[expenseSpike.index] || `period ${expenseSpike.index + 1}`;
+    const spikeEnd = labels[expenseSpike.index + expenseSpike.length - 1] || spikeStart;
+    const spikeLabel = expenseSpike.length === 1 ? spikeStart : `${spikeStart}–${spikeEnd}`;
+    drivers.push({
+      id: "excel-expense-spike-recovery",
+      category: "Unusual Spend",
+      title: "Operating expenses spiked and have returned toward baseline",
+      observation: `Operating expenses spiked in ${spikeLabel} to ${formatCurrency(expenseSpike.peak)} versus a baseline of ${formatCurrency(expenseSpike.baseline)}, then returned toward that baseline.`,
+      evidence: [
+        `Spike period: ${spikeLabel}`,
+        `Peak operating expenses: ${formatCurrency(expenseSpike.peak)}`,
+        `Baseline operating expenses: ${formatCurrency(expenseSpike.baseline)}`,
+        `Estimated excess spend: ${formatCurrency(expenseSpike.excess)}`,
+      ],
+      direction: "up",
+      severity: expenseSpike.excess >= 50000 ? "High" : "Medium",
+      impact: Math.min(10, Math.max(2, Math.round(expenseSpike.excess / 25000))),
+      confidence: 0.9,
+      managementQuestion: "What caused the expense spike, and was it a one-time cost or something that could recur?",
+    });
+  }
   const sustainedDrivers = buildSustainedTrendDrivers(revenueValues, grossProfitValues, labels, workbookForSeries);
   const allDrivers = [...drivers, ...sustainedDrivers].sort((a, b) => b.impact - a.impact).slice(0, 8);
   const alerts = buildAlerts(revenueChange, cashChange, inventoryChange, expenseChange);
