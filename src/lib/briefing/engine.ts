@@ -1059,7 +1059,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     detailDrivers: detailed.details,
     unknowns: Array.from(new Set([
       ...detailed.unknowns,
-      ...(!dataAvailability.cash ? ["The uploaded workbook does not include a balance sheet, so cash position is unknown."] : []),
+      ...(!dataAvailability.cash ? ["The uploaded workbook does not include cash data, so cash position is unknown."] : []),
       ...(inventoryDetailFallback ? ["Inventory is estimated from SKU detail — no inventory summary or balance sheet was provided."] : []),
       ...(periodMismatchUnknown ? [periodMismatchUnknown] : []),
     ])).slice(0, 10),
