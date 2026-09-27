@@ -22,9 +22,10 @@ assert.ok(
 
 console.log("PASS: Excel period header fallback uses legacy matcher");
 
-const pointsMatch = source.match(/export function formatPoints\(value: number\): string \{[\\s\\S]*?\n\}/);
-assert.ok(pointsMatch, "formatPoints helper must exist");
-const formatPoints = new Function(`${pointsMatch[0].replace(/^export /, "")}; return formatPoints;`)();
+const pointsStart = source.indexOf("export function formatPoints");
+const pointsEnd = source.indexOf("\n}\n", pointsStart);
+assert.ok(pointsStart >= 0 && pointsEnd > pointsStart, "formatPoints helper must exist");
+const formatPoints = new Function(`${source.slice(pointsStart, pointsEnd + 2).replace(/^export /, "")}; return formatPoints;`)();
 
 assert.equal(formatPoints(-10), "-10 pts");
 assert.equal(formatPoints(2.25), "+2.3 pts");
