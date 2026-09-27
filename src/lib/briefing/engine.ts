@@ -624,7 +624,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
     detailDrivers: [],
     trendInsights: [],
     trendSeries: (() => {
-      const series: { name: string; values: number[]; periods: string[] }[] = [
+      const series: { name: string; values: (number | null)[]; periods: string[] }[] = [
         { name: "Revenue", values: trend.values, periods: trend.labels },
         {
           name: "Gross Margin",
