@@ -21,3 +21,14 @@ assert.ok(
 );
 
 console.log("PASS: Excel period header fallback uses legacy matcher");
+
+const pointsStart = source.indexOf("export function formatPoints");
+const pointsEnd = source.indexOf("\n}\n", pointsStart);
+assert.ok(pointsStart >= 0 && pointsEnd > pointsStart, "formatPoints helper must exist");
+const pointsSource = source.slice(pointsStart, pointsEnd + 2);
+assert.ok(pointsSource.includes('if (!Number.isFinite(value)) return "0 pts";'));
+assert.ok(pointsSource.includes('value > 0 ? "+" : ""'));
+assert.ok(pointsSource.includes('Number(value.toFixed(1))'));
+assert.ok(pointsSource.includes('} pts'));
+
+console.log("PASS: formatPoints source contract renders signed percentage-point deltas");

@@ -1,5 +1,5 @@
 import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison, KpiBreakdowns } from "./briefing/engine";
-import { currency } from "./briefing/engine";
+import { currency, formatPoints } from "./briefing/engine";
 import { detectCashSqueeze, detectMarginErosion, type EmergingConstraint } from "./briefing/emerging-constraints";
 
 type Series = { name: string; values: (number | null)[]; periods: string[] };
@@ -324,7 +324,7 @@ function buildDrivers(revenueChange: number, marginChange: number, cashChange: n
     if ((previousCogs || 0) === 0 && (currentCogs || 0) > 0) {
       drivers.push({ id: "margin-baseline", category: "Margin", title: "COGS appeared this period after none in the prior period", observation: `COGS of ${Math.round(currentCogs).toLocaleString()} was recorded this period versus $0 in the prior period. That change coincides with the margin movement, but the prior-period baseline should be validated before treating it as a recurring margin driver.`, evidence: [`Current COGS: $${Math.round(currentCogs).toLocaleString()}`, `Prior COGS: $0`], direction: "down", severity: "Medium", impact: 2, confidence: 0.88, managementQuestion: "Was prior-period COGS omitted, or is this the beginning of a recurring COGS pattern?", estimatedImpact: Math.abs(currentCogs) });
     } else {
-      drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercent(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercent(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?", estimatedImpact: currentRevenue > 0 ? Math.abs(marginChange / 100) * currentRevenue : undefined });
+      drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPoints(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPoints(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?", estimatedImpact: currentRevenue > 0 ? Math.abs(marginChange / 100) * currentRevenue : undefined });
     }
   }
   return drivers;
