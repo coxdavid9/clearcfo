@@ -1258,7 +1258,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     recommendation: mergedDrivers[0]?.observation || "Review the latest QuickBooks financial signals and determine the most important management action.",
     impact: mergedDrivers[0]?.impact || 0,
     impactReason: mergedDrivers[0]?.observation || "No major exceptions were detected.",
-    trend: trendSeries[0].values,
+    trend: activeRevenue.slice(-12),
     periods: trendSeries[0].periods,
     health: mergedDrivers.some((driver) => driver.severity === "High") ? "attention" : mergedDrivers.length ? "watch" : "strong",
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,
