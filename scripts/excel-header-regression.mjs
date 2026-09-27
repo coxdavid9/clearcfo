@@ -21,3 +21,13 @@ assert.ok(
 );
 
 console.log("PASS: Excel period header fallback uses legacy matcher");
+
+const pointsMatch = source.match(/export function formatPoints\(value: number\): string \{[\\s\\S]*?\n\}/);
+assert.ok(pointsMatch, "formatPoints helper must exist");
+const formatPoints = new Function(`${pointsMatch[0].replace(/^export /, "")}; return formatPoints;`)();
+
+assert.equal(formatPoints(-10), "-10 pts");
+assert.equal(formatPoints(2.25), "+2.3 pts");
+assert.equal(formatPoints(NaN), "0 pts");
+
+console.log("PASS: formatPoints renders margin deltas as points");
