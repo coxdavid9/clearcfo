@@ -736,9 +736,9 @@ export default function CFOBriefing() {
               {trendPoints.length ? (
                 <>
                   <div className="pointer-events-none absolute left-2 top-2 bottom-8 flex flex-col justify-between text-[10px] font-medium text-slate-400">
-                    <span>{formatTrendValue(activeMetricKey, Math.max(...trendValues))}</span>
-                    <span>{formatTrendValue(activeMetricKey, (Math.min(...trendValues) + Math.max(...trendValues)) / 2)}</span>
-                    <span>{formatTrendValue(activeMetricKey, Math.min(...trendValues))}</span>
+                    <span>{formatTrendValue(activeMetricKey, Math.max(...trendPoints.map((point) => point.value)))}</span>
+                    <span>{formatTrendValue(activeMetricKey, (Math.min(...trendPoints.map((point) => point.value)) + Math.max(...trendPoints.map((point) => point.value))) / 2)}</span>
+                    <span>{formatTrendValue(activeMetricKey, Math.min(...trendPoints.map((point) => point.value)))}</span>
                   </div>
                   <div className="h-full pl-14">
                     <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label={`${activeMetric.name} trend over available periods`} preserveAspectRatio="none">
