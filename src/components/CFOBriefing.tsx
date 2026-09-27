@@ -142,26 +142,50 @@ export default function CFOBriefing() {
   const trendChange = activeMetricDefinition.change;
 
   const trendPoints = useMemo(() => {
-    const values = trendValues.map((value) => Number(value)).filter((value) => Number.isFinite(value));
-    if (!values.length) return [];
+    const finiteValues = trendValues
+      .map((value) => (value === null || value === undefined ? null : Number(value)))
+      .filter((value): value is number => Number.isFinite(value));
+    if (!finiteValues.length) return [];
+
     const width = 720;
     const height = 220;
     const left = 18;
     const right = 18;
     const top = 22;
     const bottom = 30;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const min = Math.min(...finiteValues);
+    const max = Math.max(...finiteValues);
     const range = max - min;
-    return trendValues.map((value, index) => {
+
+    return trendValues.flatMap((value, index) => {
+      if (value === null || value === undefined) return [];
+      const numericValue = Number(value);
+      if (!Number.isFinite(numericValue)) return [];
       const x = trendValues.length === 1 ? width / 2 : left + (index / (trendValues.length - 1)) * (width - left - right);
-      const normalized = range === 0 ? 0.5 : (value - min) / range;
+      const normalized = range === 0 ? 0.5 : (numericValue - min) / range;
       const y = top + (1 - normalized) * (height - top - bottom);
-      return { x, y, value };
+      return [{ x, y, value: numericValue, index }];
     });
   }, [trendValues]);
 
-  const trendPolyline = trendPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const trendSegments = useMemo(() => {
+    const segments: Array<typeof trendPoints> = [];
+    let current: typeof trendPoints = [];
+    let previousIndex = -2;
+
+    for (const point of trendPoints) {
+      if (point.index !== previousIndex + 1 && current.length) {
+        segments.push(current);
+        current = [];
+      }
+      current.push(point);
+      previousIndex = point.index;
+    }
+
+    if (current.length) segments.push(current);
+    return segments;
+  }, [trendPoints]);
+
   const trendLabelIndices = useMemo(() => {
     const last = Math.max(0, trendPeriods.length - 1);
     if (last === 0) return [0];
@@ -709,7 +733,7 @@ export default function CFOBriefing() {
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7" aria-labelledby="trend-heading">
             <div className="flex items-start justify-between gap-4"><div><p id="trend-heading" className="text-sm font-semibold text-slate-900">{activeMetric.name} trend</p><p className="mt-1 text-xs text-slate-500">Trailing {trendValues.length ? trendValues.length : "—"} periods</p></div><div className="text-right"><p className={`text-sm font-bold ${Number.isFinite(trendChange) ? trendChange >= 0 ? "text-emerald-600" : "text-red-600" : "text-slate-500"}`}>{displayChange(trendChange, activeMetricKey, activeMetricDefinition.current)}</p><p className="text-xs text-slate-400">latest trend</p></div></div>
             <div className="relative mt-5 h-60 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60">
-              {trendValues.length ? (
+              {trendPoints.length ? (
                 <>
                   <div className="pointer-events-none absolute left-2 top-2 bottom-8 flex flex-col justify-between text-[10px] font-medium text-slate-400">
                     <span>{formatTrendValue(activeMetricKey, Math.max(...trendValues))}</span>
@@ -719,8 +743,8 @@ export default function CFOBriefing() {
                   <div className="h-full pl-14">
                     <svg viewBox="0 0 720 220" className="h-full w-full" role="img" aria-label={`${activeMetric.name} trend over available periods`} preserveAspectRatio="none">
                       <line x1="18" y1="22" x2="702" y2="22" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="106" x2="702" y2="106" stroke="currentColor" className="text-slate-200" strokeWidth="1" /><line x1="18" y1="190" x2="702" y2="190" stroke="currentColor" className="text-slate-200" strokeWidth="1" />
-                      {trendPolyline && <polyline points={trendPolyline} fill="none" stroke="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-                      {trendPoints.map((point, index) => <circle key={`${trendPeriods[index] || index}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"}><title>{`${trendPeriods[index] || "Period"}: ${formatTrendValue(activeMetricKey, point.value)}`}</title></circle>)}
+                      {trendSegments.map((segment, segmentIndex) => <polyline key={`trend-segment-${segmentIndex}`} points={segment.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />)}
+                      {trendPoints.map((point) => <circle key={`${trendPeriods[point.index] || point.index}-${point.index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" className={activeMetricKey === "cash" ? "text-emerald-600" : activeMetricKey === "inventory" ? "text-violet-600" : activeMetricKey === "margin" ? "text-indigo-600" : "text-blue-600"}><title>{`${trendPeriods[point.index] || "Period"}: ${formatTrendValue(activeMetricKey, point.value)}`}</title></circle>)}
                     </svg>
                   </div>
                 </>
