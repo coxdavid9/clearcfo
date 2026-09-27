@@ -42,7 +42,7 @@ export type BriefingData = {
   relationships: string[];
   detailDrivers: DetailDriver[];
   trendInsights: string[];
-  trendSeries: { name: string; values: number[]; periods: string[] }[];
+  trendSeries: { name: string; values: (number | null)[]; periods: string[] }[];
   unknowns: string[];
   mtdComparison?: MtdComparison | null;
   ratios?: FinancialRatio[];
@@ -631,7 +631,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
           values: labels.map((_, index) => {
             const revenueValue = revenueValues[index] ?? 0;
             const grossProfitValue = grossProfitValues[index] ?? 0;
-            return revenueValue !== 0 ? (grossProfitValue / revenueValue) * 100 : 0;
+            return revenueValue !== 0 ? (grossProfitValue / revenueValue) * 100 : null;
           }),
           periods: labels,
         },
