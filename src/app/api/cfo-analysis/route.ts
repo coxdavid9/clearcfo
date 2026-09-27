@@ -150,6 +150,33 @@ function extractOutputText(payload: any): string {
   return text.trim();
 }
 
+async function recordExcelBriefing(userId: string, companyId: string | null) {
+  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.error("[ClearCFO AI] Could not record Excel briefing: Supabase server configuration is missing.");
+    return;
+  }
+  try {
+    const response = await fetch(url + "/rest/v1/excel_analyses", {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: "Bearer " + key,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ user_id: userId, company_id: companyId }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      console.error("[ClearCFO AI] Could not record Excel briefing:", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[ClearCFO AI] Could not record Excel briefing:", error instanceof Error ? error.message : "Unknown error");
+  }
+}
+
 function asAnalysisObject(value: unknown): Record<string, any> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : null;
 }
@@ -311,6 +338,8 @@ export async function POST(request: Request) {
     const analysisObject = asAnalysisObject(analysis);
     if (!analysisObject) return NextResponse.json({ error: "OpenAI returned an invalid analysis structure." }, { status: 502 });
     const normalizedAnalysis = normalizeScenarioAnalysis(analysisObject, scenarioSignals, bodyObject);
+    const companyId = typeof bodyObject.companyId === "string" && bodyObject.companyId.trim() ? bodyObject.companyId.trim() : null;
+    await recordExcelBriefing(userId, companyId);
     console.log("[ClearCFO AI] Analysis completed successfully.");
     return NextResponse.json({ analysis: normalizedAnalysis });
   } catch (error) {
