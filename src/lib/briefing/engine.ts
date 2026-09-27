@@ -360,7 +360,7 @@ function buildDrivers(
       title: "Operating expenses are rising faster than revenue",
       observation: usePercentage
         ? `Operating expenses increased ${formatPercentValue(expenseChange)} while revenue changed ${formatPercentValue(revenueChange)}.`
-        : `Operating expenses increased ${formatCurrency(magnitude)} (${formatCurrency(previousExpense)} to ${formatCurrency(expense)}) while revenue increased ${formatCurrency(Math.abs(revenueDelta))} (${formatCurrency(previousRevenue)} to ${formatCurrency(revenue)}).`,
+        : `Operating expenses increased ${formatCurrency(magnitude)} (${formatCurrency(previousExpense)} to ${formatCurrency(expense)}) while revenue ${revenueDelta >= 0 ? "increased" : "decreased"} ${formatCurrency(Math.abs(revenueDelta))} (${formatCurrency(previousRevenue)} to ${formatCurrency(revenue)}).`,
       evidence: [
         `Operating expenses: ${formatCurrency(previousExpense)} → ${formatCurrency(expense)} (${expenseDelta >= 0 ? "+" : ""}${formatCurrency(expenseDelta)})`,
         `Revenue: ${formatCurrency(previousRevenue)} → ${formatCurrency(revenue)} (${revenueDelta >= 0 ? "+" : ""}${formatCurrency(revenueDelta)})`,
@@ -411,7 +411,7 @@ function buildAlerts(revenueChange: number, cashChange: number, inventoryChange:
   const alerts: string[] = [];
   if (expenseChange > 0 && expenseChange > revenueChange + 2) alerts.push(`Operating expenses increased ${formatPercentValue(expenseChange)} while revenue changed ${formatPercentValue(revenueChange)}.`);
   if (cashChange < -5) alerts.push(`Cash declined ${formatPercentValue(Math.abs(cashChange))} from the prior period.`);
-  if (inventoryChange > revenueChange + 2) alerts.push(`Inventory increased ${formatPercentValue(inventoryChange)}, outpacing revenue change of ${formatPercentValue(revenueChange)}.`);
+  if (inventoryChange > revenueChange + 2) alerts.push(`Inventory ${inventoryChange >= 0 ? "increased" : "decreased"} ${formatPercentValue(Math.abs(inventoryChange))}, outpacing revenue change of ${formatPercentValue(revenueChange)}.`);
   return alerts;
 }
 
