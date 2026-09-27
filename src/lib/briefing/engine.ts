@@ -239,6 +239,11 @@ export function formatPercentValue(value: number): string {
   return `${Number.isInteger(value) ? value : Number(value.toFixed(1))}%`;
 }
 
+export function formatPoints(value: number): string {
+  if (!Number.isFinite(value)) return "0 pts";
+  return `${value > 0 ? "+" : ""}${Number(value.toFixed(1))} pts`;
+}
+
 export function percent(value: number): string {
   return formatPercentValue(value);
 }
@@ -402,7 +407,7 @@ function buildDrivers(
     });
   }
   if (marginChange < -2) {
-    drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPercentValue(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPercentValue(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
+    drivers.push({ id: "margin-pressure", category: "Margin", title: "Gross margin has weakened", observation: `Gross margin changed ${formatPoints(marginChange)} from the prior period.`, evidence: [`Margin change: ${formatPoints(marginChange)}`], direction: "down", severity: marginChange < -5 ? "High" : "Medium", impact: 4, confidence: 0.88, managementQuestion: "Is the margin change coming from pricing, product mix, or direct costs?" });
   }
   return drivers;
 }
@@ -515,7 +520,7 @@ function buildSustainedTrendDrivers(
         id: "excel-sustained-margin-compression",
         category: "Margin",
         title: "Gross margin remains below its trailing high",
-        observation: `Gross margin is ${formatPercentValue(-compression)} below its trailing-6-period high (${formatPercentValue(latestMargin)} latest vs ${formatPercentValue(trailingHigh)} high).`,
+        observation: `Gross margin is ${formatPoints(-compression)} below its trailing-6-period high (${formatPercentValue(latestMargin)} latest vs ${formatPercentValue(trailingHigh)} high).`,
         evidence: [
           `Trailing-6-period high: ${formatPercentValue(trailingHigh)}`,
           `Latest gross margin: ${formatPercentValue(latestMargin)}`,
