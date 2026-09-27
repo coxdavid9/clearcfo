@@ -2,7 +2,7 @@ import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, Cas
 import { currency } from "./briefing/engine";
 import { detectCashSqueeze, detectMarginErosion, type EmergingConstraint } from "./briefing/emerging-constraints";
 
-type Series = { name: string; values: number[]; periods: string[] };
+type Series = { name: string; values: (number | null)[]; periods: string[] };
 type ReportNode = { label: string; values: number[]; group: string; type: string };
 
 function clean(value: unknown): string {
@@ -1228,12 +1228,12 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
 
   const trendSeries: Series[] = [
     { name: "Revenue", values: activeRevenue.slice(-12), periods: activePeriods.slice(-12) },
-    { name: "Gross Margin", values: activePeriods.slice(-12).map((_, index) => { const sourceIndex = Math.max(0, activePeriods.length - Math.min(12, activePeriods.length)) + index; return activeRevenue[sourceIndex] ? (activeGrossProfit[sourceIndex] / activeRevenue[sourceIndex]) * 100 : 0; }), periods: activePeriods.slice(-12) },
+    { name: "Gross Margin", values: activePeriods.slice(-12).map((_, index) => { const sourceIndex = Math.max(0, activePeriods.length - Math.min(12, activePeriods.length)) + index; return activeRevenue[sourceIndex] ? (activeGrossProfit[sourceIndex] / activeRevenue[sourceIndex]) * 100 : null; }), periods: activePeriods.slice(-12) },
     { name: "Operating Expenses", values: activeExpenses.slice(-12), periods: activePeriods.slice(-12) },
     { name: "Cash Position", values: cashAligned.slice(-12), periods: activePeriods.slice(-12) },
     { name: "Inventory", values: inventoryAligned.slice(-12), periods: activePeriods.slice(-12) },
   ];
-  const nonEmptySeries = trendSeries.filter((series) => series.values.length && series.values.some((value) => value !== 0));
+  const nonEmptySeries = trendSeries.filter((series) => series.values.length && series.values.some((value) => value !== 0 && value !== null));
 
   return {
     companyName: companyName || "Your business",
@@ -1258,7 +1258,7 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     recommendation: mergedDrivers[0]?.observation || "Review the latest QuickBooks financial signals and determine the most important management action.",
     impact: mergedDrivers[0]?.impact || 0,
     impactReason: mergedDrivers[0]?.observation || "No major exceptions were detected.",
-    trend: trendSeries[0].values,
+    trend: activeRevenue.slice(-12),
     periods: trendSeries[0].periods,
     health: mergedDrivers.some((driver) => driver.severity === "High") ? "attention" : mergedDrivers.length ? "watch" : "strong",
     confidence: nonEmptySeries.length >= 3 ? 0.92 : 0.82,

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BriefingData, currency, demoData, formatPercentValue } from "../lib/briefing/engine";
 
-type TrendSeries = { name: string; values: number[]; periods: string[] };
+type TrendSeries = { name: string; values: (number | null)[]; periods: string[] };
 type MetricKey = "Revenue" | "Gross Margin" | "Cash Position" | "Inventory";
 
 const demoTrendSeries: TrendSeries[] = [
@@ -14,7 +14,7 @@ const demoTrendSeries: TrendSeries[] = [
 ];
 
 function TrendChart({ series, formatValue }: { series: TrendSeries; formatValue: (value: number) => string }) {
-  const values = series.values.slice(-12);
+  const values = series.values.slice(-12).filter((value): value is number => value !== null && Number.isFinite(value));
   const labels = series.periods.slice(-12);
   const points = useMemo(() => {
     if (!values.length) return [];
@@ -192,15 +192,25 @@ export default function FinancialDashboard() {
   );
 }
 
-function MiniSparkline({ values }: { values: number[] }) {
-  if (!values.length) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+function MiniSparkline({ values }: { values: (number | null)[] }) {
+  const finiteValues = values.filter((value): value is number => value !== null && Number.isFinite(value));
+  if (!finiteValues.length) return null;
+  const min = Math.min(...finiteValues);
+  const max = Math.max(...finiteValues);
   const range = max - min || 1;
   const points = values.map((value, index) => {
+    if (value === null || !Number.isFinite(value)) return null;
     const x = values.length === 1 ? 2 : (index / (values.length - 1)) * 96 + 2;
     const y = 38 - ((value - min) / range) * 30;
     return `${x},${y}`;
-  }).join(" ");
-  return <svg viewBox="0 0 100 40" className="h-full w-full overflow-visible" preserveAspectRatio="none" aria-hidden="true"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />{values.map((value, index) => { const x = values.length === 1 ? 2 : (index / (values.length - 1)) * 96 + 2; const y = 38 - ((value - min) / range) * 30; return <circle key={`${index}-${value}`} cx={x} cy={y} r="1.3" fill="currentColor" vectorEffect="non-scaling-stroke" />; })}</svg>;
+  }).filter((point): point is string => point !== null).join(" ");
+  return <svg viewBox="0 0 100 40" className="h-full w-full overflow-visible" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
+    {values.map((value, index) => {
+      if (value === null || !Number.isFinite(value)) return null;
+      const x = values.length === 1 ? 2 : (index / (values.length - 1)) * 96 + 2;
+      const y = 38 - ((value - min) / range) * 30;
+      return <circle key={`${index}-${value}`} cx={x} cy={y} r="1.3" fill="currentColor" vectorEffect="non-scaling-stroke" />;
+    })}
+  </svg>;
 }
