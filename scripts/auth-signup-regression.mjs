@@ -27,7 +27,9 @@ async function withSignupResponse(payload, status = 200) {
 }
 
 const duplicate = await withSignupResponse({
-  user: { id: "obfuscated", identities: [] },
+  id: "obfuscated",
+  email: "existing@example.com",
+  identities: [],
   session: null,
 });
 
@@ -37,7 +39,9 @@ assert.equal(duplicate.error, DUPLICATE_SIGNUP_ERROR);
 console.log("PASS: confirmed duplicate email returns duplicate-signup result");
 
 const newSignup = await withSignupResponse({
-  user: { id: "new-user", identities: [{ id: "identity-1" }] },
+  id: "new-user",
+  email: "new@example.com",
+  identities: [{ id: "identity-1" }],
   access_token: "access-token",
   refresh_token: "refresh-token",
   expires_in: 3600,
@@ -49,7 +53,9 @@ assert.equal(newSignup.refreshToken, "refresh-token");
 console.log("PASS: genuine new signup keeps success path");
 
 const unconfirmed = await withSignupResponse({
-  user: { id: "unconfirmed-user", identities: [{ id: "identity-1" }] },
+  id: "unconfirmed-user",
+  email: "existing@example.com",
+  identities: [{ id: "identity-1" }],
   access_token: null,
   refresh_token: null,
 });
