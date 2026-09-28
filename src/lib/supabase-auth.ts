@@ -67,6 +67,15 @@ export async function signInWithPassword(email: string, password: string) {
   };
 }
 
+export const DUPLICATE_SIGNUP_ERROR = "An account with this email already exists. Try logging in instead.";
+
+function isObfuscatedDuplicateSignup(payload: any) {
+  return Array.isArray(payload?.user?.identities)
+    && payload.user.identities.length === 0
+    && !payload?.access_token
+    && !payload?.refresh_token;
+}
+
 type SignupProfile = {
   companyName: string;
   industry: string;
@@ -97,6 +106,10 @@ export async function signUpWithPassword(email: string, password: string, profil
 
   if (!response.ok) {
     return { ok: false as const, error: payload?.msg || payload?.message || payload?.error_description || "Unable to create the account." };
+  }
+
+  if (isObfuscatedDuplicateSignup(payload)) {
+    return { ok: false as const, code: "DUPLICATE_EMAIL" as const, error: DUPLICATE_SIGNUP_ERROR };
   }
 
   return {
