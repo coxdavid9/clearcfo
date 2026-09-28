@@ -104,6 +104,17 @@ export async function signUpWithPassword(email: string, password: string, profil
 
   const payload = await response.json().catch(() => ({}));
 
+  // Temporary safe diagnostic: never log email, password, tokens, or user data.
+  console.info("[signup-diagnostic]", {
+    status: response.status,
+    hasUser: Boolean(payload?.user),
+    identitiesIsArray: Array.isArray(payload?.user?.identities),
+    identitiesCount: Array.isArray(payload?.user?.identities) ? payload.user.identities.length : null,
+    hasAccessToken: Boolean(payload?.access_token),
+    hasRefreshToken: Boolean(payload?.refresh_token),
+    payloadKeys: payload && typeof payload === "object" ? Object.keys(payload).sort() : [],
+  });
+
   if (!response.ok) {
     return { ok: false as const, error: payload?.msg || payload?.message || payload?.error_description || "Unable to create the account." };
   }
