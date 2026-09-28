@@ -12,6 +12,51 @@ function getSupabaseConfig() {
   return { url: url.replace(/\/$/, ""), publishableKey };
 }
 
+function getSupabaseAdminConfig() {
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    throw new Error("Supabase admin authentication is not configured.");
+  }
+
+  return { url: url.replace(/\/$/, ""), serviceRoleKey };
+}
+
+export async function supabaseAuthUserExists(email: string) {
+  const { url, serviceRoleKey } = getSupabaseAdminConfig();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  for (let page = 1; ; page += 1) {
+    const response = await fetch(
+      `${url}/auth/v1/admin/users?page=${page}&per_page=1000`,
+      {
+        method: "GET",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Unable to check account email.");
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    const users = Array.isArray(payload?.users) ? payload.users : [];
+
+    if (users.some((user: any) => typeof user?.email === "string" && user.email.toLowerCase() === normalizedEmail)) {
+      return true;
+    }
+
+    if (users.length < 1000) {
+      return false;
+    }
+  }
+}
+
 function getAppUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://theclearcfo.com").replace(/\/$/, "");
 }
@@ -70,8 +115,8 @@ export async function signInWithPassword(email: string, password: string) {
 export const DUPLICATE_SIGNUP_ERROR = "An account with this email already exists. Try logging in instead.";
 
 function isObfuscatedDuplicateSignup(payload: any) {
-  return Array.isArray(payload?.user?.identities)
-    && payload.user.identities.length === 0
+  return Array.isArray(payload?.identities)
+    && payload.identities.length === 0
     && !payload?.access_token
     && !payload?.refresh_token;
 }

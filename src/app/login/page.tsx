@@ -38,6 +38,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [duplicateEmailExists, setDuplicateEmailExists] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -53,15 +54,17 @@ export default function LoginPage() {
     setError("");
     setMessage("");
     setConfirmationSent(false);
+    setDuplicateEmailExists(false);
   }
 
   function updateProfile(field: keyof SignupProfile, value: string) {
     setProfile((current) => ({ ...current, [field]: value }));
   }
 
-  function continueSignup(event: FormEvent) {
+  async function continueSignup(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setDuplicateEmailExists(false);
     const checks = passwordChecks(password);
     if (!email.trim()) {
       setError("Enter a valid email address.");
@@ -71,7 +74,32 @@ export default function LoginPage() {
       setError("Create a stronger password using all four requirements below.");
       return;
     }
-    setSignupStep(2);
+
+    setBusy(true);
+    try {
+      const response = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(data.error || "Unable to check this email right now.");
+        return;
+      }
+
+      if (data.exists === true) {
+        setDuplicateEmailExists(true);
+        return;
+      }
+
+      setSignupStep(2);
+    } catch {
+      setError("We could not reach ClearCFO. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -176,7 +204,13 @@ export default function LoginPage() {
                 <form onSubmit={signup ? continueSignup : submit} className="space-y-5">
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-slate-700">Email address</span>
-                    <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="you@company.com" />
+                    <input type="email" autoComplete="email" required value={email} onChange={(event) => { setEmail(event.target.value); setDuplicateEmailExists(false); }} className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="you@company.com" />
+                    {duplicateEmailExists && (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-sm text-red-700">An account with this email already exists. Try logging in instead.</p>
+                        <button type="button" onClick={() => { setMode("login"); setSignupStep(1); setDuplicateEmailExists(false); setError(""); setPassword(""); }} className="mt-2 text-sm font-semibold text-blue-600 hover:text-blue-700">Log in</button>
+                      </div>
+                    )}
                   </label>
 
                   <label className="block">
