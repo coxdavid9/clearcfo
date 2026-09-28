@@ -115,8 +115,8 @@ export async function signInWithPassword(email: string, password: string) {
 export const DUPLICATE_SIGNUP_ERROR = "An account with this email already exists. Try logging in instead.";
 
 function isObfuscatedDuplicateSignup(payload: any) {
-  return Array.isArray(payload?.user?.identities)
-    && payload.user.identities.length === 0
+  return Array.isArray(payload?.identities)
+    && payload.identities.length === 0
     && !payload?.access_token
     && !payload?.refresh_token;
 }
