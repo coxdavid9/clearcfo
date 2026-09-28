@@ -59,7 +59,8 @@ export async function POST(request: Request) {
     const result = await signUpWithPassword(email, password, profileResult.profile);
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      const status = "code" in result && result.code === "DUPLICATE_EMAIL" ? 409 : 400;
+      return NextResponse.json({ error: result.error }, { status });
     }
 
     if (!result.accessToken || !result.refreshToken) {
