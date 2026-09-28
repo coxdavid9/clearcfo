@@ -13,7 +13,6 @@
     "test:alerts": "node scripts/alert-scenarios.mjs",
     "test:due": "node scripts/due-scenarios.mjs",
     "test:email": "node scripts/email-scenarios.mjs",
-    "test:auth-signup": "node --experimental-strip-types scripts/auth-signup-regression.mjs",
     "test:excel-header": "node --experimental-strip-types scripts/excel-header-regression.mjs"
   },
   "dependencies": {
