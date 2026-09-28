@@ -65,6 +65,20 @@ assert.equal(unconfirmed.accessToken, undefined);
 assert.equal(unconfirmed.refreshToken, undefined);
 console.log("PASS: unconfirmed existing account keeps confirmation path");
 
+const emailCheckRoute = await readFile(new URL("../src/app/api/auth/check-email/route.ts", import.meta.url), "utf8");
+const loginPage = await readFile(new URL("../src/app/login/page.tsx", import.meta.url), "utf8");
+assert.match(emailCheckRoute, /SUPABASE_SERVICE_ROLE_KEY/);
+assert.match(emailCheckRoute, /checkRateLimit\(request, authRateLimit\)/);
+assert.match(emailCheckRoute, /supabaseAuthUserExists\(email\)/);
+console.log("PASS: step-1 email check route uses the server-side Supabase admin key and rate limit");
+assert.match(loginPage, /\/api\/auth\/check-email/);
+assert.match(loginPage, /An account with this email already exists\. Try logging in instead\./);
+assert.match(loginPage, /setMode\("login"\)/);
+assert.match(loginPage, /setEmail/);
+console.log("PASS: signup step 1 checks email and offers login without advancing");
+assert.doesNotMatch(loginPage, /signup-diagnostic/);
+console.log("PASS: temporary signup diagnostic is removed");
+
 const route = await readFile(new URL("../src/app/api/auth/signup/route.ts", import.meta.url), "utf8");
 assert.match(route, /result\.code === "DUPLICATE_EMAIL" \? 409 : 400/);
 assert.match(route, /data\.error/);
