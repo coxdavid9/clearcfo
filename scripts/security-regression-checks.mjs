@@ -19,7 +19,7 @@ const profileRoute = read("src/app/api/customer/profile/route.ts");
 const quickBooks = read("src/lib/quickbooks-company.ts");
 const envExample = read(".env.example");
 
-assert(packageJson.dependencies.next === "16.3.4", "Next.js security baseline is not pinned to 16.3.4.");
+assert(packageJson.dependencies.next === "16.3.8", "Next.js security baseline is not pinned to 16.3.8.");
 assert(
   packageJson.dependencies.xlsx === "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
   "SheetJS security baseline is not pinned to 0.20.3."
