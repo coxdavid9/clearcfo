@@ -842,8 +842,11 @@ function buildKpiBreakdowns(args: {
   const liveCashChange = liveCash - currentCash;
   const liveCashChangePct = currentCash === 0 ? Number.NaN : (liveCashChange / Math.abs(currentCash)) * 100;
   const currentNetIncome = netIncome?.[currentIndex];
-  const cashInsight = Number.isFinite(currentNetIncome) && Math.abs(cashDelta - (currentNetIncome as number)) < 1
-    ? "Cash grew " + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + " — every dollar of reported profit landed in the bank."
+  const cashMatchesNetIncome = Number.isFinite(currentNetIncome) && Math.abs(cashDelta - (currentNetIncome as number)) < 1;
+  const cashInsight = cashMatchesNetIncome
+    ? cashDelta >= 0
+      ? "Cash grew " + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + " — every dollar of reported profit landed in the bank."
+      : "Cash declined " + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + " — matching the reported net loss."
     : "Cash " + (cashDelta >= 0 ? "grew " : "declined ") + currency.format(Math.abs(cashDelta)) + " in " + periodLabel + ". The account breakdown shows where the reported cash position sits.";
 
   return {
