@@ -980,7 +980,7 @@ function buildManagementQuestions(
     const top = expenseChanges[0];
     questions.push({
       category: "Profitability",
-      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). ${top.label} is the largest current-period expense at ${currency.format(Math.abs(top.current))}. Is this a recurring cost, a one-time expense, or something that needs to be reviewed?`,
+      question: `Operating expenses moved from ${currency.format(context.previousExpense)} to ${currency.format(context.currentExpense)} (${formatPercent(context.expenseChange)}). The largest period-over-period expense movement was ${top.label}, ${top.change > 0 ? "increasing" : "decreasing"} ${currency.format(Math.abs(top.change))} versus the prior period. Is this a recurring cost, a one-time expense, or something that needs to be reviewed?`,
     });
   } else if (Number.isFinite(context.expenseChange)) {
     questions.push({
