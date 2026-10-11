@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { operatingLossDriver } from "./evidence-policy";
 import { detectExpenseSpikeRecovery } from "../../lib/scenario-detection";
 import type { EmergingConstraint } from "./emerging-constraints";
 
@@ -26,6 +27,8 @@ export type BriefingData = {
   inventory: number;
   inventoryChange: number;
   operatingExpense?: number;
+  grossProfit?: number;
+  operatingIncome?: number;
   previousOperatingExpense?: number;
   attention: number;
   alerts: string[];
@@ -136,7 +139,7 @@ export type AIAction = {
   rationale: string;
   priority: "High" | "Medium" | "Watch";
   score?: number;
-  estimatedImpact?: number;
+  estimatedImpact?: number | null;
 };
 
 export type AIAnalysis = {
@@ -544,6 +547,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const cogsRow = findDataRow(rows, [/^cogs$/i, /cost of goods sold/i, /cost of sales/i, /cost of revenue/i]);
   const cashRow = findDataRow(rows, [/^cash$/i, /^total cash/i, /cash and cash equivalents/i]);
   const inventoryRow = findDataRow(rows, [/^inventory$/i, /total inventory/i, /inventory asset/i]);
+  const operatingIncomeRow = findDataRow(rows, [/^operating income$/i, /^net operating income$/i, /^operating profit(?: \/ loss)?$/i, /^operating loss$/i]);
   const expenseRow = findDataRow(rows, [/^operating expenses$/i, /total operating expenses/i, /^total expenses$/i, /^expenses$/i]);
   const revenueValues = revenueRow ? rowValues(revenueRow, labels.length) : [];
   const cogsValues = cogsRow ? rowValues(cogsRow, labels.length) : [];
@@ -568,6 +572,25 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const previousInventory = hasPreviousPeriod ? inventoryValues[previousIndex] ?? 0 : 0;
   const expense = expenseValues[currentIndex] ?? valueFromRow(expenseRow || [], ["Operating Expenses", "Total Operating Expenses", "Expenses"]);
   const previousExpense = hasPreviousPeriod ? expenseValues[previousIndex] ?? 0 : 0;
+  // Preserve a reported zero and a negative result. A missing final cell must
+  // remain unknown rather than falling back to an earlier nonzero period.
+  const numericCell = (value: unknown): number | undefined => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const raw = value.trim();
+    const parsed = Number(raw.replace(/[$,()]/g, ""));
+    return Number.isFinite(parsed) ? (/^\(.*\)$/.test(raw) ? -Math.abs(parsed) : parsed) : undefined;
+  };
+  const valueIndex = labels.length ? currentIndex + 1 : 1;
+  const reportedOperatingIncome = numericCell(operatingIncomeRow?.[valueIndex]);
+  const reportedGrossProfit = numericCell(grossProfitRow?.[valueIndex]);
+  const suppliedRevenue = numericCell(revenueRow?.[valueIndex]);
+  const suppliedCogs = numericCell(cogsRow?.[valueIndex]);
+  const suppliedGrossProfit = reportedGrossProfit ?? (suppliedRevenue !== undefined && suppliedCogs !== undefined ? suppliedRevenue - suppliedCogs : undefined);
+  const suppliedExpense = numericCell(expenseRow?.[valueIndex]);
+  const operatingIncome = operatingIncomeRow
+    ? reportedOperatingIncome
+    : suppliedGrossProfit !== undefined && suppliedExpense !== undefined ? suppliedGrossProfit - suppliedExpense : undefined;
   const revenueChange = changePercent(revenue, previousRevenue);
   const margin = revenue !== 0 ? (grossProfit / revenue) * 100 : 0;
   const previousMargin = hasPreviousPeriod && previousRevenue !== 0 ? (previousGrossProfit / previousRevenue) * 100 : Number.NaN;
@@ -576,6 +599,8 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
   const inventoryChange = changePercent(inventory, previousInventory);
   const expenseChange = changePercent(expense, previousExpense);
   const drivers = buildDrivers(revenue, previousRevenue, revenueChange, marginChange, cash, previousCash, cashChange, inventory, previousInventory, inventoryChange, expense, previousExpense, expenseChange);
+  const lossDriver = operatingLossDriver(operatingIncome, revenue);
+  if (lossDriver) drivers.push(lossDriver);
   const expenseSpike = detectExpenseSpikeRecovery(expenseValues);
   if (expenseSpike) {
     const spikeStart = labels[expenseSpike.index] || `period ${expenseSpike.index + 1}`;
@@ -613,6 +638,8 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
     inventory,
     inventoryChange,
     operatingExpense: expense,
+    grossProfit: suppliedGrossProfit,
+    operatingIncome,
     previousOperatingExpense: previousExpense,
     attention: alerts.length,
     alerts,
@@ -681,7 +708,7 @@ function buildBriefingFromRows(rows: unknown[][], sheetName: string, workbookFor
       }
       return series;
     })(),
-    unknowns: [],
+    unknowns: operatingIncome === undefined ? ["Operating income could not be established from the supplied P&L cells."] : [],
   };
 }
 
@@ -1063,6 +1090,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): BriefingData {
     relationships: [...base.relationships, ...detailed.relationships].slice(0, 8),
     detailDrivers: detailed.details,
     unknowns: Array.from(new Set([
+      ...base.unknowns,
       ...detailed.unknowns,
       ...(!dataAvailability.cash ? ["The uploaded workbook does not include cash data, so cash position is unknown."] : []),
       ...(inventoryDetailFallback ? ["Inventory is estimated from SKU detail — no inventory summary or balance sheet was provided."] : []),

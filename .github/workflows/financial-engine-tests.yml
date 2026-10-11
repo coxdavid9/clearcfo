@@ -45,6 +45,9 @@ jobs:
           node scripts/financial-engine-scenarios.mjs
           node --experimental-strip-types scripts/emerging-constraints-scenarios.mjs
 
+      - name: Verify operating losses and evidence boundaries
+        run: npm run test:insight-evidence
+
       - name: Run Excel header regression test
         run: npm run test:excel-header
 
