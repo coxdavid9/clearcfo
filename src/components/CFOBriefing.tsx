@@ -16,18 +16,15 @@ import {
   buildDeterministicExecutiveSummary,
 } from "../lib/briefing/engine";
 import {
+  getActiveCompanyId,
+  isExcelCacheUsable,
+  saveExcelBriefingCache,
+  saveAnalysisInput,
   evictQuickBooksCache,
   isQuickBooksCacheUsable,
   saveQuickBooksBriefingCache,
 } from "../lib/company-scoped-cache";
 
-function cacheAnalysisInput(briefing: BriefingData) {
-  try {
-    window.localStorage.setItem("clearcfo_analysis_input", JSON.stringify(briefing));
-  } catch {
-    // Keep the briefing usable if browser storage is unavailable.
-  }
-}
 
 function displayChange(value: number, metricKey?: string, currentValue?: number): string {
   if (!Number.isFinite(value)) {
@@ -81,6 +78,7 @@ function KpiDrilldown({ breakdown }: { breakdown?: NonNullable<BriefingData["kpi
 }
 export default function CFOBriefing() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const companyIdRef = useRef<string | null>(null);
   const [data, setData] = useState<BriefingData>(demoData);
   const [liveSource, setLiveSource] = useState<"demo" | "upload" | "quickbooks">("demo");
   const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
@@ -262,6 +260,18 @@ export default function CFOBriefing() {
 
   async function loadQuickBooksBriefing() {
     try {
+      let statusPayload: any = null;
+      let statusOk = false;
+      try {
+        const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
+        statusOk = statusResponse.ok;
+        statusPayload = await statusResponse.json();
+      } catch {
+        // A transient non-JSON status response must not error the whole page:
+        // fall through to the cached briefing below.
+      }
+      const activeCompanyId = statusOk ? (statusPayload?.activeCompanyId || statusPayload?.connection?.companyId || null) : null;
+      companyIdRef.current = activeCompanyId;
       const cachedBriefing = window.localStorage.getItem("clearcfo_qb_briefing_cache");
       let cached: BriefingData | null = null;
       let cachedSyncedAt: string | null = null;
@@ -269,7 +279,7 @@ export default function CFOBriefing() {
       let excelUploadedAt: string | null = null;
       try {
         const storedExcelBriefing = window.localStorage.getItem("clearcfo_excel_briefing");
-        if (storedExcelBriefing) {
+        if (isExcelCacheUsable(activeCompanyId) && storedExcelBriefing) {
           const parsed = JSON.parse(storedExcelBriefing) as BriefingData;
           if (parsed?.companyName && Array.isArray(parsed.alerts)) excelCached = parsed;
         }
@@ -313,21 +323,6 @@ export default function CFOBriefing() {
         cachedSyncedAt = serverSyncedAt;
       }
 
-      let statusPayload: any = null;
-      let statusOk = false;
-      try {
-        const statusResponse = await fetch("/api/quickbooks/status", { cache: "no-store" });
-        statusOk = statusResponse.ok;
-        statusPayload = await statusResponse.json();
-      } catch {
-        // A transient non-JSON status response must not error the whole page:
-        // fall through to the cached briefing below.
-      }
-      // Multi-company isolation: the cached briefing belongs to exactly one
-      // business. isQuickBooksCacheUsable evicts the other business's caches
-      // on a definite mismatch; when the company cannot be verified (e.g.
-      // offline) it keeps the legacy stale-cache fallback.
-      const activeCompanyId = statusPayload?.activeCompanyId || statusPayload?.connection?.companyId || null;
       const selectedServerBriefing = useServerBriefing && Boolean(serverBriefing);
       if (!isQuickBooksCacheUsable(activeCompanyId)) {
         cached = selectedServerBriefing ? serverBriefing : null;
@@ -347,14 +342,14 @@ export default function CFOBriefing() {
           setError("");
           setSyncNotice("");
           setLastSyncedLabel(excelUploadedAt || "");
-          cacheAnalysisInput(excelCached);
+          saveAnalysisInput(excelCached, activeCompanyId);
           return;
         }
         if (!statusOk && cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
-          cacheAnalysisInput(cached);
+          saveAnalysisInput(cached, activeCompanyId);
           setLastSyncedLabel(formatSyncedAt(cachedSyncedAt));
         } else {
           setLiveSource("demo");
@@ -382,14 +377,14 @@ export default function CFOBriefing() {
         window.localStorage.setItem("clearcfo_qb_initial_sync", "complete");
         saveQuickBooksBriefingCache(briefing, payload.companyId);
         if (payload.syncedAt) window.localStorage.setItem("clearcfo_qb_last_synced_at", payload.syncedAt);
-        cacheAnalysisInput(briefing);
+        saveAnalysisInput(briefing, companyIdRef.current);
         markBriefingReady();
       } catch (syncErr) {
         if (cached?.companyName && Array.isArray(cached.alerts)) {
           setData(cached);
           setLiveSource("quickbooks");
           setHasValidAnalysis(true);
-          cacheAnalysisInput(cached);
+          saveAnalysisInput(cached, activeCompanyId);
           const staleLabel = formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at"));
           setLastSyncedLabel(staleLabel);
           setSyncNotice(staleLabel ? `Couldn't refresh your QuickBooks data — showing your last synced briefing from ${staleLabel}.` : "Couldn't refresh your QuickBooks data — showing your last synced briefing.");
@@ -448,7 +443,7 @@ export default function CFOBriefing() {
     });
     const handleSync = (event: Event) => {
       const payload = (event as CustomEvent)?.detail;
-      if (payload?.briefing) {
+      if (payload?.briefing && payload?.companyId === companyIdRef.current && companyIdRef.current) {
         const briefing = payload.briefing as BriefingData;
         setData(briefing);
         setLiveSource("quickbooks");
@@ -456,7 +451,7 @@ export default function CFOBriefing() {
         setError("");
         setSyncNotice("");
         setLastSyncedLabel(formatSyncedAt(window.localStorage.getItem("clearcfo_qb_last_synced_at")));
-        cacheAnalysisInput(briefing);
+        saveAnalysisInput(briefing, companyIdRef.current);
         markBriefingReady();
         return;
       }
@@ -528,6 +523,9 @@ export default function CFOBriefing() {
         throw new Error("We couldn't find a readable worksheet in the selected files. Please check the file format and sheet names.");
       }
 
+      const companyId = await getActiveCompanyId();
+      if (!companyId) throw new Error("We could not verify your business. Refresh the page before uploading.");
+      companyIdRef.current = companyId;
       const analyzed = analyzeWorkbook(workbook);
       setData(analyzed);
       setLiveSource("upload");
@@ -536,13 +534,8 @@ export default function CFOBriefing() {
       setSyncNotice("");
       const uploadedAt = new Date().toISOString();
       setLastSyncedLabel(uploadedAt);
-      try {
-        window.localStorage.setItem("clearcfo_excel_briefing", JSON.stringify(analyzed));
-        window.localStorage.setItem("clearcfo_excel_uploaded_at", uploadedAt);
-      } catch {
-        // Keep the in-session briefing usable if browser storage is unavailable.
-      }
-      cacheAnalysisInput(analyzed);
+      saveExcelBriefingCache(analyzed, uploadedAt, companyId);
+      saveAnalysisInput(analyzed, companyId);
       markBriefingReady();
     } catch (err) {
       setHasValidAnalysis(false);
