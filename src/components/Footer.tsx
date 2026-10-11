@@ -45,7 +45,7 @@ export default function Footer({ onNavigate, tagline = "Turning financial data i
         </div>
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 ClearCFO. All rights reserved.</p>
-          <p>Built for owners who want to know what matters.</p>
+          <div className="flex gap-5"><a href="/terms" className="hover:text-white">Terms of Service</a><a href="/privacy" className="hover:text-white">Privacy Policy</a></div>
         </div>
       </div>
     </footer>

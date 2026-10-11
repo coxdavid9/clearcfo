@@ -25,6 +25,12 @@ jobs:
       - name: Audit all dependencies
         run: npm audit --audit-level=high
 
+      - name: Run signup and legal acceptance regression checks
+        run: npm run test:auth-signup
+
+      - name: Run Stripe billing compatibility checks
+        run: npm run test:billing
+
       - name: Run security regression checks
         run: npm run test:security
 

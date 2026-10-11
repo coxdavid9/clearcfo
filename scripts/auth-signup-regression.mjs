@@ -61,13 +61,14 @@ const unconfirmed = await withSignupResponse({
 });
 
 assert.equal(unconfirmed.ok, true);
-assert.equal(unconfirmed.accessToken, undefined);
-assert.equal(unconfirmed.refreshToken, undefined);
+assert.equal(unconfirmed.accessToken, null);
+assert.equal(unconfirmed.refreshToken, null);
 console.log("PASS: unconfirmed existing account keeps confirmation path");
 
 const emailCheckRoute = await readFile(new URL("../src/app/api/auth/check-email/route.ts", import.meta.url), "utf8");
 const loginPage = await readFile(new URL("../src/app/login/page.tsx", import.meta.url), "utf8");
-assert.match(emailCheckRoute, /SUPABASE_SERVICE_ROLE_KEY/);
+const authSource = await readFile(new URL("../src/lib/supabase-auth.ts", import.meta.url), "utf8");
+assert.match(authSource, /SUPABASE_SERVICE_ROLE_KEY/);
 assert.match(emailCheckRoute, /checkRateLimit\(request, authRateLimit\)/);
 assert.match(emailCheckRoute, /supabaseAuthUserExists\(email\)/);
 console.log("PASS: step-1 email check route uses the server-side Supabase admin key and rate limit");
@@ -81,8 +82,30 @@ console.log("PASS: temporary signup diagnostic is removed");
 
 const route = await readFile(new URL("../src/app/api/auth/signup/route.ts", import.meta.url), "utf8");
 assert.match(route, /result\.code === "DUPLICATE_EMAIL" \? 409 : 400/);
-assert.match(route, /data\.error/);
+assert.match(loginPage, /data\.error/);
 console.log("PASS: signup route returns 409 and client surfaces API error copy");
 
 assert.equal(DUPLICATE_SIGNUP_ERROR, "An account with this email already exists. Try logging in instead.");
 console.log("PASS: duplicate signup message matches product copy exactly");
+
+const { LEGAL_VERSION, legalAcceptance } = await import("../src/lib/legal.ts");
+for (const acceptTerms of [undefined, false, "true", 1]) {
+  assert.equal(legalAcceptance({ acceptTerms, legalVersion: LEGAL_VERSION }), null);
+}
+assert.equal(legalAcceptance({ acceptTerms: true, legalVersion: "old" }), null);
+const accepted = legalAcceptance({ acceptTerms: true, legalVersion: LEGAL_VERSION, acceptedAt: "forged" });
+assert.equal(accepted.termsVersion, LEGAL_VERSION);
+assert.equal(accepted.privacyVersion, LEGAL_VERSION);
+assert.ok(Number.isFinite(Date.parse(accepted.acceptedAt)));
+assert.notEqual(accepted.acceptedAt, "forged");
+let captured;
+globalThis.fetch = async (_url, options) => {
+  captured = JSON.parse(options.body);
+  return new Response(JSON.stringify({ id: "new-user", identities: [{ id: "identity" }] }));
+};
+try { await signUpWithPassword("new@example.com", "Password1!", undefined, accepted); }
+finally { globalThis.fetch = originalFetch; }
+assert.deepEqual(captured.data.legalAcceptance, accepted);
+assert.match(route, /legalAcceptance\(body\)/);
+assert.match(loginPage, /type="checkbox" required checked=\{acceptTerms\}/);
+console.log("PASS: explicit current-policy consent required; server timestamp and versions reach signup storage");

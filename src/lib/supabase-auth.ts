@@ -129,7 +129,7 @@ type SignupProfile = {
   contactPhone: string;
 };
 
-export async function signUpWithPassword(email: string, password: string, profile?: SignupProfile) {
+export async function signUpWithPassword(email: string, password: string, profile?: SignupProfile, acceptance?: { termsVersion: string; privacyVersion: string; acceptedAt: string }) {
   const { url, publishableKey } = getSupabaseConfig();
   const redirectTo = `${getAppUrl()}/auth/callback`;
 
@@ -142,7 +142,7 @@ export async function signUpWithPassword(email: string, password: string, profil
     body: JSON.stringify({
       email,
       password,
-      ...(profile ? { data: profile } : {}),
+      data: { ...profile, ...(acceptance ? { legalAcceptance: acceptance } : {}) },
     }),
     cache: "no-store",
   });
