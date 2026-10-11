@@ -32,25 +32,27 @@ export function applyEvidencePolicy(analysis: Record<string, any>, body: Record<
   if (inventoryBuild || hasInventoryAction) {
     actions.unshift({
       title: "Review inventory growth against SKU sales, usage, and demand",
-      rationale: `${inventoryBuild?.observation ? String(inventoryBuild.observation) + " " : ""}Compare the largest stock balances and increases with SKU sales or usage, age, and committed demand. Balance growth alone does not identify slow-moving or excess stock. Consider changing purchases only after that review.`,
+      rationale: "Compare the largest stock increases with SKU sales, usage, age, and committed demand. Change purchasing only if that review supports it; growing balances alone do not prove excess stock.",
       priority: "High", score: 3, estimatedImpact: null,
     });
     result.managementQuestion = "Which SKUs account for the inventory build, and what do their sales, usage, age, and committed demand show?";
     if (inventoryBuild) {
       result.executiveSummary = `${String(inventoryBuild.observation ?? "Inventory is building faster than revenue.")} This warrants a SKU-level demand and stock-age review; the cause and recoverable cash are not established.`;
-      result.whyItMatters = String(inventoryBuild.observation ?? "Inventory is building faster than revenue.");
+      result.whyItMatters = "Inventory is growing faster than sales. Review demand and stock age before deciding whether purchases should change.";
       result.evidence = Array.isArray(inventoryBuild.evidence) ? inventoryBuild.evidence.map(String).slice(0, 4) : [];
     }
     result.unknowns = ["SKU balances and changes do not establish turnover, stock age, excess stock, or achievable cash recovery.", ...(Array.isArray(result.unknowns) ? result.unknowns : [])].slice(0, 4);
     // Replace the prose recommendations too; cards are not the only output.
-    result.recommendedAction = actions[0].rationale;
+    result.recommendedAction = "Review SKU sales, usage, age, and committed demand before changing purchases.";
   }
   if (loss) {
     result.executiveSummary = `${loss.observation} ${String(result.executiveSummary ?? "")}`.trim();
     result.evidence = [loss.evidence[0], ...(Array.isArray(result.evidence) ? result.evidence : [])].slice(0, 4);
     actions = actions.filter((action) => !/operating loss|operating at a loss/i.test(`${action.title} ${action.rationale}`));
-    actions.unshift({ title: "Review the operating loss and a path to break-even", rationale: `${loss.observation} Review pricing, direct costs, and recurring operating expenses to identify feasible changes. The loss is an observed result, not an estimate of savings.`, priority: "High", score: 3, estimatedImpact: null });
-    result.recommendedAction = `${actions[0].rationale}${inventoryBuild || hasInventoryAction ? " " + result.recommendedAction : ""}`;
+    actions.unshift({ title: "Review the operating loss and a path to break-even", rationale: "Compare gross profit with recurring operating expenses. Review pricing and direct costs to identify feasible changes toward break-even.", priority: "High", score: 3, estimatedImpact: null });
+    result.recommendedAction = inventoryBuild || hasInventoryAction
+      ? `1. Review pricing, direct costs, and recurring expenses to work toward break-even.\n2. ${result.recommendedAction}`
+      : "Review pricing, direct costs, and recurring expenses to work toward break-even.";
   }
   // No action-level savings model is supplied by this endpoint. Observed
   // movements must never be republished as estimated action benefits.

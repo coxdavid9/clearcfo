@@ -78,7 +78,12 @@ assert.ok(guarded.actions.some(action => /operating loss/.test(action.title)));
 assert.equal(guarded.actions.filter(action => /inventory/.test(action.title)).length, 1);
 assert.ok(guarded.actions.every(action => action.estimatedImpact === null));
 assert.ok(!guarded.actions.some(action => /Pause|identified slow-moving|Recover the entire/.test(action.title + action.rationale)));
-assert.match(guarded.recommendedAction, /only after that review/);
+assert.match(guarded.recommendedAction, /^1\. .*break-even\.\n2\. .*before changing purchases\.$/);
+assert.ok(guarded.recommendedAction.length < 220);
+assert.ok(!guarded.recommendedAction.includes("$"));
+assert.ok(guarded.actions.every(action => !action.rationale.includes("278,329,316")));
+assert.match(guarded.executiveSummary, /278,329,316/);
+assert.ok(!guarded.whyItMatters.includes("$"));
 const healthy = applyEvidencePolicy({ actions: [] }, { financialSnapshot: { operatingIncome: 0, revenue: 100 } });
 assert.equal(healthy.actions.length, 0);
 

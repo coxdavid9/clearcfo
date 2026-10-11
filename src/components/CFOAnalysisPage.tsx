@@ -37,7 +37,7 @@ function priorityBadge(priority: string) {
 
 function analysisFingerprint(input: BriefingData) {
   return JSON.stringify({
-    analysisVersion: 4,
+    analysisVersion: 5,
     operatingIncome: input.operatingIncome,
     operatingExpense: input.operatingExpense,
     companyName: input.companyName,
@@ -135,8 +135,8 @@ export default function CFOAnalysisPage() {
   }, []);
 
   const recommendedActions = analysis ? splitRecommendedActions(analysis.recommendedAction) : [];
-  const fallbackActions = analysis?.actions && analysis.actions.length >= 3
-    ? analysis.actions.slice(0, 3).map((action) => `${action.title}: ${action.rationale}`)
+  const fallbackActions = analysis?.actions && analysis.actions.length > 0
+    ? analysis.actions.slice(0, 3).map((action) => action.title)
     : recommendedActions;
   const displayRecommendedActions = recommendedActions.length >= 2 ? recommendedActions : fallbackActions;
 
