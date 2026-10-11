@@ -59,6 +59,7 @@ const instructions = [
   "For every action return estimatedImpact as null. This input has no validated action-benefit model. An inventory increase, loss, balance, or dollar exposure is an observed fact, never an estimate of achievable savings or action impact.",
   "SKU stock balances and changes do not establish sales velocity, age, turnover, excess stock, or demand. Never call SKUs identified slow-moving based on balances alone. Recommend obtaining SKU sales or usage and stock age before deciding whether to change purchases or discount stock.",
   "When an operating loss is supplied, explicitly include it in the executive summary and a practical break-even review action, even if inventory is the primary working-capital driver.",
+  "Keep recommendedAction to 1 to 3 short numbered steps, one sentence each. Put supporting amounts in executiveSummary and evidence instead of repeating them in recommendedAction. Keep each action rationale to at most two concise sentences explaining the review needed; whyItMatters should explain the implication instead of repeating the summary.",
   "Return only the requested structured analysis.",
 ].join(" ");
 
