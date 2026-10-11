@@ -6,12 +6,12 @@ import { getActiveCompanyId, isQuickBooksCacheUsable } from "../lib/company-scop
 
 const CACHE_KEY = "clearcfo_qb_briefing_cache";
 const AI_CACHE_KEY = "clearcfo_qb_ai_analysis_cache";
-const ANALYSIS_VERSION = 3;
+const ANALYSIS_VERSION = 4;
 
 type Props = { enabled?: boolean };
 
 function briefingSignature(briefing: BriefingData): string {
-  return JSON.stringify({ analysisVersion: ANALYSIS_VERSION, revenue: briefing.revenue, revenueChange: briefing.revenueChange, margin: briefing.grossMargin, marginChange: briefing.marginChange, cash: briefing.cash, cashChange: briefing.cashChange, liveCash: briefing.liveCash ?? null, liveCashAsOf: briefing.liveCashAsOf ?? null, inventory: briefing.inventory, inventoryChange: briefing.inventoryChange, operatingExpense: briefing.operatingExpense, previousOperatingExpense: briefing.previousOperatingExpense, drivers: briefing.drivers, detailDrivers: briefing.detailDrivers, relationships: briefing.relationships, unknowns: briefing.unknowns, trend: briefing.trend, periods: briefing.periods });
+  return JSON.stringify({ analysisVersion: ANALYSIS_VERSION, operatingIncome: briefing.operatingIncome, revenue: briefing.revenue, revenueChange: briefing.revenueChange, margin: briefing.grossMargin, marginChange: briefing.marginChange, cash: briefing.cash, cashChange: briefing.cashChange, liveCash: briefing.liveCash ?? null, liveCashAsOf: briefing.liveCashAsOf ?? null, inventory: briefing.inventory, inventoryChange: briefing.inventoryChange, operatingExpense: briefing.operatingExpense, previousOperatingExpense: briefing.previousOperatingExpense, drivers: briefing.drivers, detailDrivers: briefing.detailDrivers, relationships: briefing.relationships, unknowns: briefing.unknowns, trend: briefing.trend, periods: briefing.periods });
 }
 
 function normalizePercentageText(value: string): string {
@@ -90,6 +90,8 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
     const body = JSON.stringify({
       companyName: briefing.companyName,
       financialSnapshot: {
+        operatingIncome: briefing.operatingIncome,
+        grossProfit: briefing.grossProfit,
         revenue: briefing.revenue,
         revenueChange: briefing.revenueChange,
         grossMargin: briefing.grossMargin,
@@ -191,7 +193,7 @@ export default function AIAnalysisPanel({ enabled = true }: Props) {
             <div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Management question</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.managementQuestion}</p></div>
             <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5"><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended action</p><p className="mt-2 text-sm leading-6 text-slate-700">{analysis.recommendedAction}</p></div>
             {analysis.evidence?.length > 0 && <div className="rounded-2xl border border-slate-200 p-5"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Evidence</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">{analysis.evidence.map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
-            {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p>{typeof action.estimatedImpact === "number" && <p className="mt-2 text-xs font-bold text-blue-700">Est. impact: ${Math.round(action.estimatedImpact).toLocaleString("en-US")}</p>}</div>)}</div></div>}
+            {analysis.actions?.length > 0 && <div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Priority actions</p><div className="mt-3 space-y-3">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{action.title}</p><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{action.priority}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{action.rationale}</p></div>)}</div></div>}
             {(analysis.unknowns ?? []).length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-amber-700">Known unknowns</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">{(analysis.unknowns ?? []).map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}</ul></div>}
           </div>
         )}

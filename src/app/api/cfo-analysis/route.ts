@@ -1,3 +1,4 @@
+import { applyEvidencePolicy } from "../../../lib/briefing/evidence-policy";
 import { NextResponse } from "next/server";
 import { aiRateLimit, checkRateLimit } from "../../../lib/rate-limit";
 import { detectExpenseSpikeRecovery, inventoryOutpacesRevenue } from "../../../lib/scenario-detection";
@@ -30,7 +31,7 @@ const analysisSchema = {
           rationale: { type: "string" },
           priority: { type: "string", enum: ["High", "Medium", "Watch"] },
           score: { type: "number" },
-          estimatedImpact: { type: ["number", "null"] },
+          estimatedImpact: { type: "null" },
         },
         required: ["title", "rationale", "priority", "score", "estimatedImpact"],
       },
@@ -55,7 +56,9 @@ const instructions = [
   "Return 1 to 4 practical management actions and 0 to 4 material unknowns. Every action should relate to supplied financial evidence.",
   "When balance-sheet ratios, day-matched month-to-date comparisons, account/customer/vendor movements, or cash-flow bridge information are supplied, use them as evidence where they support the analysis.",
   "For every dollar-denominated amount in the analysis, always include the $ symbol. This applies to revenue, cash, prior-period balances, expenses, inventory, accounts receivable, estimated impact, dollar movements, ranges, and any other monetary amount. Never write a dollar amount as a bare number.",
-  "For each action, include estimatedImpact as a dollar estimate of the amount at stake when the supplied evidence supports one; otherwise return null. Never invent the estimate.",
+  "For every action return estimatedImpact as null. This input has no validated action-benefit model. An inventory increase, loss, balance, or dollar exposure is an observed fact, never an estimate of achievable savings or action impact.",
+  "SKU stock balances and changes do not establish sales velocity, age, turnover, excess stock, or demand. Never call SKUs identified slow-moving based on balances alone. Recommend obtaining SKU sales or usage and stock age before deciding whether to change purchases or discount stock.",
+  "When an operating loss is supplied, explicitly include it in the executive summary and a practical break-even review action, even if inventory is the primary working-capital driver.",
   "Return only the requested structured analysis.",
 ].join(" ");
 
@@ -68,6 +71,7 @@ type ScenarioSignals = {
 };
 
 function asFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -193,7 +197,7 @@ function normalizeScenarioAnalysis(analysis: Record<string, any>, signals: Scena
     normalized.managementQuestion = "Which inventory categories or SKUs are driving the build, and are current purchases supported by demand?";
     normalized.recommendedAction = typeof body.currentRecommendation === "string" && body.currentRecommendation.trim() ? body.currentRecommendation : "Review inventory aging, purchasing cadence, demand support, and slow-moving stock to determine whether inventory growth is absorbing working capital without matching sales.";
     if (!evidence.some((item) => /inventory/i.test(item))) evidence.push(...(Array.isArray(driver.evidence) ? driver.evidence.map(String) : []));
-    if (!unknowns.some((item) => /inventory/i.test(item))) unknowns.unshift("The workbook does not identify which inventory categories or SKUs are driving the increase.");
+    if (!unknowns.some((item) => /inventory/i.test(item))) unknowns.unshift("Inventory balances do not establish SKU sales velocity, stock age, or committed demand.");
     normalized.executiveSummary = `${normalized.executiveSummary} ClearCFO specifically detected inventory building faster than revenue, so inventory is the primary working-capital pattern to investigate.`.trim();
   }
 
@@ -310,7 +314,7 @@ export async function POST(request: Request) {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model, store: false, instructions: [
         ...(liveCash !== null && liveCashAsOf ? [`CASH POSITION: The business's current cash position is ${Math.round(liveCash).toLocaleString("en-US")} as of ${liveCashAsOf}. The financialSnapshot cash figure (${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}, ${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}%) is the last complete month-end balance — use it only for period change math. In the executive summary, state cash exactly as: "Cash is ${Math.round(liveCash).toLocaleString("en-US")} as of ${liveCashAsOf} (prior month-end ${Math.round(asFiniteNumber(snapshot.cash) ?? 0).toLocaleString("en-US")}, ${asFiniteNumber(snapshot.cashChange)?.toFixed(1) ?? "unknown"}% vs prior period)." Never present the month-end balance as the current cash position.`] : []),
-        ...instructions,
+        instructions,
         ...scenarioDirectives,
       ].filter(Boolean).join("\n\n"), input: JSON.stringify(bodyObject), text: { format: { type: "json_schema", name: "clearcfo_cfo_analysis", strict: true, schema: analysisSchema } } }),
     });
@@ -337,7 +341,7 @@ export async function POST(request: Request) {
     }
     const analysisObject = asAnalysisObject(analysis);
     if (!analysisObject) return NextResponse.json({ error: "OpenAI returned an invalid analysis structure." }, { status: 502 });
-    const normalizedAnalysis = normalizeScenarioAnalysis(analysisObject, scenarioSignals, bodyObject);
+    const normalizedAnalysis = applyEvidencePolicy(normalizeScenarioAnalysis(analysisObject, scenarioSignals, bodyObject), bodyObject);
     const companyId = typeof bodyObject.companyId === "string" && bodyObject.companyId.trim() ? bodyObject.companyId.trim() : null;
     await recordExcelBriefing(userId, companyId);
     console.log("[ClearCFO AI] Analysis completed successfully.");

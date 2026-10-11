@@ -1,4 +1,5 @@
 import type { BriefingData, FinancialDriver, FinancialRatio, CashFlowBridge, CashFlowLine, DetailDriver, MtdComparison, MtdMetricComparison, KpiBreakdowns } from "./briefing/engine";
+import { operatingLossDriver } from "./briefing/evidence-policy";
 import { currency, formatPoints } from "./briefing/engine";
 import { detectCashSqueeze, detectMarginErosion, type EmergingConstraint } from "./briefing/emerging-constraints";
 
@@ -1146,6 +1147,9 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
   const previousCogs = previous >= 0 ? activeCogs[previous] || 0 : 0;
   const currentCogsValue = activeCogs[current] || 0;
   const drivers = buildDrivers(revenueChange, marginChange, cashChange, inventoryChange, expenseChange, previousCogs, currentCogsValue, previousExpense, currentExpense, previousCash, currentCash, previousInventory, currentInventory, currentRevenue, previousRevenue);
+  const operatingIncome = currentGrossProfit - currentExpense;
+  const lossDriver = operatingLossDriver(operatingIncome, currentRevenue);
+  if (lossDriver) drivers.push(lossDriver);
   const classificationReview = buildClassificationReview(pnlRows, currentRevenue, currentCogsValue, currentExpense);
   const pnlReconciliation = findPnlReconciliationIssue(pnlRows, activePeriods, activeRevenue, activeCogs, activeExpenses, netIncome);
   const ratioResult = buildRatios({
@@ -1254,6 +1258,8 @@ export function buildQuickBooksBriefing(profitAndLoss: any, balanceSheet: any, c
     liveCashNote,
     inventory: currentInventory,
     inventoryChange,
+    grossProfit: currentGrossProfit,
+    operatingIncome,
     operatingExpense: currentExpense,
     previousOperatingExpense: previousExpense,
     attention: mergedDrivers.length,
