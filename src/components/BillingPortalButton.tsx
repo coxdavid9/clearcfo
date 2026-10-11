@@ -2,10 +2,15 @@
 
 export default function BillingPortalButton() {
   async function openPortal() {
+    try {
     const r = await fetch("/api/billing/portal", { method: "POST" });
     const d = await r.json().catch(() => ({}));
     if (d?.url) window.location.href = d.url;
-    else alert("Couldn't open the billing portal. Please try again.");
+    else if (d?.code === "BILLING_NOT_CONNECTED") window.location.href = "/#pricing";
+    else alert(d?.error || "Couldn't open the billing portal. Please try again.");
+    } catch {
+      alert("We could not reach ClearCFO. Please try again.");
+    }
   }
 
   return (

@@ -70,28 +70,17 @@ export async function listUserCompanies(userId: string): Promise<Membership[]> {
 async function createInitialCompany(userId: string) {
   const user = await currentUser();
   const metadata = user?.user_metadata || {};
-  const response = await supabaseRequest("companies", {
+  // The database locks this user's initialization and creates company + membership
+  // together. Parallel requests must never each create a default business.
+  const response = await supabaseRequest("rpc/ensure_initial_company", {
     method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({
-      name: typeof metadata.companyName === "string" && metadata.companyName.trim() ? metadata.companyName.trim().slice(0, 200) : "My Business",
-      industry: typeof metadata.industry === "string" && metadata.industry.trim() ? metadata.industry.trim().slice(0, 200) : null,
-      company_size: typeof metadata.companySize === "string" && metadata.companySize.trim() ? metadata.companySize.trim().slice(0, 200) : null,
-      contact_phone: typeof metadata.contactPhone === "string" && metadata.contactPhone.trim() ? metadata.contactPhone.trim().slice(0, 200) : null,
-      created_by: userId,
-    }),
+    body: JSON.stringify({ p_user_id: userId, p_profile: metadata }),
   });
-  if (!response.ok) throw new Error(`Could not create initial business (${response.status}).`);
+  if (!response.ok) throw new Error(`Could not initialize business (${response.status}).`);
   const companies = await response.json() as Company[];
   const company = companies[0];
   if (!company) throw new Error("Initial business was not created.");
 
-  const membershipResponse = await supabaseRequest("company_memberships", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ company_id: company.id, user_id: userId, role: "owner" }),
-  });
-  if (!membershipResponse.ok) throw new Error(`Could not create initial business membership (${membershipResponse.status}).`);
   return company;
 }
 

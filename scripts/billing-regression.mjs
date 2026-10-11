@@ -18,6 +18,8 @@ assert.equal(invoiceUserId({ parent: { type: "quote_details", subscription_detai
 // Execute the actual route bodies with external services replaced by in-memory doubles.
 let writes = [], emails = [], current = null, signatureValid = true, subscription;
 const doubles = {
+  requireBillingUser: async () => "user1",
+  STRIPE_API_VERSION: "2026-08-26.dahlia",
   NextResponse: { json: (body, init) => Response.json(body, init), redirect: url => Response.redirect(url) },
   subscriptionPeriodEnd, invoiceUserId,
   mapStatus: status => ["trialing", "active", "past_due"].includes(status) ? status : "canceled",
@@ -79,5 +81,13 @@ assert.equal(writes[0].status, "canceled");
 signatureValid = false;
 assert.equal((await deliver("customer.subscription.updated", modern)).status, 400);
 assert.equal(writes.length, 0);
-delete globalThis.__billingRegression;
 console.log("PASS: legacy and modern periods, invoice owners, checkout return, five webhook events, comp preservation, invalid signatures");
+
+const portal = await route("../src/app/api/billing/portal/route.ts");
+current = null; writes = [];
+const noCustomer = await portal.POST();
+assert.equal(noCustomer.status, 400);
+assert.equal((await noCustomer.json()).code, "BILLING_NOT_CONNECTED");
+console.log("PASS: accounts without Stripe customers receive actionable billing response");
+
+delete globalThis.__billingRegression;
