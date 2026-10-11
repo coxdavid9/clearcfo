@@ -1,3 +1,4 @@
+import { legalAcceptance } from "../../../../lib/legal";
 import { NextResponse } from "next/server";
 import { authRateLimit, checkRateLimit } from "../../../../lib/rate-limit";
 import { getAuthCookieNames, signUpWithPassword } from "../../../../lib/supabase-auth";
@@ -51,12 +52,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Password must be at least 8 characters and include upper and lower case letters, a number, and a symbol." }, { status: 400 });
     }
 
+    const acceptance = legalAcceptance(body);
+    if (!acceptance) return NextResponse.json({ error: "Accept the current Terms of Service and acknowledge the Privacy Policy." }, { status: 400 });
+
     const profileResult = readProfile(body);
     if ("error" in profileResult) {
       return NextResponse.json({ error: profileResult.error }, { status: 400 });
     }
 
-    const result = await signUpWithPassword(email, password, profileResult.profile);
+    const result = await signUpWithPassword(email, password, profileResult.profile, acceptance);
 
     if (!result.ok) {
       const status = "code" in result && result.code === "DUPLICATE_EMAIL" ? 409 : 400;

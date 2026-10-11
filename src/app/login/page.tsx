@@ -1,4 +1,5 @@
 "use client";
+import { LEGAL_VERSION } from "../../lib/legal";
 
 import Image from "next/image";
 import { type FormEvent, useEffect, useState } from "react";
@@ -34,6 +35,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [profile, setProfile] = useState<SignupProfile>(emptyProfile);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -50,6 +52,7 @@ export default function LoginPage() {
 
   function switchMode(nextMode: "login" | "signup") {
     setMode(nextMode);
+    setAcceptTerms(false);
     setSignupStep(1);
     setError("");
     setMessage("");
@@ -104,12 +107,13 @@ export default function LoginPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === "signup" && !acceptTerms) { setError("Accept the Terms of Service and acknowledge the Privacy Policy to continue."); return; }
     setBusy(true);
     setMessage("");
     setError("");
 
     const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
-    const body = mode === "login" ? { email, password } : { email, password, ...profile };
+    const body = mode === "login" ? { email, password } : { email, password, ...profile, acceptTerms, legalVersion: LEGAL_VERSION };
 
     try {
       const response = await fetch(endpoint, {
@@ -288,9 +292,13 @@ export default function LoginPage() {
 
                   {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
+                  <label className="flex items-start gap-3 text-sm leading-6 text-slate-600">
+                    <input type="checkbox" required checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} className="mt-1 h-4 w-4 shrink-0" />
+                    <span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">Terms of Service</a> and acknowledge the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline">Privacy Policy</a>, including financial data processing by AI providers.</span>
+                  </label>
                   <div className="flex gap-3">
                     <button type="button" onClick={() => { setSignupStep(1); setError(""); }} className="flex-1 rounded-xl border border-slate-300 px-5 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50">Back</button>
-                    <button type="submit" disabled={busy} className="flex-1 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{busy ? "Creating…" : "Create Account"}</button>
+                    <button type="submit" disabled={busy || !acceptTerms} className="flex-1 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{busy ? "Creating…" : "Create Account"}</button>
                   </div>
                 </form>
               )}
