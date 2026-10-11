@@ -16,7 +16,8 @@
     "test:billing": "node --experimental-strip-types scripts/billing-regression.mjs",
     "test:auth-signup": "node --experimental-strip-types scripts/auth-signup-regression.mjs",
     "test:excel-header": "node --experimental-strip-types scripts/excel-header-regression.mjs",
-    "test:lint-dependencies": "node scripts/lint-dependency-regression.mjs"
+    "test:lint-dependencies": "node scripts/lint-dependency-regression.mjs",
+    "test:financial-cache": "node --experimental-strip-types scripts/financial-cache-regression.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

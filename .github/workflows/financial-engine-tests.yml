@@ -34,6 +34,9 @@ jobs:
       - name: Run Stripe billing compatibility checks
         run: npm run test:billing
 
+      - name: Verify financial cache isolation
+        run: npm run test:financial-cache
+
       - name: Run security regression checks
         run: npm run test:security
 

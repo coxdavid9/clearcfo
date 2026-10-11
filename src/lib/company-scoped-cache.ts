@@ -13,6 +13,8 @@ const QB_CACHE_KEYS = [
   "clearcfo_qb_ai_analysis_cache_signature",
   "clearcfo_analysis_input",
   "clearcfo_ai_analysis_cache_v2",
+  "clearcfo_ai_analysis_cache_v3",
+  "clearcfo_analysis_input_company_id",
   "clearcfo_qb_initial_sync",
   QB_CACHE_COMPANY_KEY,
 ];
@@ -42,13 +44,7 @@ export function stampQuickBooksCacheCompany(companyId: string | null | undefined
   }
 }
 
-/**
- * Returns true when the local QuickBooks caches may be used for the given
- * active company. Ownership can only be disproven when BOTH ids are known
- * and differ; when either is unknown we keep the legacy behavior so the
- * offline stale-cache fallback keeps working. A definite mismatch evicts
- * the other business's caches and returns false.
- */
+/** Save a QuickBooks briefing with its business ownership stamp. */
 export function saveQuickBooksBriefingCache(briefing: unknown, companyId: string | null | undefined): void {
   try {
     window.localStorage.setItem("clearcfo_qb_briefing_cache", JSON.stringify(briefing));
@@ -69,7 +65,7 @@ export function saveQuickBooksBriefingCache(briefing: unknown, companyId: string
 /**
  * A verified business may only consume a cache carrying the same company
  * stamp. Unlabeled or mismatched data is evicted. If the business cannot be
- * verified, only a provably offline browser may use the cache.
+ * verified, the cache cannot be used.
  */
 export function isQuickBooksCacheUsable(activeCompanyId: string | null | undefined): boolean {
   const cachedCompanyId = getCachedCompanyId();
@@ -80,7 +76,6 @@ export function isQuickBooksCacheUsable(activeCompanyId: string | null | undefin
     }
     return true;
   }
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
   return false;
 }
 
@@ -93,9 +88,50 @@ let activeCompanyIdPromise: Promise<string | null> | null = null;
 export function getActiveCompanyId(): Promise<string | null> {
   if (!activeCompanyIdPromise) {
     activeCompanyIdPromise = fetch("/api/quickbooks/status", { cache: "no-store" })
-      .then((response) => response.json().catch(() => null))
+      .then((response) => response.ok ? response.json().catch(() => null) : null)
       .then((payload) => payload?.activeCompanyId || payload?.connection?.companyId || null)
       .catch(() => null);
   }
   return activeCompanyIdPromise;
+}
+
+const EXCEL_CACHE_COMPANY_KEY = "clearcfo_excel_cache_company_id";
+const ANALYSIS_INPUT_COMPANY_KEY = "clearcfo_analysis_input_company_id";
+
+function ownedCache(companyId: string | null | undefined, stampKey: string, keys: string[]): boolean {
+  try {
+    if (companyId && window.localStorage.getItem(stampKey) === companyId) return true;
+    for (const key of [...keys, stampKey]) window.localStorage.removeItem(key);
+  } catch { /* Unavailable storage cannot verify ownership. */ }
+  return false;
+}
+
+export function isExcelCacheUsable(companyId: string | null | undefined): boolean {
+  return ownedCache(companyId, EXCEL_CACHE_COMPANY_KEY, ["clearcfo_excel_briefing", "clearcfo_excel_uploaded_at"]);
+}
+
+export function isAnalysisInputUsable(companyId: string | null | undefined): boolean {
+  return ownedCache(companyId, ANALYSIS_INPUT_COMPANY_KEY, ["clearcfo_analysis_input", "clearcfo_ai_analysis_cache_v2", "clearcfo_ai_analysis_cache_v3"]);
+}
+
+export function saveExcelBriefingCache(briefing: unknown, uploadedAt: string, companyId: string): void {
+  try {
+    // Invalidate first so a partial write cannot attribute old data to a new business.
+    window.localStorage.removeItem(EXCEL_CACHE_COMPANY_KEY);
+    window.localStorage.setItem("clearcfo_excel_briefing", JSON.stringify(briefing));
+    window.localStorage.setItem("clearcfo_excel_uploaded_at", uploadedAt);
+    window.localStorage.setItem(EXCEL_CACHE_COMPANY_KEY, companyId);
+  } catch { /* In-session upload remains usable. */ }
+}
+
+export function saveAnalysisInput(briefing: unknown, companyId: string | null | undefined): void {
+  try {
+    window.localStorage.removeItem(ANALYSIS_INPUT_COMPANY_KEY);
+    if (!companyId) {
+      isAnalysisInputUsable(null);
+      return;
+    }
+    window.localStorage.setItem("clearcfo_analysis_input", JSON.stringify(briefing));
+    window.localStorage.setItem(ANALYSIS_INPUT_COMPANY_KEY, companyId);
+  } catch { /* In-session briefing remains usable. */ }
 }
