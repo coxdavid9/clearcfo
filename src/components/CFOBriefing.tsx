@@ -15,6 +15,7 @@ import {
   analyzeWorkbook,
   buildDeterministicExecutiveSummary,
 } from "../lib/briefing/engine";
+import { publicDemoBriefing } from "../lib/briefing/public-demo-data";
 import {
   getActiveCompanyId,
   isExcelCacheUsable,
@@ -76,13 +77,13 @@ function KpiDrilldown({ breakdown }: { breakdown?: NonNullable<BriefingData["kpi
     </div>
   );
 }
-export default function CFOBriefing() {
+export default function CFOBriefing({ demoMode = false }: { demoMode?: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const companyIdRef = useRef<string | null>(null);
-  const [data, setData] = useState<BriefingData>(demoData);
+  const [data, setData] = useState<BriefingData>(demoMode ? publicDemoBriefing : demoData);
   const [liveSource, setLiveSource] = useState<"demo" | "upload" | "quickbooks">("demo");
-  const [hasValidAnalysis, setHasValidAnalysis] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [hasValidAnalysis, setHasValidAnalysis] = useState(demoMode);
+  const [isLoading, setIsLoading] = useState(!demoMode);
   const [uploading, setUploading] = useState(false);
   const [selectedFileLabel, setSelectedFileLabel] = useState("");
   const [error, setError] = useState("");
@@ -91,7 +92,7 @@ export default function CFOBriefing() {
   const [onboardingStep, setOnboardingStep] = useState<"welcome" | "connect" | "building">("welcome");
   const [onboardingSource, setOnboardingSource] = useState<"quickbooks" | "excel">("quickbooks");
   const [readyBanner, setReadyBanner] = useState(false);
-  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingLoading, setBillingLoading] = useState(!demoMode);
   const [billingLocked, setBillingLocked] = useState(false);
   const [billingCancelled, setBillingCancelled] = useState(false);
   const [billingInfo, setBillingInfo] = useState<{plan:"core"|"pro"|null;interval:"month"|"year"|null;status:string|null;trialEndsAt:string|null}>({plan:null,interval:null,status:null,trialEndsAt:null});
@@ -401,6 +402,7 @@ export default function CFOBriefing() {
   }
 
   useEffect(() => {
+    if (demoMode) return; // The public demo must never call billing or customer APIs.
     let cancelled = false;
     if (new URLSearchParams(window.location.search).get("billing") === "cancelled") setBillingCancelled(true);
     void fetch("/api/billing/status", { cache: "no-store" }).then(async (response) => {
@@ -422,9 +424,10 @@ export default function CFOBriefing() {
       setError(error instanceof Error ? error.message : "Unable to check billing status.");
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) return; // The public demo must never load QuickBooks, caches or onboarding.
     if (billingLoading || billingLocked) return;
     try {
       const syncing = sessionStorage.getItem("clearcfo_onboarding_syncing") === "1";
@@ -476,7 +479,7 @@ export default function CFOBriefing() {
       window.removeEventListener("clearcfo:onboarding-connect", handleOnboardingConnect);
       window.removeEventListener("clearcfo:onboarding-welcome", handleOnboardingWelcome);
     };
-  }, [billingLoading, billingLocked]);
+  }, [demoMode, billingLoading, billingLocked]);
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
@@ -598,10 +601,10 @@ export default function CFOBriefing() {
   const visibleAttention = showAllAttention ? attentionCandidates : shownAttention;
   const attentionCountLabel = showAllAttention ? attentionCandidates.length : Math.min(3, attentionCandidates.length);
 
-  if (billingLoading) {
+  if (!demoMode && billingLoading) {
     return <main className="min-h-screen bg-slate-50 px-5 py-10"><div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"><p className="text-sm font-semibold text-slate-500">Checking your ClearCFO plan…</p></div></main>;
   }
-  if (billingLocked) return <PlanSelection cancelled={billingCancelled} locked status={billingInfo.status} />;
+  if (!demoMode && billingLocked) return <PlanSelection cancelled={billingCancelled} locked status={billingInfo.status} />;
 
   if (isLoading) {
     return (
@@ -621,7 +624,7 @@ export default function CFOBriefing() {
   if (!hasValidAnalysis) {
     return (
       <div className="px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
-        <input ref={fileRef} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        {!demoMode && <input ref={fileRef} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />}
         {error && <div className="mx-auto mb-4 w-full max-w-6xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</div>}
         <div className="mx-auto w-full max-w-6xl">{emptyState}</div>
       </div>
@@ -636,18 +639,18 @@ export default function CFOBriefing() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">TODAY&apos;S CFO BRIEFING</p>
-              <p className="mt-1 text-sm text-slate-500">{liveSource === "quickbooks" ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}` : liveSource === "upload" ? `${data.companyName} · Last uploaded: ${lastSyncedLabel ? new Date(lastSyncedLabel).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "unknown"}` : "Demo data"}</p>
+              <p className="mt-1 text-sm text-slate-500">{demoMode ? `${data.companyName} · Sample data · Read-only preview` : liveSource === "quickbooks" ? `${data.companyName} · Synced ${lastSyncedLabel || "just now"}` : liveSource === "upload" ? `${data.companyName} · Last uploaded: ${lastSyncedLabel ? new Date(lastSyncedLabel).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "unknown"}` : "Demo data"}</p>
             </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
-              <BusinessSwitcher />
+              {demoMode ? <span className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">Fictional sample business</span> : <BusinessSwitcher />}
               {selectedFileLabel && liveSource === "upload" ? <p className="max-w-xs truncate text-xs text-slate-400" title={selectedFileLabel}>{selectedFileLabel}</p> : null}
-              <button type="button" onClick={() => fileRef.current?.click()} className={liveSource === "quickbooks" ? "text-sm font-semibold text-slate-500 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30" : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"}>{uploading ? "Analyzing…" : "Upload Excel"}</button>
+              {!demoMode && <button type="button" onClick={() => fileRef.current?.click()} className={liveSource === "quickbooks" ? "text-sm font-semibold text-slate-500 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30" : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30"}>{uploading ? "Analyzing…" : "Upload Excel"}</button>}
             </div>
           </div>
         </div>
 
         <div className="p-7 sm:p-10">
-          {readyBanner && (
+          {!demoMode && readyBanner && (
             <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-5 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -664,7 +667,7 @@ export default function CFOBriefing() {
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           {syncNotice && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{syncNotice}</div>}
 
-          {billingInfo.status === "trialing" && billingInfo.trialEndsAt ? (
+          {!demoMode && billingInfo.status === "trialing" && billingInfo.trialEndsAt ? (
             <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/60 px-5 py-4 shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-semibold text-slate-800">Trial ends in {Math.max(0, Math.ceil((new Date(billingInfo.trialEndsAt).getTime() - Date.now()) / 86400000))} days — {billingInfo.plan === "pro" ? "Pro" : "Core"} {billingInfo.interval === "year" ? (billingInfo.plan === "pro" ? "$790/year" : "$390/year") : (billingInfo.plan === "pro" ? "$79/mo" : "$39/mo")} starts {new Date(billingInfo.trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.</p>
@@ -768,13 +771,13 @@ export default function CFOBriefing() {
 
           <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6" aria-labelledby="questions-heading">
             <p id="questions-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">MANAGEMENT QUESTIONS</p>
-            <p className="mt-1 text-xs text-slate-500">{liveSource === "upload" ? "Questions generated from your uploaded financial data." : "Questions generated from the financial data ClearCFO received from QuickBooks."}</p>
+            <p className="mt-1 text-xs text-slate-500">{demoMode ? "Examples based on fictional data. The real service builds these questions from uploaded or connected records." : liveSource === "upload" ? "Questions generated from your uploaded financial data." : "Questions generated from the financial data ClearCFO received from QuickBooks."}</p>
             <div className="mt-4 space-y-3">{(data.managementQuestions?.length ? data.managementQuestions : deterministicManagementQuestions).map((item, index) => <div key={`mq-${item.category}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">{item.category}:</span> {item.question}</div>)}</div>
           </section>
 
           <section className="mt-6 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p></div>
-            <a href="/customer/analysis" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">View AI Analysis →</a>
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p>{demoMode && <p className="mt-3 text-xs font-medium leading-5 text-slate-500">This is an illustrative, deterministic summary. No live AI analysis is run on the demo page.</p>}</div>
+            {demoMode ? <a href="/contact" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">Ask about ClearCFO →</a> : <a href="/customer/analysis" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">View AI Analysis →</a>}
           </section>
         </div>
       </div>
