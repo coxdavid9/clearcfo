@@ -40,6 +40,9 @@ jobs:
       - name: Run security regression checks
         run: npm run test:security
 
+      - name: Verify two-customer AI analysis isolation
+        run: npm run test:tenant-isolation
+
       - name: Run deterministic financial engine regression tests
         run: |
           node scripts/financial-engine-scenarios.mjs
