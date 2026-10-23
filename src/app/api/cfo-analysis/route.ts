@@ -253,6 +253,15 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid analysis payload." }, { status: 400 });
 
     const bodyObject = body as Record<string, unknown>;
+    // The financial payload is client-supplied; only a server-verified active business
+    // may be used for tenant-scoped analysis tracking.
+    const { getActiveCompany } = await import("../../../lib/company");
+    const { resolveVerifiedAnalysisCompanyId } = await import("../../../lib/analysis-company-authz");
+    const activeCompany = await getActiveCompany(userId);
+    const verifiedCompanyId = resolveVerifiedAnalysisCompanyId(activeCompany?.id, bodyObject.companyId);
+    if (!verifiedCompanyId) {
+      return NextResponse.json({ error: "Business not found or not authorized." }, { status: 403 });
+    }
     const model = process.env.OPENAI_MODEL || "gpt-5-mini";
     const scenarioSignals = deriveScenarioSignals(bodyObject);
     const snapshot = bodyObject.financialSnapshot && typeof bodyObject.financialSnapshot === "object"
@@ -343,8 +352,7 @@ export async function POST(request: Request) {
     const analysisObject = asAnalysisObject(analysis);
     if (!analysisObject) return NextResponse.json({ error: "OpenAI returned an invalid analysis structure." }, { status: 502 });
     const normalizedAnalysis = applyEvidencePolicy(normalizeScenarioAnalysis(analysisObject, scenarioSignals, bodyObject), bodyObject);
-    const companyId = typeof bodyObject.companyId === "string" && bodyObject.companyId.trim() ? bodyObject.companyId.trim() : null;
-    await recordExcelBriefing(userId, companyId);
+    await recordExcelBriefing(userId, verifiedCompanyId);
     console.log("[ClearCFO AI] Analysis completed successfully.");
     return NextResponse.json({ analysis: normalizedAnalysis });
   } catch (error) {

@@ -18,10 +18,11 @@
     "test:excel-header": "node --experimental-strip-types scripts/excel-header-regression.mjs",
     "test:lint-dependencies": "node scripts/lint-dependency-regression.mjs",
     "test:insight-evidence": "node scripts/insight-evidence-regression.mjs",
-    "test:financial-cache": "node --experimental-strip-types scripts/financial-cache-regression.mjs"
+    "test:financial-cache": "node --experimental-strip-types scripts/financial-cache-regression.mjs",
+    "test:tenant-isolation": "node --experimental-strip-types scripts/analysis-company-isolation-regression.mjs"
   },
   "dependencies": {
-    "next": "16.3.8",
+    "next": "16.4.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
@@ -43,7 +44,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
