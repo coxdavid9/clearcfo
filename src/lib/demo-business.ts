@@ -21,13 +21,13 @@ export function moneyChange(key: DemoMoneyKey): number {
 
 export function percentChange(key: DemoMoneyKey): number {
   const metric = DEMO_FINANCIALS[key];
-  return metric.prior === 0 ? 0 : (100 * moneyChange(key)) / metric.prior;
+  return (100 * moneyChange(key)) / metric.prior;
 }
 
 export function grossMargin(period: keyof typeof DEMO_PERIODS): number {
   const revenue = DEMO_FINANCIALS.revenue[period];
   const cogs = DEMO_FINANCIALS.costOfGoodsSold[period];
-  return revenue === 0 ? 0 : (100 * (revenue - cogs)) / revenue;
+  return (100 * (revenue - cogs)) / revenue;
 }
 
 export function demoCurrency(amount: number): string {
