@@ -112,11 +112,15 @@ const doubles = {
   inventoryOutpacesRevenue: (await import(scenarioUrl)).inventoryOutpacesRevenue,
   getSubscription: async () => ({ plan: "pro" }), hasAccess: () => true,
   requireBillingUser: async () => "test-user",
+  getActiveCompany: async () => ({ id: "test-company" }),
+  resolveVerifiedAnalysisCompanyId: (activeId, requestedId) => !activeId || (requestedId != null && requestedId !== "" && requestedId !== activeId) ? null : activeId,
 };
 globalThis.__insightRoute = doubles;
 const routeSource = (await read("../src/app/api/cfo-analysis/route.ts"))
   .replace(/^import .*;$/gm, "")
-  .replace('await import("../../../lib/billing/entitlements")', 'globalThis.__insightRoute');
+  .replace('await import("../../../lib/billing/entitlements")', 'globalThis.__insightRoute')
+  .replace('await import("../../../lib/company")', 'globalThis.__insightRoute')
+  .replace('await import("../../../lib/analysis-company-authz")', 'globalThis.__insightRoute');
 const route = await import(dataUrl(compile(`const {${Object.keys(doubles).join(",")}} = globalThis.__insightRoute;\n` + routeSource)));
 const originalFetch = globalThis.fetch;
 const originalKey = process.env.OPENAI_API_KEY;
@@ -128,6 +132,11 @@ globalThis.fetch = async (_url, init) => {
   return Response.json({ output_text: JSON.stringify(generated) });
 };
 try {
+  const foreign = await route.POST(new Request("https://theclearcfo.com/api/cfo-analysis", {
+    method: "POST", body: JSON.stringify({ ...body, companyId: "another-customer-business" }),
+  }));
+  assert.equal(foreign.status, 403);
+  assert.equal(sentInstructions, undefined, "Denied company must not reach the AI provider");
   const response = await route.POST(new Request("https://theclearcfo.com/api/cfo-analysis", { method: "POST", body: JSON.stringify(body) }));
   assert.equal(response.status, 200);
   const payload = await response.json();
