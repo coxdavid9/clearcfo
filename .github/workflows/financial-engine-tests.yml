@@ -40,6 +40,9 @@ jobs:
       - name: Run security regression checks
         run: npm run test:security
 
+      - name: Verify public guided-demo figures and safety
+        run: npm run test:demo
+
       - name: Verify two-customer AI analysis isolation
         run: npm run test:tenant-isolation
 

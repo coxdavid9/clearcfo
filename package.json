@@ -19,7 +19,8 @@
     "test:lint-dependencies": "node scripts/lint-dependency-regression.mjs",
     "test:insight-evidence": "node scripts/insight-evidence-regression.mjs",
     "test:financial-cache": "node --experimental-strip-types scripts/financial-cache-regression.mjs",
-    "test:tenant-isolation": "node --experimental-strip-types scripts/analysis-company-isolation-regression.mjs"
+    "test:tenant-isolation": "node --experimental-strip-types scripts/analysis-company-isolation-regression.mjs",
+    "test:demo": "node --experimental-strip-types scripts/guided-demo-regression.mjs"
   },
   "dependencies": {
     "next": "16.4.2",
