@@ -5,11 +5,11 @@ import { publicDemoBriefing as data } from "../src/lib/briefing/public-demo-data
 const previousRevenue = data.revenue / (1 + data.revenueChange / 100);
 const previousMargin = data.grossMargin - data.marginChange;
 const previousGrossProfit = previousRevenue * previousMargin / 100;
-assert.equal(previousRevenue, 120000);
-assert.equal(previousGrossProfit, 42000);
+assert.ok(Math.abs(previousRevenue - 120000) < 0.001);
+assert.ok(Math.abs(previousGrossProfit - 42000) < 0.001);
 assert.equal(data.revenue, 132000);
 assert.equal(data.grossProfit, 39600);
-assert.equal(data.grossProfit / data.revenue * 100, data.grossMargin);
+assert.ok(Math.abs((data.grossProfit / data.revenue * 100) - data.grossMargin) < 0.001);
 assert.equal(data.cash - (data.previousCash ?? 0), -16000);
 assert.equal(data.inventory - (data.previousInventory ?? 0), 32000);
 assert.equal(data.inventoryChange, 40);
