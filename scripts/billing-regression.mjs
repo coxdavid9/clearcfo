@@ -28,17 +28,22 @@ const doubles = {
     customer: "cus_live", metadata: { supabase_user_id: "user1", plan: "pro", interval: "year" }, subscription,
   } : subscription,
   upsertSubscription: async row => { writes.push(row); },
+  updateSubscriptionStatus: async (user_id, status, stripe_subscription_id) => { writes.push({user_id, status, stripe_subscription_id}); },
   getSubscription: async () => current ?? (writes.length ? writes.at(-1) : null),
   sendTrialEmail: async (row, day) => emails.push({ row, day }),
 };
 globalThis.__billingRegression = doubles;
-async function route(file) {
+let loadId = 0;
+async function route(file, dependencies = doubles) {
   const source = (await readFile(new URL(file, import.meta.url), "utf8")).replace(/import[^;]+;/g, "");
-  const injected = `const {${Object.keys(doubles).join(",")}} = globalThis.__billingRegression;\n` + source;
+  const key = "__billingLoad" + loadId++;
+  globalThis[key] = dependencies;
+  const injected = `const {${Object.keys(dependencies).join(",")}} = globalThis[${JSON.stringify(key)}];\n` + source;
   const js = ts.transpileModule(injected, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-  return import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+  try { return await import("data:text/javascript;base64," + Buffer.from(js).toString("base64")); }
+  finally { delete globalThis[key]; }
 }
-const webhook = await route("../src/app/api/billing/webhook/route.ts");
+let webhook = await route("../src/app/api/billing/webhook/route.ts");
 const returned = await route("../src/app/api/billing/return/route.ts");
 async function deliver(type, object) {
   writes = []; emails = [];
@@ -89,5 +94,73 @@ const noCustomer = await portal.POST();
 assert.equal(noCustomer.status, 400);
 assert.equal((await noCustomer.json()).code, "BILLING_NOT_CONNECTED");
 console.log("PASS: accounts without Stripe customers receive actionable billing response");
+
+// Exercise the real persistence helper through the webhook. A partial POST
+// fails required-column validation; PATCH preserves the rest of the row.
+const stripePersistence = await route("../src/lib/billing/stripe.ts", { STRIPE_API_VERSION: doubles.STRIPE_API_VERSION });
+const originalFetch = globalThis.fetch;
+const originalUrl = process.env.SUPABASE_URL;
+const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const originalUpdate = doubles.updateSubscriptionStatus;
+let requests = [], databaseFails = false;
+let stored = { user_id: "user1", stripe_subscription_id: "sub_live", plan: "pro", interval: "year", status: "active", is_comp: false, trial_email_day0_sent_at: "already-sent" };
+try {
+  process.env.SUPABASE_URL = "https://database.invalid";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "regression-only";
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(input), body = JSON.parse(init.body);
+    requests.push({ url, init, body });
+    if (databaseFails) return Response.json({ code: "XX000" }, { status: 500 });
+    if (init.method === "POST" && (!body.plan || !body.interval)) return Response.json({ code: "23502" }, { status: 400 });
+    assert.equal(init.method, "PATCH");
+    assert.equal(url.searchParams.get("user_id"), "eq.user1");
+    assert.equal(url.searchParams.get("is_comp"), "eq.false");
+    assert.deepEqual(Object.keys(body).sort(), ["status", "updated_at"]);
+    assert.ok(Number.isFinite(Date.parse(body.updated_at)));
+    if (stored && !stored.is_comp && (!url.searchParams.has("stripe_subscription_id") || url.searchParams.get("stripe_subscription_id") === "eq." + stored.stripe_subscription_id)) stored = { ...stored, ...body };
+    return new Response(null, { status: 204 });
+  };
+  doubles.updateSubscriptionStatus = stripePersistence.updateSubscriptionStatus;
+  webhook = await route("../src/app/api/billing/webhook/route.ts");
+  signatureValid = true;
+  current = null;
+  // Repeat delivery succeeds without inserting or erasing plan/email fields.
+  for (let i = 0; i < 2; i++) {
+    assert.equal((await deliver("customer.subscription.deleted", modern)).status, 200);
+    assert.equal(stored.status, "canceled");
+    assert.equal(stored.plan, "pro");
+    assert.equal(stored.interval, "year");
+    assert.equal(stored.trial_email_day0_sent_at, "already-sent");
+  }
+  assert.equal(requests.length, 2);
+  assert.equal(writes.length, 0, "status event must not call upsert");
+  assert.equal((await deliver("invoice.payment_failed", { parent: { type: "subscription_details", subscription_details: { metadata: modern.metadata } } })).status, 200);
+  assert.equal(stored.status, "past_due");
+  assert.equal(stored.plan, "pro");
+  assert.equal(writes.length, 0);
+  stored.stripe_subscription_id = "sub_replacement";
+  await deliver("customer.subscription.deleted", modern);
+  assert.equal(stored.status, "past_due", "old cancellation cannot cancel replacement");
+  stored.is_comp = true;
+  await stripePersistence.updateSubscriptionStatus("user1", "canceled");
+  assert.equal(stored.status, "past_due", "atomic filter protects comp account");
+  stored = null;
+  assert.equal((await deliver("customer.subscription.deleted", modern)).status, 200);
+  assert.equal(stored, null, "removed account must not be recreated");
+  databaseFails = true;
+  const originalError = console.error;
+  try {
+    console.error = () => {};
+    assert.equal((await deliver("customer.subscription.deleted", modern)).status, 500, "database failures must remain retryable");
+    assert.equal((await deliver("invoice.payment_failed", { subscription_details: { metadata: modern.metadata } })).status, 500);
+  } finally { console.error = originalError; }
+  await assert.rejects(stripePersistence.updateSubscriptionStatus("", "canceled"));
+  console.log("PASS: real status persistence, duplicate delivery, required field preservation, removed/replacement/comp protection, retryable database errors");
+} finally {
+  globalThis.fetch = originalFetch;
+  doubles.updateSubscriptionStatus = originalUpdate;
+  if (originalUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = originalUrl;
+  if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+}
 
 delete globalThis.__billingRegression;
