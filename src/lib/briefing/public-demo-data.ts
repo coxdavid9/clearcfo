@@ -51,7 +51,7 @@ export const publicDemoBriefing: BriefingData = {
     {
       id: "cash-decline", category: "Cash", severity: "Medium", direction: "down",
       title: "Cash fell despite stronger sales",
-      observation: "Cash fell $16,000, from $58,000 to $42,000, while receivables grew by $15,000. These movements do not establish causation.",
+      observation: "Cash fell $16,000, from $58,000 to $42,000, while receivables grew by $15,000.",
       evidence: ["Cash: $58,000 → $42,000", "Receivables: $46,000 → $61,000"],
       impact: 0, confidence: 0.95,
       managementQuestion: "What do the receivables aging and cash-flow statement reveal about the timing?",

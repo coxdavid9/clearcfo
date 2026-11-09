@@ -22,13 +22,17 @@ export default function DemoPage() {
                 This is what your CFO Briefing looks like.
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+                This is a sample CFO Briefing built on fictional data. Connect QuickBooks or upload an Excel file, and ClearCFO generates this briefing from your real numbers automatically at every sync.
+              </p>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
                 You are viewing the same dashboard component our customers use, filled with clearly fictional figures.
                 Tap any KPI to switch its chart and breakdown. This page is read-only and never connects to customer accounts.
               </p>
+              <a href="/signup" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                Start your 7-day free trial
+              </a>
+              <p className="mt-2 text-xs text-slate-600">7-day free trial · Credit card required</p>
             </div>
-            <a href="/contact" className="inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-              Request a walkthrough →
-            </a>
           </div>
         </div>
       </section>
@@ -38,9 +42,15 @@ export default function DemoPage() {
           Sample business and amounts are fictional. No uploaded books, QuickBooks connection, live AI request,
           subscription, or customer records are used for this preview.
         </p>
-        <a href="/contact" className="mt-4 inline-block text-sm font-semibold text-blue-700 hover:text-blue-800">
-          Talk to ClearCFO about your business →
-        </a>
+        <div className="mt-4">
+          <a href="/signup" className="inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+            Start your 7-day free trial
+          </a>
+          <p className="mt-2 text-xs text-slate-600">7-day free trial · Credit card required</p>
+          <a href="/contact" className="mt-3 inline-block text-sm font-semibold text-blue-700 hover:text-blue-800">
+            Questions? Ask about ClearCFO
+          </a>
+        </div>
       </div>
       <Footer />
     </main>
