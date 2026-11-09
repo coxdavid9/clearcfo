@@ -249,6 +249,8 @@ export default function CFOBriefing({ demoMode = false }: { demoMode?: boolean }
   }, [data.revenue, data.revenueChange, data.operatingExpense, data.previousOperatingExpense, data.cash, data.cashChange, data.marginChange, data.inventory, data.inventoryChange]);
 
   const deterministicAnalysis = buildDeterministicExecutiveSummary(data);
+  const demoTakeaway = "Inventory increased $32,000 (40.0%) versus a $12,000 (10.0%) revenue increase. Cash fell $16,000, from $58,000 to $42,000, while receivables grew by $15,000. These movements do not establish causation.";
+  const demoAnalysis = "Three signals point the same direction: sales grew, but the growth consumed cash instead of producing it. Inventory absorbed $32,000 and customers are holding another $15,000 in unpaid invoices, while gross margin slipped from 35% to 30% — so each new sales dollar is costing more to deliver. The decision this sets up: before ordering more stock, find out whether the inventory build is deliberate or drift, and tighten collections on the oldest receivables. Those two moves protect the cash balance without slowing sales.";
 
   function formatSyncedAt(raw: string | null): string {
     try {
@@ -677,7 +679,7 @@ export default function CFOBriefing({ demoMode = false }: { demoMode?: boolean }
           ) : null}
           <section aria-labelledby="takeaway-heading">
             <p id="takeaway-heading" className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">THE TAKEAWAY</p>
-            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm sm:p-7"><p className="text-base leading-7 text-slate-800 sm:text-lg">{deterministicAnalysis}</p></div>
+            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm sm:p-7"><p className="text-base leading-7 text-slate-800 sm:text-lg">{demoMode ? demoTakeaway : deterministicAnalysis}</p></div>
           </section>
 
           <EmergingConstraintsCard constraints={data.emergingConstraints || []} />
@@ -776,8 +778,8 @@ export default function CFOBriefing({ demoMode = false }: { demoMode?: boolean }
           </section>
 
           <section className="mt-6 flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">AI Analysis</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{deterministicAnalysis}</p>{demoMode && <p className="mt-3 text-xs font-medium leading-5 text-slate-500">This is an illustrative, deterministic summary. No live AI analysis is run on the demo page.</p>}</div>
-            {demoMode ? <a href="/contact" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">Ask about ClearCFO →</a> : <a href="/customer/analysis" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">View AI Analysis →</a>}
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">{demoMode ? "What ClearCFO would tell you" : "AI Analysis"}</p><h3 className="mt-2 text-xl font-bold text-slate-900">Turn the signals into a decision.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{demoMode ? demoAnalysis : deterministicAnalysis}</p>{demoMode && <p className="mt-3 text-xs font-medium leading-5 text-slate-500">Illustrative analysis based on fictional data. With QuickBooks connected or an Excel file uploaded, ClearCFO generates this from your numbers automatically.</p>}</div>
+            {!demoMode && <a href="/customer/analysis" className="self-start rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700">View AI Analysis →</a>}
           </section>
         </div>
       </div>
