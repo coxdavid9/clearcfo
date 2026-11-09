@@ -24,6 +24,7 @@ export default function Hero() {
         <p className="mt-4 font-semibold text-blue-700">7-day free trial · Credit card required</p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <a href="/signup" className="rounded-xl bg-blue-600 px-7 py-3.5 font-semibold text-white shadow-lg shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">Start free trial</a>
+          <a href="/demo" className="rounded-xl border border-slate-300 bg-white px-7 py-3.5 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See a sample briefing</a>
           <a href="#how-it-works" className="rounded-xl border border-slate-300 bg-white px-7 py-3.5 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See How It Works →</a>
         </div>
       </ScrollReveal>
