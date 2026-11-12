@@ -62,9 +62,9 @@ const homepageSignupHref = pricing.match(/<a href="([^"]+)" className={`mt-4 rou
 assert(homepageSignupHref, "Could not identify homepage Get Started destination.");
 assert.equal(homepageSignupHref[1], "/signup");
 assert.equal((page.match(/href="\/signup"/g) || []).length, 2, "Top and bottom demo trial CTAs must point to Get Started destination.");
-assert.equal((page.match(/Start your 7-day free trial/g) || []).length, 2, "Demo must contain exactly two trial CTAs.");
-assert.equal((page.match(/7-day free trial · Credit card required/g) || []).length, 2, "Card-required fine print must appear below both CTAs.");
-assert(pricing.includes("7-day free trial · Credit card required"), "Fine print must match homepage pricing copy.");
+assert.equal((page.match(/<TrialLine button \/>/g) || []).length, 2, "Demo must contain exactly two trial CTAs.");
+assert.equal((page.match(/<TrialLine \/>/g) || []).length, 2, "Card-required fine print must appear below both CTAs.");
+assert(pricing.includes("{days}-day free trial · Credit card required"), "Fine print must match homepage pricing copy.");
 assert(page.includes("This is a sample CFO Briefing built on fictional data. Connect QuickBooks or upload an Excel file, and ClearCFO generates this briefing from your real numbers automatically at every sync."), "Missing requested explanation under title.");
 assert(hero.includes('href="/demo"') && hero.includes("See a sample briefing"), "Homepage hero must link to the actual sample briefing.");
 assert(page.includes("Questions? Ask about ClearCFO") && page.includes('href="/contact"'), "Contact CTA must be secondary and near bottom trial CTA.");

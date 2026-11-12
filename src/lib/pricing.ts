@@ -1,4 +1,11 @@
 export const TRIAL_DAYS = 7;
+export const PROMO_TRIAL_DAYS = 30;
+const PROMO_START_MS = Date.parse("2026-11-25T06:00:00.000Z");
+const PROMO_END_MS = Date.parse("2026-12-01T06:00:00.000Z");
+export function currentTrialDays(now: Date = new Date()): number {
+ const t = now.getTime();
+ return t >= PROMO_START_MS && t < PROMO_END_MS ? PROMO_TRIAL_DAYS : TRIAL_DAYS;
+}
 
 export const PLANS = {
   core: {
@@ -33,5 +40,5 @@ export function getMaxBusinesses(plan: PlanKey) {
 export function getTrialDisclosure(plan: PlanKey, interval: BillingInterval) {
   const price = getPlanPrice(plan, interval);
   const suffix = interval === "year" ? "/year" : "/month";
-  return `7-day free trial, then $${price}${suffix} unless cancelled.`;
+  return `${currentTrialDays()}-day free trial, then $${price}${suffix} unless cancelled.`;
 }
