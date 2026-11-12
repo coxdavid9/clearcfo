@@ -1,3 +1,4 @@
+import TrialLine from "../../components/TrialLine";
 import type { Metadata } from "next";
 import Navbar from "../../components/Navbar";
 import CFOBriefing from "../../components/CFOBriefing";
@@ -29,9 +30,9 @@ export default function DemoPage() {
                 Tap any KPI to switch its chart and breakdown. This page is read-only and never connects to customer accounts.
               </p>
               <a href="/signup" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                Start your 7-day free trial
+                <TrialLine button />
               </a>
-              <p className="mt-2 text-xs text-slate-600">7-day free trial · Credit card required</p>
+              <p className="mt-2 text-xs text-slate-600"><TrialLine /></p>
             </div>
           </div>
         </div>
@@ -44,9 +45,9 @@ export default function DemoPage() {
         </p>
         <div className="mt-4">
           <a href="/signup" className="inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-            Start your 7-day free trial
+            <TrialLine button />
           </a>
-          <p className="mt-2 text-xs text-slate-600">7-day free trial · Credit card required</p>
+          <p className="mt-2 text-xs text-slate-600"><TrialLine /></p>
           <a href="/contact" className="mt-3 inline-block text-sm font-semibold text-blue-700 hover:text-blue-800">
             Questions? Ask about ClearCFO
           </a>

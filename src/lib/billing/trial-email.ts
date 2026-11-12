@@ -1,5 +1,6 @@
 import { escapeHtml, sendEmail } from "../email";
 import type { Subscription } from "./entitlements";
+type TrialSubscription = Subscription & { created_at?: string | null };
 function config(){const url=process.env.SUPABASE_URL?.replace(/\/$/,""),key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)throw new Error("Supabase server configuration is missing.");return{url,key}}
 async function sb(path:string,init:RequestInit={}){const{url,key}=config();return fetch(url+"/rest/v1/"+path,{...init,headers:{apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json",...(init.headers||{})},cache:"no-store"})}
 async function ownerEmail(userId:string){const{url,key}=config();const r=await fetch(url+"/auth/v1/admin/users/"+encodeURIComponent(userId),{headers:{apikey:key,Authorization:"Bearer "+key},cache:"no-store"});if(!r.ok)throw new Error("Could not resolve trial email recipient.");const u=await r.json();if(!u.email)throw new Error("Trial recipient email is missing.");return u.email as string}
@@ -11,10 +12,12 @@ async function hasBriefing(userId:string){const r=await sb("company_memberships?
 function brandedEmail({title,bodyHtml}:{title:string;bodyHtml:string}){
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:24px 12px;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0F172A;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;"><tr><td align="center"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;border-collapse:collapse;background:#ffffff;"><tr><td align="center" style="padding:32px 24px 20px;"><img src="https://theclearcfo.com/logo.png" alt="ClearCFO" height="48" style="display:block;height:48px;width:auto;border:0;margin:0 auto 12px;"></td></tr><tr><td style="padding:12px 32px 32px;font-size:16px;line-height:1.6;color:#334155;"><h1 style="font-size:24px;line-height:1.3;font-weight:700;color:#0F172A;margin:0 0 20px;">${escapeHtml(title)}</h1>${bodyHtml}</td></tr><tr><td style="padding:0 32px 28px;"><div style="border-top:1px solid #e2e8f0;padding-top:20px;text-align:center;color:#64748b;font-size:12px;line-height:1.6;">ClearCFO · Financial clarity. Smarter decisions.<div><a href="mailto:support@theclearcfo.com" style="color:#2563EB;text-decoration:none;">support@theclearcfo.com</a></div></div></td></tr></table></td></tr></table></body></html>`;
 }
-export async function sendTrialEmail(s:Subscription,day:0|2|5|7){
+export async function sendTrialEmail(s:TrialSubscription,day:0|2|5|7){
   const to=await ownerEmail(s.user_id),date=chargeDate(s),amt=amount(s),plan=s.plan==="pro"?"Pro":"Core",interval=s.interval==="year"?"annual":"monthly",url=appUrl()+"/customer/briefing";
   const subject=day===0?"Welcome to ClearCFO — let's set up your briefing":day===2?"Your CFO Briefing is one step away":day===5?"Your ClearCFO trial ends in 2 days":"Your ClearCFO trial ends today";
-  const text=day===0?`Your 7-day ${plan} trial has started. You won't be charged until ${date} — cancel anytime before then and you'll pay nothing.
+  const trialDays=s.created_at&&s.trial_ends_at?Math.round((Date.parse(s.trial_ends_at)-Date.parse(s.created_at))/86400000):NaN;
+ const welcome=Number.isFinite(trialDays)&&trialDays>0?`Your ${trialDays}-day ${plan} trial has started.`:`Your ${plan} trial is ready.`;
+ const text=day===0?`${welcome} You won't be charged until ${date} — cancel anytime before then and you'll pay nothing.
 
 Get your first CFO Briefing in a few minutes:
 1. Connect QuickBooks for live sync, or
@@ -26,7 +29,7 @@ Open your briefing: ${url}`:day===5?`Your ${plan} trial ends on ${date}. After t
   const e={url:escapeHtml(url),plan:escapeHtml(plan),date:escapeHtml(date),amount:escapeHtml(amt),interval:escapeHtml(interval)};
   const c='display:inline-block;background:#2563EB;color:#ffffff;padding:14px 28px;border-radius:8px;font-weight:600;text-decoration:none;';
   const button=`<p style="text-align:center;"><a href="${e.url}" style="${c}">Open your briefing</a></p>`;
-  const html=day===0?`<p>Your 7-day ${e.plan} trial has started. You won't be charged until ${e.date} — cancel anytime before then and you'll pay nothing.</p><p>Get your first CFO Briefing in a few minutes:</p><p>1. Connect QuickBooks for live sync, or<br>2. Upload a P&amp;L in Excel — no QuickBooks needed.</p>${button}`:day===2?`<p>There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&amp;L in Excel:</p>${button}`:day===5?`<p>Your ${e.plan} trial ends on ${e.date}. After that, your plan continues at ${e.amount}. Cancel anytime from your Account page — cancel before ${e.date} and you won't be charged.</p>${button}`:`<p>Your card will be charged ${e.amount} tomorrow for your ${e.plan} ${e.interval} plan. Cancel anytime from your Account page.</p>${button}`;
+  const html=day===0?`<p>${escapeHtml(welcome)} You won't be charged until ${e.date} — cancel anytime before then and you'll pay nothing.</p><p>Get your first CFO Briefing in a few minutes:</p><p>1. Connect QuickBooks for live sync, or<br>2. Upload a P&amp;L in Excel — no QuickBooks needed.</p>${button}`:day===2?`<p>There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&amp;L in Excel:</p>${button}`:day===5?`<p>Your ${e.plan} trial ends on ${e.date}. After that, your plan continues at ${e.amount}. Cancel anytime from your Account page — cancel before ${e.date} and you won't be charged.</p>${button}`:`<p>Your card will be charged ${e.amount} tomorrow for your ${e.plan} ${e.interval} plan. Cancel anytime from your Account page.</p>${button}`;
   const title=day===0?"Welcome to ClearCFO":day===2?"Your CFO Briefing is one step away":day===5?"Your ClearCFO trial ends in 2 days":"Your ClearCFO trial ends today";
   await sendEmail({to,subject,text,html:brandedEmail({title,bodyHtml:html})});
   const column=day===0?"trial_email_day0_sent_at":day===2?"trial_email_day2_sent_at":day===5?"trial_email_day5_sent_at":"trial_email_day7_sent_at";
@@ -34,13 +37,13 @@ Open your briefing: ${url}`:day===5?`Your ${plan} trial ends on ${date}. After t
 }
 export async function dispatchTrialEmails(){
   const r=await sb("subscriptions?status=eq.trialing&select=*");if(!r.ok)throw new Error("Could not read trial subscriptions.");
-  const rows=await r.json() as Subscription[];const now=Date.now();
-  for(const s of rows){if(!s.trial_ends_at)continue;const end=new Date(s.trial_ends_at).getTime(),start=end-7*86400000,elapsed=(now-start)/86400000;
+  const rows=await r.json() as TrialSubscription[];const now=Date.now();
+  for(const s of rows){if(!s.trial_ends_at)continue;const end=new Date(s.trial_ends_at).getTime(),start=s.created_at?Date.parse(s.created_at):end-7*86400000,elapsed=(now-start)/86400000,remaining=(end-now)/86400000;
     try{
       if(elapsed>=0&&!s.trial_email_day0_sent_at)await sendTrialEmail(s,0);
       else if(elapsed>=2&&!s.trial_email_day2_sent_at&&!(await hasBriefing(s.user_id)))await sendTrialEmail(s,2);
-      else if(elapsed>=5&&!s.trial_email_day5_sent_at)await sendTrialEmail(s,5);
-      else if(elapsed>=6&&!s.trial_email_day7_sent_at)await sendTrialEmail(s,7);
+      else if(remaining<=2&&remaining>1&&!s.trial_email_day5_sent_at)await sendTrialEmail(s,5);
+      else if(remaining<=1&&remaining>-1&&!s.trial_email_day7_sent_at)await sendTrialEmail(s,7);
     }catch(error){console.error("[ClearCFO Trial Email]",s.user_id,error instanceof Error?error.message:"Unknown error")}
   }
 }
