@@ -72,5 +72,8 @@ jobs:
           npm run test:due
           npm run test:email
 
+      - name: Verify public financial health quiz and email protections
+        run: npm run test:quiz
+
       - name: Verify production build
         run: npm run build

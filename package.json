@@ -20,7 +20,8 @@
     "test:insight-evidence": "node scripts/insight-evidence-regression.mjs",
     "test:financial-cache": "node --experimental-strip-types scripts/financial-cache-regression.mjs",
     "test:tenant-isolation": "node --experimental-strip-types scripts/analysis-company-isolation-regression.mjs",
-    "test:demo": "node --experimental-strip-types scripts/guided-demo-regression.mjs"
+    "test:demo": "node --experimental-strip-types scripts/guided-demo-regression.mjs",
+    "test:quiz": "node --experimental-strip-types scripts/quiz-regression.mjs"
   },
   "dependencies": {
     "next": "16.4.5",
