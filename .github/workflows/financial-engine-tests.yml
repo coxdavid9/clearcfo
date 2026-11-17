@@ -23,7 +23,7 @@ jobs:
         run: npm ci
 
       - name: Audit all dependencies
-        run: npm audit --audit-level=high
+        run: node scripts/audit-gate.mjs
 
       - name: Verify Next lint dependency compatibility
         run: npm run test:lint-dependencies

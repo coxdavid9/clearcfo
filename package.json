@@ -7,7 +7,7 @@
     "build": "npm ci && next build",
     "start": "next start",
     "lint": "eslint",
-    "test:security": "node scripts/security-regression-checks.mjs",
+    "test:security": "node scripts/security-regression-checks.mjs && node scripts/audit-gate-regression.mjs",
     "test:reasoning": "node scripts/reasoning-scenarios.mjs",
     "test:trends": "node scripts/trend-scenarios.mjs",
     "test:alerts": "node scripts/alert-scenarios.mjs",
@@ -24,7 +24,7 @@
     "test:quiz": "node --experimental-strip-types scripts/quiz-regression.mjs"
   },
   "dependencies": {
-    "next": "16.4.2",
+    "next": "16.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
@@ -46,7 +46,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.2",
+    "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
