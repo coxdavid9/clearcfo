@@ -38,8 +38,8 @@ try {
   let sent = [];
   globalThis.fetch = async (url, init) => { sent.push(JSON.parse(init.body)); return new Response("{}", { status: 200 }); };
   let ip = 0;
-  function request(body, headers = {}) {
-    return new Request("https://theclearcfo.com/api/quiz/email", { method: "POST", headers: { "content-type": "application/json", "x-real-ip": `test-${ip++}`, ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
+  function request(body, headers = {}, url = "https://theclearcfo.com/api/quiz/email") {
+    return new Request(url, { method: "POST", headers: { "content-type": "application/json", "x-real-ip": `test-${ip++}`, ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
   }
   const answers = [2, 2, 0, 2, 2, 1, 2, 2];
   for (const body of [{}, null, { email: "a@example.com", answers: [0] }, { email: "bad", answers }, { email: "a@example.com\r\nBcc:evil@example.com", answers }, "{"]) {
@@ -62,8 +62,40 @@ try {
     assert.ok(mail.html.includes("https://theclearcfo.com/signup"));
     assert.ok(!mail.html.includes("evil"));
   }
+  // Render terminates TLS: the app sees an internal HTTP URL and the public host in headers.
+  const internalUrl = "http://localhost:3000/api/quiz/email";
+  for (const host of ["theclearcfo.com", "www.theclearcfo.com", "clearcfo.onrender.com"]) {
+    const before = sent.length;
+    const response = await POST(request({ email: `proxy-${before}@example.com`, answers }, {
+      origin: `https://${host}`, "x-forwarded-host": host, host: "localhost:3000",
+    }, internalUrl));
+    assert.equal(response.status, 200, `public ${host} must work through the internal HTTP URL`);
+    assert.equal(sent.length, before + 1, "same-host proxy request reaches Resend");
+  }
+  assert.equal((await POST(request({ email: "host-fallback@example.com", answers }, {
+    origin: "https://theclearcfo.com", host: "theclearcfo.com",
+  }, internalUrl))).status, 200, "Host is used when X-Forwarded-Host is absent");
+  for (const headers of [
+    { origin: "https://evil.example", "x-forwarded-host": "theclearcfo.com", host: "localhost:3000" },
+    { origin: "https://theclearcfo.com", "x-forwarded-host": "evil.example", host: "theclearcfo.com" },
+    { origin: "https://evil.example", host: "theclearcfo.com" },
+    { origin: "not a URL", "x-forwarded-host": "theclearcfo.com" },
+    { origin: "null", "x-forwarded-host": "theclearcfo.com" },
+    { origin: "", "x-forwarded-host": "theclearcfo.com" },
+    { origin: "https://theclearcfo.com" },
+  ]) {
+    const before = sent.length;
+    const response = await POST(request({ email: "rejected@example.com", answers }, headers, internalUrl));
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "Please send your breakdown from the quiz page." });
+    assert.equal(sent.length, before, "invalid/mismatched origin must not send email");
+  }
+  console.log("PASS: internal HTTP proxy URL, all public hosts, Host fallback, forwarded-host precedence, invalid/cross-site origins");
   globalThis.fetch = async () => new Response("unavailable", { status: 503 });
   assert.equal((await POST(request({ email: "failure@example.com", answers }))).status, 503);
+  assert.equal((await POST(request({ email: "proxy-failure@example.com", answers }, {
+    origin: "https://theclearcfo.com", "x-forwarded-host": "theclearcfo.com", host: "localhost:3000",
+  }, internalUrl))).status, 503, "valid proxied request reaches provider-failure handling");
   for (let i = 0; i < 2; i++) await POST(request({ email: "limited@example.com", answers }));
   assert.equal((await POST(request({ email: "LIMITED@example.com", answers }))).status, 429);
   for (let i = 0; i < 5; i++) await POST(request({}, { "x-forwarded-for": `spoof-${i},trusted-proxy-ip` }));
