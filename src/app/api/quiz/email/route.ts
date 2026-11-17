@@ -11,8 +11,14 @@ export async function POST(request: Request) {
   const limited = checkRateLimit(request, { limit: 5, windowMs: 15 * 60 * 1000, label: "quiz emails" });
   if (limited) return limited;
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
-    return NextResponse.json({ error: "Please send your breakdown from the quiz page." }, { status: 403 });
+  if (origin !== null) {
+    // Render terminates TLS and forwards the public host; request.url may be internal HTTP.
+    const effectiveHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    let originHost: string | null = null;
+    try { originHost = new URL(origin).host; } catch { /* Invalid origins are rejected below. */ }
+    if (!originHost || originHost !== effectiveHost?.toLowerCase()) {
+      return NextResponse.json({ error: "Please send your breakdown from the quiz page." }, { status: 403 });
+    }
   }
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return NextResponse.json({ error: "Please submit JSON data." }, { status: 415 });
