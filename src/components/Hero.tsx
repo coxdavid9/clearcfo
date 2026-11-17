@@ -28,6 +28,7 @@ export default function Hero() {
           <a href="/demo" className="rounded-xl border border-slate-300 bg-white px-7 py-3.5 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See a sample briefing</a>
           <a href="#how-it-works" className="rounded-xl border border-slate-300 bg-white px-7 py-3.5 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30">See How It Works →</a>
         </div>
+        <a href="/quiz" className="mt-4 inline-block py-2 text-sm font-semibold text-blue-700 underline underline-offset-4">Take the 1-minute check</a>
       </ScrollReveal>
 
       <ScrollReveal className="relative mx-auto mt-14 max-w-6xl sm:mt-16" delay={120} y={28}>

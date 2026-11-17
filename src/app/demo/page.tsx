@@ -48,6 +48,7 @@ export default function DemoPage() {
             <TrialLine button />
           </a>
           <p className="mt-2 text-xs text-slate-600"><TrialLine /></p>
+          <p className="mt-3"><a href="/quiz" className="inline-block py-2 text-sm font-semibold text-blue-700 underline underline-offset-4">Not sure? Take the check first.</a></p>
           <a href="/contact" className="mt-3 inline-block text-sm font-semibold text-blue-700 hover:text-blue-800">
             Questions? Ask about ClearCFO
           </a>
