@@ -81,3 +81,10 @@ const rejected=await checkoutRoute.POST(request("NOPE99"));
 assert.equal(rejected.status,400);
 assert.deepEqual(await rejected.json(),{error:promo.INVALID_PROMO});
 console.log("PASS: invalid code endpoints reject generically and never fall back to standard terms");
+
+const planSelection = await readFile("src/components/PlanSelection.tsx", "utf8");
+assert.match(planSelection, /\{status\s*===\s*null\s*&&<div[^>]*><button[\s\S]*?Have a code\?/,
+ "Promo entry must render for never-subscribed accounts (status === null).");
+assert.doesNotMatch(planSelection, /\{!locked\s*&&<div[^>]*><button[\s\S]*?Have a code\?/,
+ "Promo entry must not be gated by !locked.");
+console.log("PASS: never-subscribed promo entry is independent of locked");
