@@ -88,3 +88,81 @@ assert.match(planSelection, /\{status\s*===\s*null\s*&&<div[^>]*><button[\s\S]*?
 assert.doesNotMatch(planSelection, /\{!locked\s*&&<div[^>]*><button[\s\S]*?Have a code\?/,
  "Promo entry must not be gated by !locked.");
 console.log("PASS: never-subscribed promo entry is independent of locked");
+
+// Execute actual in-app start route with service doubles.
+const entitlements = await load("src/lib/billing/entitlements.ts", s => s.replace(/import[^;]+;/g, ""));
+const clock = Date.now();
+const inAppRow = { ...row, status: "trialing", promo_code: "TEST14", stripe_subscription_id: null, trial_ends_at: new Date(clock - 1).toISOString() };
+assert.equal(entitlements.hasAccess(inAppRow), false);
+assert.equal(entitlements.hasAccess({...inAppRow,trial_ends_at:new Date(clock+86400000).toISOString()}), true);
+assert.equal(entitlements.hasAccess({...inAppRow,stripe_subscription_id:"sub_test"}), true);
+let existingRow=null, writtenRow=null, claims=0, completed=0, welcomes=0, cardRequired=false, claimAllowed=true, emailFails=false;
+const startRoute=await route("src/app/api/billing/promo/start/route.ts",{
+ NextResponse:doubles.NextResponse,
+ requireBillingUser:async()=>"new-user",
+ validatePromo:async()=>({code:"TEST14",trialDays:14,cardRequired}),
+ INVALID_PROMO:promo.INVALID_PROMO,
+ hasAccess:entitlements.hasAccess,
+ getSubscription:async()=>writtenRow??existingRow,
+ claimPromoCode:async()=>{claims++;return claimAllowed;},
+ recordPromoRedemption:async()=>{completed++;},
+ upsertSubscription:async value=>{writtenRow=value;},
+ sendTrialEmail:async (_row,day)=>{assert.equal(day,0);welcomes++;if(emailFails)throw new Error("Email unavailable");}
+});
+const startRequest=(extra={})=>new Request("https://example.invalid/api/billing/promo/start",{method:"POST",body:JSON.stringify({code:"TEST14",plan:"core",interval:"month",termsAccepted:true,...extra})});
+function resetStart(){existingRow=null;writtenRow=null;claims=0;completed=0;welcomes=0;cardRequired=false;claimAllowed=true;emailFails=false;}
+resetStart();
+let result=await startRoute.POST(startRequest());
+assert.equal(result.status,200);
+assert.equal(writtenRow.status,"trialing");
+assert.equal(writtenRow.stripe_customer_id,null);
+assert.equal(writtenRow.stripe_subscription_id,null);
+assert.equal(writtenRow.promo_code,"TEST14");
+assert.equal(writtenRow.trial_card_required,false);
+assert(Date.parse(writtenRow.terms_accepted_at)>=clock);
+assert(Math.abs(Date.parse(writtenRow.trial_ends_at)-Date.now()-14*86400000)<5000);
+assert.equal(completed,1);assert.equal(welcomes,1);
+resetStart();
+result=await startRoute.POST(startRequest({termsAccepted:undefined}));
+assert.equal(result.status,400);assert.equal(claims,0);assert.equal(writtenRow,null);
+resetStart();cardRequired=true;
+result=await startRoute.POST(startRequest());
+assert.equal(result.status,400);assert.deepEqual(await result.json(),{error:promo.INVALID_PROMO});assert.equal(claims,0);
+resetStart();existingRow={...inAppRow,status:"active"};
+assert.equal((await startRoute.POST(startRequest())).status,409);assert.equal(claims,0);
+resetStart();existingRow={...inAppRow,stripe_subscription_id:"sub_old",status:"canceled"};
+assert.equal((await startRoute.POST(startRequest())).status,400);assert.equal(claims,0);
+resetStart();existingRow={...inAppRow,promo_code:"OLD14"};
+assert.equal((await startRoute.POST(startRequest())).status,200);assert.equal(writtenRow.promo_code,"TEST14");
+assert.equal(writtenRow.trial_email_day2_sent_at,null);
+resetStart();claimAllowed=false;
+assert.equal((await startRoute.POST(startRequest())).status,400);assert.equal(writtenRow,null);
+resetStart();emailFails=true;
+const oldError=console.error;console.error=()=>{};
+try { assert.equal((await startRoute.POST(startRequest())).status,200); } finally { console.error=oldError; }
+resetStart();
+assert.equal((await startRoute.POST(startRequest({plan:"bad"}))).status,400);assert.equal(claims,0);
+
+const patches=[];
+sent.length=0;
+globalThis.fetch=async (url,init={})=>{
+ if(init.method==="PATCH"){patches.push({url,body:JSON.parse(init.body)});return new Response(null,{status:204});}
+ if(url.includes("subscriptions?"))return Response.json([inAppRow]);
+ throw new Error("Expired in-app trials must not resolve email or briefing");
+};
+await email.dispatchTrialEmails();
+assert.equal(sent.length,0);
+assert.equal(patches.length,1);
+assert.equal(patches[0].body.status,"canceled");
+assert(patches[0].url.includes("stripe_subscription_id=is.null"));
+assert.match(planSelection,/disabled=\{busy!==null\|\|\(noCard&&!termsAccepted\)\}/);
+assert(planSelection.includes('fetch("/api/billing/promo/start"'));
+assert(planSelection.includes('href="/terms" target="_blank"'));
+assert(planSelection.includes('href="/privacy" target="_blank"'));
+console.log("PASS: in-app trial consent, persistence, redemption, best-effort email, access expiry and dispatcher cleanup");
+
+globalThis.__promoDoubles={...doubles,hasAccess:entitlements.hasAccess,getSubscription:async()=>inAppRow};
+const conversionSource=(await readFile("src/app/api/billing/checkout/route.ts","utf8")).replace(/import[^;]+;/g,"");
+const conversion=await loadFromSource("const {"+Object.keys(globalThis.__promoDoubles).join(",")+"}=globalThis.__promoDoubles;\n"+conversionSource+"\n// Expired in-app conversion regression");
+assert.equal((await conversion.POST(new Request("https://example.invalid",{method:"POST",body:JSON.stringify({plan:"core",interval:"month"})}))).status,200);
+console.log("PASS: expired in-app trial can enter normal card checkout");

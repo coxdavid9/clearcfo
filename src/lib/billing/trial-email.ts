@@ -44,6 +44,11 @@ export async function dispatchTrialEmails(){
   const rows=await r.json() as TrialSubscription[];const now=Date.now();
   for(const s of rows){if(!s.trial_ends_at)continue;const end=new Date(s.trial_ends_at).getTime(),start=s.created_at?Date.parse(s.created_at):end-7*86400000,elapsed=(now-start)/86400000,remaining=(end-now)/86400000;
     try{
+      if(s.promo_code&&!s.stripe_subscription_id&&end<=now){
+        const expired=await sb("subscriptions?user_id=eq."+encodeURIComponent(s.user_id)+"&status=eq.trialing&stripe_subscription_id=is.null&promo_code=eq."+encodeURIComponent(s.promo_code)+"&trial_ends_at=lte."+encodeURIComponent(new Date(now).toISOString()),{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"canceled",updated_at:new Date(now).toISOString()})});
+        if(!expired.ok)throw new Error("Could not expire in-app trial.");
+        continue;
+      }
       if(elapsed>=0&&!s.trial_email_day0_sent_at)await sendTrialEmail(s,0);
       else if(elapsed>=2&&!s.trial_email_day2_sent_at&&!(await hasBriefing(s.user_id)))await sendTrialEmail(s,2);
       else if(remaining<=2&&remaining>1&&!s.trial_email_day5_sent_at)await sendTrialEmail(s,5);
