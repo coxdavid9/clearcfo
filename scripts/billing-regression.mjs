@@ -18,6 +18,7 @@ assert.equal(invoiceUserId({ parent: { type: "quote_details", subscription_detai
 // Execute the actual route bodies with external services replaced by in-memory doubles.
 let writes = [], emails = [], current = null, signatureValid = true, subscription;
 const doubles = {
+  hasAccess: s => !!s && ["trialing", "active", "past_due"].includes(s.status),
   promoFields: () => ({}),
   recordPromoRedemption: async () => {},
   expirePromoClaim: async () => {},
