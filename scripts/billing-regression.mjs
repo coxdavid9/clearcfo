@@ -18,6 +18,12 @@ assert.equal(invoiceUserId({ parent: { type: "quote_details", subscription_detai
 // Execute the actual route bodies with external services replaced by in-memory doubles.
 let writes = [], emails = [], current = null, signatureValid = true, subscription;
 const doubles = {
+  promoFields: () => ({}),
+  recordPromoRedemption: async () => {},
+  expirePromoClaim: async () => {},
+  validatePromo: async () => null,
+  claimPromoCode: async () => false,
+  INVALID_PROMO: "That code is no longer valid. Remove it to continue with the standard trial.",
   requireBillingUser: async () => "user1",
   STRIPE_API_VERSION: "2026-08-26.dahlia",
   NextResponse: { json: (body, init) => Response.json(body, init), redirect: url => Response.redirect(url) },

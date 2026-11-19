@@ -33,6 +33,8 @@ jobs:
 
       - name: Run Stripe billing compatibility checks
         run: npm run test:billing
+      - name: Verify custom trial promo codes
+        run: npm run test:promo-code
 
       - name: Verify financial cache isolation
         run: npm run test:financial-cache

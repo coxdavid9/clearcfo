@@ -17,7 +17,11 @@ export async function sendTrialEmail(s:TrialSubscription,day:0|2|5|7){
   const subject=day===0?"Welcome to ClearCFO — let's set up your briefing":day===2?"Your CFO Briefing is one step away":day===5?"Your ClearCFO trial ends in 2 days":"Your ClearCFO trial ends today";
   const trialDays=s.created_at&&s.trial_ends_at?Math.round((Date.parse(s.trial_ends_at)-Date.parse(s.created_at))/86400000):NaN;
  const welcome=Number.isFinite(trialDays)&&trialDays>0?`Your ${trialDays}-day ${plan} trial has started.`:`Your ${plan} trial is ready.`;
- const text=day===0?`${welcome} You won't be charged until ${date} — cancel anytime before then and you'll pay nothing.
+ const noCard=s.trial_card_required===false;
+ const noCharge=`No card was required and nothing will be charged. When your trial ends on ${date}, access pauses unless you choose a plan and add a card.`;
+ const ending=`Your ${plan} trial ends on ${date}. Add a card before then to continue at ${amt} — otherwise your briefing pauses. Your data stays put either way.`;
+ const final=`Your trial ends today, and no card was charged. Add a card from your Account page whenever you're ready to restart your ${plan} ${interval} plan at ${amt}.`;
+ const text=day===0?`${welcome} ${noCard?noCharge:`You won't be charged until ${date} — cancel anytime before then and you'll pay nothing.`}
 
 Get your first CFO Briefing in a few minutes:
 1. Connect QuickBooks for live sync, or
@@ -25,11 +29,11 @@ Get your first CFO Briefing in a few minutes:
 
 Open your briefing: ${url}`:day===2?`There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&L in Excel:
 
-Open your briefing: ${url}`:day===5?`Your ${plan} trial ends on ${date}. After that, your plan continues at ${amt}. Cancel anytime from your Account page — cancel before ${date} and you won't be charged.`:`Your card will be charged ${amt} tomorrow for your ${plan} ${interval} plan. Cancel anytime from your Account page.`;
+Open your briefing: ${url}`:day===5&&noCard?ending:day===7&&noCard?final:day===5?`Your ${plan} trial ends on ${date}. After that, your plan continues at ${amt}. Cancel anytime from your Account page — cancel before ${date} and you won't be charged.`:`Your card will be charged ${amt} tomorrow for your ${plan} ${interval} plan. Cancel anytime from your Account page.`;
   const e={url:escapeHtml(url),plan:escapeHtml(plan),date:escapeHtml(date),amount:escapeHtml(amt),interval:escapeHtml(interval)};
   const c='display:inline-block;background:#2563EB;color:#ffffff;padding:14px 28px;border-radius:8px;font-weight:600;text-decoration:none;';
   const button=`<p style="text-align:center;"><a href="${e.url}" style="${c}">Open your briefing</a></p>`;
-  const html=day===0?`<p>${escapeHtml(welcome)} You won't be charged until ${e.date} — cancel anytime before then and you'll pay nothing.</p><p>Get your first CFO Briefing in a few minutes:</p><p>1. Connect QuickBooks for live sync, or<br>2. Upload a P&amp;L in Excel — no QuickBooks needed.</p>${button}`:day===2?`<p>There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&amp;L in Excel:</p>${button}`:day===5?`<p>Your ${e.plan} trial ends on ${e.date}. After that, your plan continues at ${e.amount}. Cancel anytime from your Account page — cancel before ${e.date} and you won't be charged.</p>${button}`:`<p>Your card will be charged ${e.amount} tomorrow for your ${e.plan} ${e.interval} plan. Cancel anytime from your Account page.</p>${button}`;
+  const html=day===0?`<p>${escapeHtml(welcome)} ${noCard?escapeHtml(noCharge):`You won't be charged until ${e.date} — cancel anytime before then and you'll pay nothing.`}</p><p>Get your first CFO Briefing in a few minutes:</p><p>1. Connect QuickBooks for live sync, or<br>2. Upload a P&amp;L in Excel — no QuickBooks needed.</p>${button}`:day===2?`<p>There's no briefing waiting for you yet because your financial data isn't connected. It takes a few minutes — connect QuickBooks or upload a P&amp;L in Excel:</p>${button}`:day===5&&noCard?`<p>${escapeHtml(ending)}</p>${button}`:day===7&&noCard?`<p>${escapeHtml(final)}</p>${button}`:day===5?`<p>Your ${e.plan} trial ends on ${e.date}. After that, your plan continues at ${e.amount}. Cancel anytime from your Account page — cancel before ${e.date} and you won't be charged.</p>${button}`:`<p>Your card will be charged ${e.amount} tomorrow for your ${e.plan} ${e.interval} plan. Cancel anytime from your Account page.</p>${button}`;
   const title=day===0?"Welcome to ClearCFO":day===2?"Your CFO Briefing is one step away":day===5?"Your ClearCFO trial ends in 2 days":"Your ClearCFO trial ends today";
   await sendEmail({to,subject,text,html:brandedEmail({title,bodyHtml:html})});
   const column=day===0?"trial_email_day0_sent_at":day===2?"trial_email_day2_sent_at":day===5?"trial_email_day5_sent_at":"trial_email_day7_sent_at";
