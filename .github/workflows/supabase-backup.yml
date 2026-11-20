@@ -46,7 +46,10 @@ jobs:
           if ! docker exec -i restore-drill pg_restore -U postgres -d clearcfo_restore_drill \
             --no-owner --no-acl --exit-on-error < database.dump > restore.log 2>&1; then
             echo "::error::Database restore failed. Diagnostic output is limited to archive object types."
-            awk '/^pg_restore: from TOC entry/ {print "Failed archive entry:", $5, $6, $7}' restore.log
+            awk '/from TOC entry/ {print "Failed archive entry:", $5, $6, $7}' restore.log
+            for reason in 'unsupported version' 'transaction_timeout' 'unrecognized configuration parameter' 'permission denied' 'does not exist' 'already exists' 'connection to server' 'not a valid archive' 'could not read' 'not available' 'authentication failed'; do
+              if grep -Fqi "$reason" restore.log; then echo "Restore error category: $reason"; fi
+            done
             exit 1
           fi
       - name: Verify restored tables
