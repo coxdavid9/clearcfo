@@ -57,7 +57,7 @@ export async function supabaseAuthUserExists(email: string) {
   }
 }
 
-function getAppUrl() {
+export function getAppUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://theclearcfo.com").replace(/\/$/, "");
 }
 
