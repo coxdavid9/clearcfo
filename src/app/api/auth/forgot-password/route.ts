@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authRateLimit, checkRateLimit } from "../../../../lib/rate-limit";
+import { getAppUrl } from "../../../../lib/supabase-auth";
 
 export const runtime = "nodejs";
 
@@ -20,8 +21,7 @@ export async function POST(request: Request) {
     if (!email) return NextResponse.json({ error: "Email address is required." }, { status: 400 });
 
     const { url, publishableKey } = getSupabaseConfig();
-    const origin = new URL(request.url).origin;
-    const redirectTo = `${origin}/reset-password`;
+    const redirectTo = `${getAppUrl()}/reset-password`;
 
     const response = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
       method: "POST",
